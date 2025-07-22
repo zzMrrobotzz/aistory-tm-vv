@@ -2,8 +2,8 @@
 
 [build]
   # This is the command Netlify will run to build your app.
-  # It assumes a standard Vite setup.
-  command = "npm install && npm run build"
+  # Optimized for stability and speed
+  command = "npm ci && npm run build"
   
   # This is the directory that contains the built site.
   publish = "dist"

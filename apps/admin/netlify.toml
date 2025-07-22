@@ -3,7 +3,7 @@
 [build]
   # This is the command Netlify will run to build your app.
   # Disable CI warnings as errors for Netlify build
-  command = "npm ci --only=production && CI=false npm run build"
+  command = "npm ci && CI=false npm run build"
   
   # This is the directory that contains the built site.
   publish = "build"
