@@ -509,13 +509,31 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     <ModuleContainer title="🎨 Xưởng Tạo Ảnh AI">
       {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
-        <p><strong>💡 Hướng dẫn:</strong> Chọn chế độ tạo ảnh mong muốn từ các tab bên dưới.</p>
-        <p className="mt-1"><strong>"📸 Ảnh AI từ Hook/Truyện":</strong> Nhập hook hoặc nội dung truyện. AI sẽ tự phân tích và tạo nhiều prompt ảnh tiếng Anh, sau đó tạo ảnh.</p>
-        <p className="mt-1"><strong>"📸 Ảnh AI (Ngữ Cảnh Thông minh)":</strong> Tương tự như trên, nhưng AI sẽ cố gắng tạo prompt ảnh (vẫn bằng Tiếng Anh) phản ánh bối cảnh văn hóa phù hợp với ngôn ngữ của truyện (ví dụ: Tiếng Việt -> bối cảnh Việt, Tiếng Hàn -> bối cảnh Hàn), rồi tạo ảnh.</p>
-        <p className="mt-1"><strong>"📝 Tạo Prompt (Ngữ Cảnh Thông minh)":</strong> Nhập hook/truyện. AI sẽ phân tích và tạo danh sách prompt tiếng Anh (đã bao gồm phong cách nghệ thuật và ngữ cảnh văn hóa) để bạn sao chép và sử dụng ở nơi khác. Tab này không tự tạo ảnh.</p>
-        <p className="mt-1"><strong>"🖼️ Ảnh Hàng Loạt (Prompts)":</strong> Nhập danh sách prompt tiếng Anh (mỗi prompt một dòng), AI sẽ tạo ảnh.</p>
-        <p className="mt-1"><strong>Mới:</strong> Sau khi ảnh được tạo, bạn có thể nhấp vào nút "🎨 Tinh Chỉnh (i2i)" để yêu cầu AI sửa đổi hoặc thay đổi phong cách ảnh đó.</p>
-        <p className="mt-1"><strong>Lưu ý về API:</strong> Chức năng này có thể sử dụng API của Google Imagen, Stability AI, ChatGPT (DALL-E), hoặc DeepSeek. Hãy đảm bảo bạn có API Key hợp lệ và đủ credit cho dịch vụ bạn chọn.</p>
+        <p><strong>�� Hướng dẫn:</strong> Chọn chế độ tạo ảnh mong muốn từ các tab bên dưới.</p>
+        <p className="mt-1">
+          <strong>"📸 Ảnh AI từ Hook/Truyện":</strong>
+          {' Nhập hook hoặc nội dung truyện. AI sẽ tự phân tích và tạo nhiều prompt ảnh tiếng Anh, sau đó tạo ảnh.'}
+        </p>
+        <p className="mt-1">
+          <strong>"📸 Ảnh AI (Ngữ Cảnh Thông minh)":</strong>
+          {' Tương tự như trên, nhưng AI sẽ cố gắng tạo prompt ảnh (vẫn bằng Tiếng Anh) phản ánh bối cảnh văn hóa phù hợp với ngôn ngữ của truyện (ví dụ: Tiếng Việt sang bối cảnh Việt, Tiếng Hàn sang bối cảnh Hàn), rồi tạo ảnh.'}
+        </p>
+        <p className="mt-1">
+          <strong>"📝 Tạo Prompt (Ngữ Cảnh Thông minh)":</strong>
+          {' Nhập hook/truyện. AI sẽ phân tích và tạo danh sách prompt tiếng Anh (đã bao gồm phong cách nghệ thuật và ngữ cảnh văn hóa) để bạn sao chép và sử dụng ở nơi khác. Tab này không tự tạo ảnh.'}
+        </p>
+        <p className="mt-1">
+          <strong>"🖼️ Ảnh Hàng Loạt (Prompts)":</strong>
+          {' Nhập danh sách prompt tiếng Anh (mỗi prompt một dòng), AI sẽ tạo ảnh.'}
+        </p>
+        <p className="mt-1">
+          <strong>Mới:</strong>
+          {' Sau khi ảnh được tạo, bạn có thể nhấp vào nút "🎨 Tinh Chỉnh (i2i)" để yêu cầu AI sửa đổi hoặc thay đổi phong cách ảnh đó.'}
+        </p>
+        <p className="mt-1">
+          <strong>Lưu ý về API:</strong>
+          {' Chức năng này có thể sử dụng API của Google Imagen, Stability AI, ChatGPT (DALL-E), hoặc DeepSeek. Hãy đảm bảo bạn có API Key hợp lệ và đủ credit cho dịch vụ bạn chọn.'}
+        </p>
       </InfoBox>
       
       {/* Common Settings */}
@@ -679,7 +697,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
          <div role="tabpanel" id="ctx-image-gen-panel" className="animate-fadeIn space-y-6">
             <h3 className="text-xl font-semibold text-gray-800">🧠 Ảnh AI (Ngữ Cảnh Thông minh)</h3>
              <InfoBox variant="info">
-                <p>Tương tự tab "Ảnh AI từ Hook/Truyện", nhưng AI sẽ cố gắng tạo prompt ảnh (bằng Tiếng Anh) phản ánh bối cảnh văn hóa phù hợp với ngôn ngữ của truyện (ví dụ: Tiếng Việt -> bối cảnh Việt, Tiếng Hàn -> bối cảnh Hàn), sau đó tạo ảnh.</p>
+                <p>Tương tự tab "Ảnh AI từ Hook/Truyện", nhưng AI sẽ cố gắng tạo prompt ảnh (bằng Tiếng Anh) phản ánh bối cảnh văn hóa phù hợp với ngôn ngữ của truyện (ví dụ: Tiếng Việt sang bối cảnh Việt, Tiếng Hàn sang bối cảnh Hàn), sau đó tạo ảnh.</p>
             </InfoBox>
             <div>
                 <label htmlFor="igsCtxHookText" className="block text-sm font-medium text-gray-700 mb-1">Nhập Hook hoặc Nội dung truyện (AI sẽ phân tích ngôn ngữ để tạo ảnh theo ngữ cảnh):</label>
