@@ -1,0 +1,35 @@
+# Headers configuration for performance optimization
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Cache static assets
+/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Cache CSS and JS files  
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+# Cache images
+/*.png
+  Cache-Control: public, max-age=2592000
+
+/*.jpg
+  Cache-Control: public, max-age=2592000
+
+/*.svg
+  Cache-Control: public, max-age=2592000
+
+# Don't cache HTML files
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Don't cache API responses
+/api/*
+  Cache-Control: no-cache, no-store, must-revalidate 

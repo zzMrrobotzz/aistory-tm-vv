@@ -1,0 +1,20 @@
+# Netlify configuration for the admin application.
+
+[build]
+  # This is the command Netlify will run to build your app.
+  # It assumes a standard Vite setup.
+  command = "npm install && npm run build"
+  
+  # This is the directory that contains the built site.
+  publish = "dist"
+
+# The base directory is not set here, but in the Netlify UI.
+# You will set the "Base directory" to "apps/admin" in your site's settings.
+
+[[redirects]]
+  # This rule is crucial for single-page applications (SPAs) like React.
+  # It ensures that any request that doesn't match a file on the server
+  # is redirected to index.html. This allows React Router to handle the routing.
+  from = "/*"
+  to = "/index.html"
+  status = 200
