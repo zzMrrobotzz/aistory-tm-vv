@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { LoginData, RegisterData, UserProfile } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://key-manager-backend.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com/api';
 
 const authApi = axios.create({
   baseURL: API_URL,

@@ -20,7 +20,7 @@ exports.handler = async (event, context) => {
     const apiPath = path.replace('/.netlify/functions/api-proxy', '');
     
     // Forward request to original backend
-    const backendUrl = `https://key-manager-backend.onrender.com/api${apiPath}`;
+    const backendUrl = `https://aistory-backend.onrender.com/api${apiPath}`;
     
     const response = await fetch(backendUrl, {
       method: httpMethod,

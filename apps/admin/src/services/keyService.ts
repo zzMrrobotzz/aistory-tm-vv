@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // --- Base API Configuration ---
-const API_BASE = process.env.REACT_APP_API_URL || "/.netlify/functions/api-proxy";
+const API_BASE = process.env.REACT_APP_API_URL || "https://aistory-backend.onrender.com/api";
 
 const apiClient = axios.create({
     baseURL: API_BASE,

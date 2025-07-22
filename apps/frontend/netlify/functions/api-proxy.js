@@ -25,7 +25,7 @@ exports.handler = async (event, context) => {
     const apiPath = queryStringParameters?.path || '/auth/register';
     
     // Forward request to original backend
-    const backendUrl = `https://key-manager-backend.onrender.com/api${apiPath}`;
+    const backendUrl = `https://aistory-backend.onrender.com/api${apiPath}`;
     
     console.log(`Proxying ${httpMethod} to ${backendUrl}`);
     
