@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { login } from '../../services/authService';
 
 const Login = () => {
@@ -59,6 +60,14 @@ const Login = () => {
               <button className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-full">
                 Login
               </button>
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-sm text-gray-600">
+                Chưa có tài khoản?{' '}
+                <Link to="/register" className="text-blue-600 hover:underline">
+                  Đăng ký ngay
+                </Link>
+              </p>
             </div>
           </div>
         </form>
