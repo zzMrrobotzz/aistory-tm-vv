@@ -1,3 +1,5 @@
+console.log(">>> Starting application...");
+
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -59,10 +61,21 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// --- Log environment variables for debugging ---
+console.log(`[ENV] NODE_ENV: ${process.env.NODE_ENV}`);
+const mongoUri = process.env.MONGODB_URI;
+if (mongoUri) {
+    // Mask password in log
+    const maskedUri = mongoUri.replace(/:([^:]+)@/, ':****@');
+    console.log(`[ENV] MongoDB URI found: ${maskedUri}`);
+} else {
+    console.error("[ENV] MONGODB_URI is not set! Application will fail.");
+}
+
 // --- MongoDB Connection ---
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB connected!'))
-  .catch(err => console.error('MongoDB connection error:', err));
+// mongoose.connect(process.env.MONGODB_URI)
+//   .then(() => console.log('MongoDB connected!'))
+//   .catch(err => console.error('MongoDB connection error:', err));
 
 // --- API Endpoints ---
 
@@ -447,12 +460,32 @@ app.get('/', (req, res) => {
   res.send('Backend is running!');
 });
 
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 3001; // Changed default to 3001 for consistency
 
-// Increase server timeout for long AI requests (5 minutes)
-server.timeout = 300000; // 300 seconds = 5 minutes
-server.keepAliveTimeout = 300000;
-server.headersTimeout = 305000;
+async function startServer() {
+    try {
+        console.log(">>> Connecting to MongoDB...");
+        await mongoose.connect(mongoUri);
+        console.log("✅ MongoDB connected successfully!");
+
+        const server = app.listen(PORT, () => {
+            console.log(`✅ Server is successfully running on port ${PORT}`);
+        });
+
+        // Increase server timeout for long AI requests (5 minutes)
+        server.timeout = 300000;
+        server.keepAliveTimeout = 300000;
+        server.headersTimeout = 305000;
+        
+        server.on('error', (error) => {
+            console.error('❌ Server startup error:', error);
+            process.exit(1);
+        });
+
+    } catch (err) {
+        console.error('❌ Could not start server due to MongoDB connection error:', err);
+        process.exit(1);
+    }
+}
+
+startServer();
