@@ -1,0 +1,38 @@
+# This file is used by Render to configure the backend service.
+# You can deploy by creating a new "Blueprint" service on Render
+# and connecting it to your GitHub repository.
+# Render will automatically detect and use this file.
+
+services:
+  # A web service for our Express.js backend
+  - type: web
+    name: ai-story-backend
+    env: node
+    plan: free # or your desired plan, e.g., 'starter'
+    region: singapore # optional, choose a region close to you
+    rootDir: ./backend-repo # Tell Render to look in this subdirectory
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        fromDatabase:
+          name: ai-story-mongodb # This should match the name of the MongoDB service below
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false # This is a secret, set it in the Render dashboard
+      - key: PORT
+        value: 3001 # Render will automatically use this port
+      - key: PAYOS_CLIENT_ID
+        sync: false
+      - key: PAYOS_API_KEY
+        sync: false
+      - key: PAYOS_CHECKSUM_KEY
+        sync: false
+
+databases:
+  # A MongoDB database instance
+  - name: ai-story-mongodb
+    plan: free # or your desired plan
+    ipAllowList: [] # Allows access from anywhere, Render services are secure by default 

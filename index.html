@@ -1,0 +1,58 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Story Creator Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Simulate process.env.API_KEY for browser environment if not set by a build tool.
+      // This is a placeholder. The actual API key MUST be configured in the deployment environment.
+      // This shim helps prevent the app from crashing due to an undefined process.env.API_KEY
+      // when running directly in a browser without a Node.js-like environment.
+      if (typeof window.process === 'undefined') {
+        window.process = { env: {} };
+      }
+      if (typeof window.process.env === 'undefined') {
+        window.process.env = {};
+      }
+      if (typeof window.process.env.API_KEY === 'undefined') {
+        // IMPORTANT: This is a placeholder.
+        // For the application to function with Gemini, a REAL and VALID API key
+        // must be available as process.env.API_KEY in the execution environment.
+        window.process.env.API_KEY = "YOUR_GEMINI_API_KEY_MUST_BE_SET_IN_ENVIRONMENT";
+        console.warn(
+          "Placeholder API_KEY is being used for Gemini.\\n" +
+          "The application UI will load, but Gemini API calls will fail until a valid API_KEY\\n" +
+          "is properly configured in the execution environment (e.g., via server-side templating,\\n" +
+          "a build process, or other secure means of providing environment variables to the frontend)."
+        );
+      }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^0.11.0",
+    "@/components/modules/TtsModule": "/components/modules/TtsModule.tsx",
+    "@/components/modules/ImageGenerationSuiteModule": "/components/modules/ImageGenerationSuiteModule.tsx",
+    "@/services/openaiService": "/services/openaiService.ts",
+    "@/services/deepseekService": "/services/deepseekService.ts",
+    "@/services/textGenerationService": "/services/textGenerationService.ts",
+    "@/services/googleCloudTtsService": "/services/googleCloudTtsService.ts",
+    "@/services/amazonPollyService": "/services/amazonPollyService.ts",
+    "recharts": "https://esm.sh/recharts@^2.12.7",
+    "lucide-react": "https://esm.sh/lucide-react@^0.417.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Netlify configuration for the main frontend application.
+# You will need to create a separate site on Netlify for the admin panel
+# and configure its build settings manually in the Netlify UI.
+
+[build]
+  # This is the command Netlify will run to build your main app.
+  command = "npm install && npm run build"
+  
+  # This is the directory that contains the built site.
+  publish = "dist"
+  
+  # The base directory to run the build command from.
+  # For the main app, this is the root.
+  base = "/"
+
+[[redirects]]
+  # This rule is crucial for single-page applications (SPAs) like React.
+  # It ensures that any request that doesn't match a file on the server
+  # is redirected to index.html. This allows React Router to handle the routing.
+  from = "/*"
+  to = "/index.html"
+  status = 200 
