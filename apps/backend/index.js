@@ -57,7 +57,9 @@ const corsOptions = {
     return callback(null, true);
   },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token']
 };
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));

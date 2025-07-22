@@ -4,6 +4,15 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
 
+// Handle preflight OPTIONS requests
+router.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-auth-token');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
 // @route   GET api/auth/me
 // @desc    Get user data
 // @access  Private
