@@ -30,7 +30,8 @@ const Register = () => {
       if (result.token) {
         setSuccess(result.msg || 'Đăng ký thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          window.location.href = '/';
+          // Force full page reload to update authentication state  
+          window.location.replace('/');
         }, 1500);
       } else {
         setError('Đăng ký thất bại - không nhận được token');

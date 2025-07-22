@@ -10,10 +10,10 @@ const authApi = axios.create({
 const setAuthToken = (token: string | null) => {
   if (token) {
     authApi.defaults.headers.common['x-auth-token'] = token;
-    localStorage.setItem('token', token);
+    localStorage.setItem('userToken', token);
   } else {
     delete authApi.defaults.headers.common['x-auth-token'];
-    localStorage.removeItem('token');
+    localStorage.removeItem('userToken');
   }
 };
 

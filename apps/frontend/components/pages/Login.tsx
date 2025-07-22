@@ -29,7 +29,8 @@ const Login = () => {
       if (result.token) {
         setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          window.location.href = '/';
+          // Force full page reload to update authentication state
+          window.location.replace('/');
         }, 1000);
       } else {
         setError('Đăng nhập thất bại - không nhận được token');
