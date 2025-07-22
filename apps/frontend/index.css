@@ -1,7 +1,4 @@
 /* Base styles for AI Story Frontend */
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
 
 /* Ensure body and html take full height */
 html, body {
