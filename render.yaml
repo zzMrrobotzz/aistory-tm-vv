@@ -10,7 +10,7 @@ services:
     env: node
     plan: free # or your desired plan, e.g., 'starter'
     region: singapore # optional, choose a region close to you
-    rootDir: ./backend-repo # Tell Render to look in this subdirectory
+    rootDir: apps/backend # Tell Render to look in this subdirectory
     buildCommand: "npm install"
     startCommand: "npm start"
     envVars:
