@@ -1,16 +1,18 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { ActiveModule } from '../types';
+import { ActiveModule, UserProfile } from '../types';
 import { NAVIGATION_GROUPS } from '../constants';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, LogOut, User } from 'lucide-react';
 
 interface SidebarProps {
   activeModule: ActiveModule;
   setActiveModule: (module: ActiveModule) => void;
+  currentUser?: UserProfile | null;
+  onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, currentUser, onLogout }) => {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -81,6 +83,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule }) => {
           </div>
         ))}
       </nav>
+      
+      {/* User Info & Logout Section */}
+      <div className="border-t border-gray-700 pt-4 mt-4">
+        {currentUser && (
+          <div className="flex items-center px-4 py-2 mb-3 text-sm">
+            <User className="w-4 h-4 mr-2" />
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-medium truncate">{currentUser.username}</p>
+              <p className="text-gray-400 text-xs">Credits: {currentUser.credits || 0}</p>
+            </div>
+          </div>
+        )}
+        
+        <button
+          onClick={onLogout}
+          className="flex items-center w-full text-left px-4 py-3 rounded-lg transition-all duration-200 ease-in-out font-medium text-sm hover:bg-red-600 hover:text-white text-red-400"
+        >
+          <LogOut className="w-4 h-4 mr-3" />
+          Đăng xuất
+        </button>
+      </div>
     </aside>
   );
 };

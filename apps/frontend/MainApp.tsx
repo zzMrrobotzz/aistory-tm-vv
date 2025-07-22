@@ -1021,9 +1021,19 @@ const MainApp: React.FC = () => {
     }
   };
 
+  const handleLogout = useCallback(() => {
+    logout();
+    navigate('/login');
+  }, [navigate]);
+
   return (
     <div className="flex bg-gray-100">
-      <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} />
+      <Sidebar 
+        activeModule={activeModule} 
+        setActiveModule={setActiveModule} 
+        currentUser={currentUser}
+        onLogout={handleLogout}
+      />
       <div className="flex-1 ml-64">
         <MainHeader />
         <main className="p-8">
