@@ -40,6 +40,7 @@ const app = express();
 const allowedOrigins = [
   'https://keyadmintoolviettruyen.netlify.app',
   'https://toolviettruyen.netlify.app',
+  'https://webadminaistory.netlify.app',
   'http://localhost:3000',
   'http://localhost:5173'
 ];
