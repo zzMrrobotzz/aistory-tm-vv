@@ -1,0 +1,1 @@
+feat(api): configure CORS and add status endpoint
