@@ -8,6 +8,8 @@ const Login = () => {
     password: '',
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const { email, password } = formData;
 
@@ -16,12 +18,27 @@ const Login = () => {
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
     try {
-      await login({ email, password });
-      // Redirect to home or dashboard
-      window.location.href = '/';
+      const result = await login({ email, password });
+      console.log('Login result:', result);
+      
+      if (result.token) {
+        setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
+      } else {
+        setError('Đăng nhập thất bại - không nhận được token');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.msg || 'Login failed');
+      console.error('Login error:', err);
+      setError(err.message || 'Đăng nhập thất bại');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -29,7 +46,8 @@ const Login = () => {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="px-8 py-6 mt-4 text-left bg-white shadow-lg rounded-lg">
         <h3 className="text-2xl font-bold text-center">Login to your account</h3>
-        {error && <p className="text-red-500">{error}</p>}
+        {error && <div className="mt-2 p-3 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>}
+        {success && <div className="mt-2 p-3 bg-green-100 border border-green-400 text-green-700 rounded">{success}</div>}
         <form onSubmit={onSubmit}>
           <div className="mt-4">
             <div>
@@ -57,8 +75,11 @@ const Login = () => {
               />
             </div>
             <div className="flex items-baseline justify-between">
-              <button className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-full">
-                Login
+              <button 
+                disabled={loading}
+                className={`px-6 py-2 mt-4 text-white rounded-lg w-full ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-900'}`}
+              >
+                {loading ? 'Đang đăng nhập...' : 'Login'}
               </button>
             </div>
             <div className="mt-4 text-center">
