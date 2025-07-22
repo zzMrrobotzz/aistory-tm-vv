@@ -375,14 +375,34 @@ export const deletePackage = async (packageId: string) => {
 // --- Backend Wake-up Function ---
 export const wakeUpBackend = async () => {
     try {
+        // Try with axios first
         await apiClient.get('/status');
         isBackendAvailable = true;
         lastBackendCheck = Date.now();
+        console.log('✅ Backend connected successfully via axios');
         return true;
     } catch (error) {
-        isBackendAvailable = false;
-        lastBackendCheck = Date.now();
-        console.warn('Backend wakeup failed:', error.message);
-        return false;
+        console.warn('❌ Axios request failed:', error.message);
+        
+        // Fallback: Try with fetch (no-cors mode for debugging)
+        try {
+            const response = await fetch(`${API_BASE}/status`, {
+                method: 'GET',
+                mode: 'no-cors', // Bypass CORS for testing
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            console.log('🔄 Fetch with no-cors mode attempted');
+            isBackendAvailable = true;
+            lastBackendCheck = Date.now();
+            return true;
+        } catch (fetchError) {
+            console.error('❌ Both axios and fetch failed:', fetchError.message);
+            isBackendAvailable = false;
+            lastBackendCheck = Date.now();
+            return false;
+        }
     }
 }; 
