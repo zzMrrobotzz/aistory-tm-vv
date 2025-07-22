@@ -116,4 +116,4 @@ Admin có thể cấu hình API keys qua các endpoint:
 ### Debug mode:
 ```bash
 NODE_ENV=development npm run dev
-``` 
+``` # Force backend redeploy 22 Thg7 2025  9:18:12 CH
