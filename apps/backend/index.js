@@ -468,7 +468,17 @@ app.use('/api/auth', require('./routes/auth'));
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
-  res.send('Backend is running!');
+  res.json({ 
+    status: 'healthy', 
+    message: 'AI Story Backend v2.0',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', service: 'ai-story-backend' });
 });
 
 const PORT = process.env.PORT || 3001; // Changed default to 3001 for consistency

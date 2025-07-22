@@ -4,6 +4,7 @@
   # This is the command Netlify will run to build your app.
   # Optimized for stability and speed
   command = "npm ci && npm run build"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . || exit 1"
   
   # This is the directory that contains the built site.
   publish = "dist"
