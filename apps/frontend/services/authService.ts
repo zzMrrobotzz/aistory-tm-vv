@@ -18,8 +18,9 @@ const setAuthToken = (token: string | null) => {
 };
 
 export const register = async (userData: RegisterData) => {
-  // Try with fetch first to bypass CORS
   try {
+    console.log('Attempting registration with:', userData.username, userData.email);
+    
     const response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
@@ -28,37 +29,30 @@ export const register = async (userData: RegisterData) => {
       body: JSON.stringify(userData),
     });
     
+    console.log('Registration response status:', response.status);
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ msg: 'Registration failed' }));
+      console.error('Registration failed with error:', errorData);
       throw new Error(errorData.msg || 'Registration failed');
     }
     
     const data = await response.json();
+    console.log('Registration successful, received data:', data);
+    
     if (data.token) {
       setAuthToken(data.token);
+      // Remove any demo user data
+      localStorage.removeItem('demo_user');
     }
-    return data;
-  } catch (error) {
-    console.warn('Backend registration failed, using demo mode:', error.message);
     
-    // TEMPORARY DEMO MODE - Remove when backend is fixed
-    console.log('🔧 Demo mode: Creating temporary account');
-    
-    // Simulate successful registration
-    const demoToken = 'demo_' + Date.now() + '_' + Math.random().toString(36);
-    const demoUser = {
-      id: Date.now(),
-      username: userData.username,
-      email: userData.email,
-      token: demoToken,
-      msg: 'Demo account created successfully!'
+    return {
+      ...data,
+      msg: 'Đăng ký thành công!'
     };
-    
-    // Store demo account info
-    localStorage.setItem('demo_user', JSON.stringify(demoUser));
-    setAuthToken(demoToken);
-    
-    return demoUser;
+  } catch (error) {
+    console.error('Registration error:', error);
+    throw error; // Don't fall back to demo mode, throw the actual error
   }
 };
 
