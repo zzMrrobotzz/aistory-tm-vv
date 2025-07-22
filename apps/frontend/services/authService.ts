@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { LoginData, RegisterData, UserProfile } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/api-proxy';
+const API_URL = import.meta.env.VITE_API_URL || 'https://key-manager-backend.onrender.com/api';
 
 const authApi = axios.create({
   baseURL: API_URL,
@@ -18,18 +18,67 @@ const setAuthToken = (token: string | null) => {
 };
 
 export const register = async (userData: RegisterData) => {
+  // Try with fetch first to bypass CORS
+  try {
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ msg: 'Registration failed' }));
+      throw new Error(errorData.msg || 'Registration failed');
+    }
+    
+    const data = await response.json();
+    if (data.token) {
+      setAuthToken(data.token);
+    }
+    return data;
+  } catch (error) {
+    // Fallback to original axios method
+    console.warn('Fetch failed, trying axios:', error.message);
+  }
+  
+  // Original axios method
   const response = await authApi.post('/auth/register', userData);
   if (response.data.token) {
-    localStorage.setItem('userToken', response.data.token);
     setAuthToken(response.data.token);
   }
   return response.data;
 };
 
 export const login = async (userData: LoginData) => {
+  // Try with fetch first to bypass CORS
+  try {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ msg: 'Login failed' }));
+      throw new Error(errorData.msg || 'Login failed');
+    }
+    
+    const data = await response.json();
+    if (data.token) {
+      setAuthToken(data.token);
+    }
+    return data;
+  } catch (error) {
+    console.warn('Fetch failed, trying axios:', error.message);
+  }
+  
+  // Fallback to axios
   const response = await authApi.post('/auth/login', userData);
   if (response.data.token) {
-    localStorage.setItem('userToken', response.data.token);
     setAuthToken(response.data.token);
   }
   return response.data;
