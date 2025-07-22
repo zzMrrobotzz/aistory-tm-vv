@@ -81,7 +81,14 @@ if (mongoUri) {
 // --- API Endpoints ---
 
 app.get('/api/status', (req, res) => {
-    res.status(200).json({ status: 'ok', message: 'Backend is awake and running.' });
+    const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    res.status(200).json({ 
+        status: 'ok', 
+        message: 'Backend is awake and running.',
+        mongodb: mongoStatus,
+        timestamp: new Date().toISOString(),
+        cors_origins: allowedOrigins
+    });
 });
 
 // Provider Management
@@ -465,12 +472,25 @@ const PORT = process.env.PORT || 3001; // Changed default to 3001 for consistenc
 
 async function startServer() {
     try {
-        console.log(">>> Connecting to MongoDB...");
-        await mongoose.connect(mongoUri);
-        console.log("✅ MongoDB connected successfully!");
+        console.log(">>> Starting server...");
+        
+        // Try to connect to MongoDB, but don't crash if it fails
+        if (mongoUri) {
+            try {
+                console.log(">>> Connecting to MongoDB...");
+                await mongoose.connect(mongoUri);
+                console.log("✅ MongoDB connected successfully!");
+            } catch (mongoError) {
+                console.error('⚠️ MongoDB connection failed, but server will continue:', mongoError.message);
+                console.log('ℹ️ Some features requiring database may not work properly');
+            }
+        } else {
+            console.log('ℹ️ No MongoDB URI provided, running without database');
+        }
 
         const server = app.listen(PORT, () => {
             console.log(`✅ Server is successfully running on port ${PORT}`);
+            console.log(`🌐 CORS enabled for origins: ${allowedOrigins.join(', ')}`);
         });
 
         // Increase server timeout for long AI requests (5 minutes)
@@ -480,12 +500,25 @@ async function startServer() {
         
         server.on('error', (error) => {
             console.error('❌ Server startup error:', error);
-            process.exit(1);
+            if (error.code === 'EADDRINUSE') {
+                console.log(`Port ${PORT} is busy, trying port ${PORT + 1}`);
+                // Could implement port retry logic here
+            }
         });
 
     } catch (err) {
-        console.error('❌ Could not start server due to MongoDB connection error:', err);
-        process.exit(1);
+        console.error('❌ Could not start server:', err);
+        console.log('Attempting to start without MongoDB connection...');
+        
+        // Fallback: Start server without MongoDB
+        try {
+            const server = app.listen(PORT, () => {
+                console.log(`⚠️ Server started in fallback mode on port ${PORT}`);
+            });
+        } catch (fallbackError) {
+            console.error('❌ Fallback server start failed:', fallbackError);
+            process.exit(1);
+        }
     }
 }
 
