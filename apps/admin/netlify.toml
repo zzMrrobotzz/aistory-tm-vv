@@ -6,7 +6,7 @@
   command = "npm install && npm run build"
   
   # This is the directory that contains the built site.
-  publish = "dist"
+  publish = "build"
 
 # The base directory is not set here, but in the Netlify UI.
 # You will set the "Base directory" to "apps/admin" in your site's settings.
