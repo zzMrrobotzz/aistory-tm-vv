@@ -52,6 +52,7 @@ import SupportModule from './components/modules/SupportModule'; // Added
 import { getUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
+import Pricing from './components/pages/Pricing'; // Added for Pricing module
 
 // NOTE: Renaming the component back to MainApp from App
 const MainApp: React.FC = () => {
@@ -1033,6 +1034,8 @@ const MainApp: React.FC = () => {
                 />;
       case ActiveModule.Settings:
         return <Settings onApiKeysChange={handleApiKeysChange} />;
+      case ActiveModule.Pricing:
+        return <Pricing />;
       default:
         return <SuperAgentModule 
                   apiSettings={apiSettings} 

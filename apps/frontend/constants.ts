@@ -47,6 +47,13 @@ export const NAVIGATION_GROUPS = [
     ]
   },
   {
+    title: "Gói Cước & Giá",
+    icon: "💸",
+    subItems: [
+      { id: ActiveModule.Pricing, label: "Gói Cước & Giá", icon: "💸" },
+    ]
+  },
+  {
     title: "Cài Đặt",
     icon: "⚙️",
     subItems: [

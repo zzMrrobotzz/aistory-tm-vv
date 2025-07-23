@@ -40,9 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, curren
             ALL IN ONE
           </span>
         </div>
-        <div className="bg-white/10 text-white py-1 px-3 rounded-full text-xs font-bold inline-block mt-2">
-          Phiên Bản 1.1
-        </div>
+        <div className="bg-white/10 text-white py-1 px-3 rounded-full text-xs font-bold inline-block mt-2" style={{background: '#7CFC00', color: '#222'}}>Phiên bản TM 1.0</div>
       </div>
       <nav className="flex-grow">
         {NAVIGATION_GROUPS.map((group) => (
