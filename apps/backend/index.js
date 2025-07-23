@@ -42,6 +42,7 @@ const allowedOrigins = [
   'https://toolviettruyen.netlify.app',
   'https://webadminaistory.netlify.app',
   'https://aistorytmvvfrontend.netlify.app',
+  'https://aistorymmo.top', // Thêm domain mới
   'http://localhost:3000',
   'http://localhost:5173'
 ];
