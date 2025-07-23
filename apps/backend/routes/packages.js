@@ -6,16 +6,33 @@ const { createAuditLog } = require('../utils/auditLogger');
 // GET /api/packages - Lấy tất cả gói cước active cho frontend
 router.get('/', async (req, res) => {
     try {
-        // Chỉ lấy packages active cho frontend public
-        const packages = await CreditPackage.find({ isActive: true }).sort({ 
-            durationType: 1, // days first, then months
-            durationValue: 1, // sort by duration value
-            price: 1 // then by price
-        });
+        // Lấy tất cả packages active, bao gồm cả isActive undefined (mặc định true)
+        const packages = await CreditPackage.find({ 
+            $or: [
+                { isActive: true },
+                { isActive: { $exists: false } } // Packages cũ không có field isActive
+            ]
+        }).sort({ price: 1 });
         
         console.log(`📦 Public packages API: Found ${packages.length} active packages`);
         
-        res.json({ success: true, packages });
+        // Format packages để đảm bảo backward compatibility
+        const formattedPackages = packages.map(pkg => ({
+            _id: pkg._id,
+            planId: pkg.planId,
+            name: pkg.name,
+            description: pkg.description || '',
+            price: pkg.price,
+            durationType: pkg.durationType || 'months',
+            durationValue: pkg.durationValue || pkg.durationMonths || 1,
+            durationMonths: pkg.durationMonths, // Backward compatibility
+            isPopular: pkg.isPopular || false,
+            isActive: pkg.isActive !== false, // Default to true if undefined
+            createdAt: pkg.createdAt,
+            updatedAt: pkg.updatedAt
+        }));
+        
+        res.json({ success: true, packages: formattedPackages });
     } catch (error) {
         console.error('Public packages API error:', error);
         res.status(500).json({ success: false, error: 'Lỗi máy chủ' });
