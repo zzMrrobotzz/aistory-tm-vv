@@ -3,7 +3,7 @@ import React from 'react';
 
 const MainHeader: React.FC = () => {
   return (
-    <header className="bg-gradient-to-r from-slate-800 to-sky-700 text-white p-8 text-center rounded-t-2xl shadow-lg">
+    <header className="text-white p-8 text-center rounded-t-2xl shadow-lg" style={{background: '#7CFC00'}}>
       <h1 className="text-3xl md:text-4xl font-bold mb-3">
         Tool Viết Truyện AI Story - ALL IN ONE
       </h1>

@@ -230,7 +230,7 @@ const Pricing: React.FC = () => {
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <div className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold flex items-center">
                     <Crown className="h-4 w-4 mr-1" />
-                    Phổ biến nhất
+                    Phổ biến
                   </div>
                 </div>
               )}
@@ -242,6 +242,8 @@ const Pricing: React.FC = () => {
                 </div>
                 <p className="text-gray-600">{formatDuration(pkg)}</p>
                 <p className="text-sm text-gray-500 mt-2">{pkg.description}</p>
+                <div className="text-xs text-gray-400 mt-1">Mã gói: {pkg.planId || 'N/A'}</div>
+                <div className="text-xs text-gray-400 mt-1">Trạng thái: {pkg.isActive === false ? 'Ngừng' : 'Đang hoạt động'}</div>
               </div>
               
               <ul className="space-y-3 mb-8">
