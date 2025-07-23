@@ -18,9 +18,12 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateText as generateGeminiText, generateTextWithJsonOutput as generateGeminiJson } from '../../services/geminiService';
 import { generateText as generateDeepSeekText, generateTextWithJsonOutput as generateDeepSeekJson } from '../../services/deepseekService';
 import { delay, isSubscribed } from '../../utils';
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
+import { StopCircle } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
 
 interface BatchStoryWritingModuleProps {
@@ -38,6 +41,8 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     outputLanguage, referenceViralStoryForStyle, isProcessingBatch,
     batchProgressMessage, batchError, concurrencyLimit
   } = moduleState;
+  
+  const [currentAbortController, setCurrentAbortController] = useState<AbortController | null>(null);
 
   const updateState = (updates: Partial<BatchStoryWritingModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
@@ -247,6 +252,8 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     }
 
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
+    const abortCtrl = new AbortController();
+    setCurrentAbortController(abortCtrl);
 
     updateState({
       isProcessingBatch: true,
@@ -278,6 +285,8 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
         if (!item) continue;
 
         try {
+          if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          
           updateResultCallback(item.id, { status: 'writing', progressMessage: 'Bắt đầu xử lý...' });
           
           const singleStoryResult = await generateSingleStoryForBatch(
@@ -285,14 +294,31 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
             (updates) => updateResultCallback(item.id, updates)
           );
           
+          if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          
           updateResultCallback(item.id, { ...singleStoryResult });
+          
+          // Save to history when story completed
+          if (singleStoryResult.generatedStory?.trim()) {
+            const storyTitle = item.outline.split('\n')[0]?.trim().substring(0, 50) || 'Truyện hàng loạt';
+            HistoryStorage.saveToHistory(MODULE_KEYS.BATCH_STORY_WRITING, storyTitle, singleStoryResult.generatedStory);
+          }
 
-        } catch (e) {
-          updateResultCallback(item.id, {
-            status: 'error',
-            error: (e as Error).message,
-            progressMessage: 'Lỗi xử lý mục này.'
-          });
+        } catch (e: any) {
+          if (e.name === 'AbortError') {
+            updateResultCallback(item.id, {
+              status: 'error',
+              error: 'Đã bị hủy',
+              progressMessage: 'Đã dừng xử lý.'
+            });
+            break; // Exit the worker loop
+          } else {
+            updateResultCallback(item.id, {
+              status: 'error',
+              error: e.message,
+              progressMessage: 'Lỗi xử lý mục này.'
+            });
+          }
         } finally {
             setModuleState(prev => {
                 const newCompletedCount = prev.results.filter(r => r.status === 'completed' || r.status === 'error').length;
@@ -305,14 +331,34 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
       }
     };
 
-    const workers = Array(CONCURRENCY_LIMIT).fill(null).map(worker);
-    await Promise.all(workers);
+    try {
+      const workers = Array(CONCURRENCY_LIMIT).fill(null).map(worker);
+      await Promise.all(workers);
 
-    updateState({ 
-        isProcessingBatch: false, 
-        batchProgressMessage: `Hoàn thành xử lý toàn bộ ${validItems.length} truyện.` 
-    });
-    setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
+      updateState({ 
+          isProcessingBatch: false, 
+          batchProgressMessage: `Hoàn thành xử lý toàn bộ ${validItems.length} truyện.` 
+      });
+      setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
+    } catch (error) {
+      updateState({
+        isProcessingBatch: false,
+        batchProgressMessage: 'Đã dừng xử lý hàng loạt.',
+        batchError: 'Xử lý đã bị dừng.'
+      });
+      setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
+    } finally {
+      setCurrentAbortController(null);
+    }
+  };
+
+  const handleCancelBatch = () => {
+    if (currentAbortController) {
+      currentAbortController.abort();
+      updateState({
+        batchProgressMessage: 'Đang dừng xử lý...'
+      });
+    }
   };
   
   const copyToClipboard = (text: string, buttonId: string) => {
@@ -438,13 +484,31 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
       </div>
 
       {/* Action Button & Progress */}
-      <button 
-        onClick={handleStartBatchWriting} 
-        disabled={!hasActiveSubscription || isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.outline.trim())} 
-        className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg"
-      >
-        🚀 Bắt Đầu Viết Hàng Loạt ({inputItems.filter(it => it.outline.trim()).length} truyện)
-      </button>
+      {isProcessingBatch ? (
+        <div className="flex space-x-3">
+          <button
+            disabled
+            className="flex-1 bg-gray-400 text-white font-bold py-3 px-6 rounded-lg shadow-xl cursor-not-allowed text-lg"
+          >
+            Đang xử lý...
+          </button>
+          <button
+            onClick={handleCancelBatch}
+            className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg shadow-xl flex items-center"
+          >
+            <StopCircle className="w-5 h-5 mr-2" />
+            Dừng
+          </button>
+        </div>
+      ) : (
+        <button 
+          onClick={handleStartBatchWriting} 
+          disabled={!hasActiveSubscription || inputItems.length === 0 || inputItems.every(it => !it.outline.trim())} 
+          className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg"
+        >
+          🚀 Bắt Đầu Viết Hàng Loạt ({inputItems.filter(it => it.outline.trim()).length} truyện)
+        </button>
+      )}
 
       {isProcessingBatch && batchProgressMessage && <LoadingSpinner message={batchProgressMessage} />}
       {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}
@@ -507,6 +571,18 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
           ))}
         </div>
       )}
+      
+      {/* History Panel for Batch Story Writing */}
+      <div className="mt-8">
+        <HistoryPanel 
+          moduleKey={MODULE_KEYS.BATCH_STORY_WRITING}
+          onSelectHistory={(content) => {
+            // For batch, we could add to results or show in a modal
+            // For now, just show notification
+            alert('Lịch sử đã được chọn! Nội dung: ' + content.substring(0, 100) + '...');
+          }}
+        />
+      </div>
     </ModuleContainer>
   );
 };

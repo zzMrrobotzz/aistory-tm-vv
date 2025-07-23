@@ -4,7 +4,8 @@
 
 
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { StopCircle } from 'lucide-react';
 import { 
     ApiSettings, 
     BatchRewriteModuleState, 
@@ -17,9 +18,11 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateText as generateGeminiText } from '../../services/geminiService';
 import { generateText as generateDeepSeekText } from '../../services/deepseekService';
 import { delay, isSubscribed } from '../../utils';
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 
 interface BatchRewriteModuleProps {
@@ -31,6 +34,7 @@ interface BatchRewriteModuleProps {
 
 const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, moduleState, setModuleState, currentUser }) => {
   const hasActiveSubscription = isSubscribed(currentUser);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const {
     inputItems, results, globalRewriteLevel, globalSourceLanguage, globalTargetLanguage,
     globalRewriteStyle, globalCustomRewriteStyle, globalAdaptContext,
@@ -391,6 +395,8 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
       return;
     }
 
+    // Create new AbortController for this batch operation
+    abortControllerRef.current = new AbortController();
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
     
     const textGenerator = apiSettings.provider === 'deepseek'
@@ -430,11 +436,22 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     const taskQueue = [...validItems.map((item, index) => ({ item, index }))];
 
     const worker = async () => {
-        while (taskQueue.length > 0) {
+        while (taskQueue.length > 0 && !abortControllerRef.current?.signal.aborted) {
             const task = taskQueue.shift();
             if (!task) continue;
 
             const { item, index } = task;
+            
+            // Check if operation was aborted before processing each item
+            if (abortControllerRef.current?.signal.aborted) {
+                updateResultCallback(item.id, { 
+                    status: 'error', 
+                    progressMessage: 'Đã dừng', 
+                    error: 'Thao tác đã bị dừng' 
+                });
+                break;
+            }
+            
             await processSingleBatchItem(item, index, validItems.length, updateResultCallback, textGenerator);
         }
     };
@@ -443,12 +460,38 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     await Promise.all(workers);
 
 
-    setModuleState(prev => ({ 
-        ...prev,
-        isProcessingBatch: false, 
-        batchProgressMessage: `Hoàn thành xử lý toàn bộ ${validItems.length} mục.` 
-    }));
+    setModuleState(prev => {
+        const completedResults = prev.results.filter(r => r.status === 'completed' && r.rewrittenText);
+        
+        // Save completed results to history
+        completedResults.forEach((result, index) => {
+            if (result.rewrittenText) {
+                const title = `Viết lại hàng loạt #${index + 1} - ${new Date().toLocaleString('vi-VN')}`;
+                HistoryStorage.saveToHistory(MODULE_KEYS.BATCH_REWRITE, title, result.rewrittenText);
+            }
+        });
+        
+        const wasAborted = abortControllerRef.current?.signal.aborted;
+        const message = wasAborted 
+            ? `Đã dừng. Hoàn thành ${completedResults.length}/${validItems.length} mục.`
+            : `Hoàn thành xử lý toàn bộ ${validItems.length} mục.`;
+            
+        return { 
+            ...prev,
+            isProcessingBatch: false, 
+            batchProgressMessage: message
+        };
+    });
+    
+    abortControllerRef.current = null;
     setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
+  };
+
+  const handleCancelBatch = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      updateState({ batchProgressMessage: 'Đang dừng xử lý hàng loạt...' });
+    }
   };
   
   const handleRefineSingleResult = async (resultId: string) => {
@@ -548,6 +591,15 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         btn.textContent = 'Đã sao chép!';
         setTimeout(() => { btn.textContent = originalText; }, 2000);
     }
+  };
+
+  const handleSelectHistory = (content: string) => {
+    // Add new item with the selected content
+    const newItem: BatchRewriteInputItem = {
+      id: Date.now().toString(),
+      originalText: content,
+    };
+    updateState({ inputItems: [...inputItems, newItem] });
   };
 
   const userLevelDescriptions: { [key: number]: string } = {
@@ -702,13 +754,24 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
       </div>
 
       {/* Action Button & Progress */}
-      <button 
-        onClick={handleStartBatchRewrite} 
-        disabled={!hasActiveSubscription || isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.originalText.trim())} 
-        className="w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg"
-      >
-        🚀 Bắt Đầu Viết Lại Hàng Loạt ({inputItems.filter(it => it.originalText.trim()).length} mục)
-      </button>
+      <div className="flex gap-3">
+        <button 
+          onClick={handleStartBatchRewrite} 
+          disabled={!hasActiveSubscription || isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.originalText.trim())} 
+          className="flex-1 bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg"
+        >
+          🚀 Bắt Đầu Viết Lại Hàng Loạt ({inputItems.filter(it => it.originalText.trim()).length} mục)
+        </button>
+        {isProcessingBatch && (
+          <button
+            onClick={handleCancelBatch}
+            className="bg-red-500 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors flex items-center"
+            title="Dừng xử lý hàng loạt"
+          >
+            <StopCircle className="w-5 h-5" />
+          </button>
+        )}
+      </div>
 
       {isProcessingBatch && batchProgressMessage && <LoadingSpinner message={batchProgressMessage} />}
       {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}
@@ -773,6 +836,12 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
           ))}
         </div>
       )}
+
+      {/* History Panel */}
+      <HistoryPanel 
+        moduleKey={MODULE_KEYS.BATCH_REWRITE}
+        onSelectHistory={handleSelectHistory}
+      />
     </ModuleContainer>
   );
 };

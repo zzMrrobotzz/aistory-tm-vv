@@ -10,9 +10,11 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService';
 import { delay, isSubscribed } from '../../utils';
-import { Languages } from 'lucide-react';
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
+import { Languages, StopCircle } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
 
 interface WriteStoryModuleProps {
@@ -147,6 +149,12 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       updateState({ generatedHooks: result.text, hookLoadingMessage: "Tạo hook hoàn tất!" });
+      
+      // Save hooks to history
+      if (result.text.trim()) {
+        const hookTitle = storyInputForHook.split('\n')[0]?.trim().substring(0, 50) || 'Hooks không tiêu đề';
+        HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY + '_hooks', hookTitle, result.text);
+      }
     } catch (e: any) {
       if (e.name === 'AbortError') {
         updateState({ hookError: 'Tạo hook đã bị hủy.', hookLoadingMessage: 'Đã hủy.' });
@@ -372,6 +380,12 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         singleStoryEditProgress: 100,
         hasSingleStoryBeenEditedSuccessfully: true
       });
+      
+      // Save to history when story is completed
+      if (editedStory.trim()) {
+        const storyTitle = storyOutline.split('\n')[0]?.trim() || 'Truyện không tiêu đề';
+        HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY, storyTitle, editedStory);
+      }
     } catch (e: any) {
       if (e.name === 'AbortError') {
          updateState({ storyError: 'Biên tập truyện đã bị hủy.', storyLoadingMessage: 'Đã hủy biên tập.', singleStoryEditProgress: null, hasSingleStoryBeenEditedSuccessfully: false });
@@ -446,6 +460,12 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       updateState({ generatedLesson: result.text, lessonLoadingMessage: "Đúc kết bài học hoàn tất!" });
+      
+      // Save lesson to history  
+      if (result.text.trim()) {
+        const lessonTitle = storyInputForLesson.split('\n')[0]?.trim().substring(0, 50) || 'Bài học không tiêu đề';
+        HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY + '_lessons', lessonTitle, result.text);
+      }
     } catch (e: any) {
        if (e.name === 'AbortError') {
         updateState({ lessonError: 'Tạo bài học đã bị hủy.', lessonLoadingMessage: 'Đã hủy.' });
@@ -540,7 +560,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
             className="w-1/3 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md"
             aria-label="Hủy tác vụ hiện tại"
           >
-            Hủy ⏹️
+            <StopCircle className="w-4 h-4 mr-1" />
+            Dừng
           </button>
         </div>
       );
@@ -760,6 +781,19 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
                     )}
                 </div>
             )}
+            
+            {/* History Panel for Write Story */}
+            <div className="mt-6">
+                <HistoryPanel 
+                    moduleKey={MODULE_KEYS.WRITE_STORY}
+                    onSelectHistory={(content) => {
+                        updateState({ 
+                            generatedStory: content,
+                            hasSingleStoryBeenEditedSuccessfully: true 
+                        });
+                    }}
+                />
+            </div>
          </div>
       )}
 

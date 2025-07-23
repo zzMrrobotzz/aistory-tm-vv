@@ -1,14 +1,17 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { StopCircle } from 'lucide-react';
 import { ApiSettings, RewriteModuleState, UserProfile } from '../../types';
 import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService';
 import { delay, isSubscribed } from '../../utils';
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 
 
@@ -26,6 +29,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
   currentUser 
 }) => {
   const hasActiveSubscription = isSubscribed(currentUser);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const {
         rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,
@@ -53,12 +57,20 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
         }
         updateState({ error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
         
+        // Create new AbortController for this operation
+        abortControllerRef.current = new AbortController();
+        
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
         let fullRewrittenText = '';
 
         try {
             for (let i = 0; i < numChunks; i++) {
+                // Check if operation was aborted
+                if (abortControllerRef.current?.signal.aborted) {
+                    updateState({ loadingMessage: 'Đã dừng!', progress: 0 });
+                    return;
+                }
                 updateState({ progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` });
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
                 
@@ -120,10 +132,28 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 updateState({ rewrittenText: fullRewrittenText }); // Update UI progressively
             }
             updateState({ rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 });
+            
+            // Save to history on successful completion
+            if (fullRewrittenText.trim()) {
+                const title = `Viết lại - ${new Date().toLocaleString('vi-VN')}`;
+                HistoryStorage.saveToHistory(MODULE_KEYS.REWRITE, title, fullRewrittenText.trim());
+            }
         } catch (e) {
-            updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
+            if (abortControllerRef.current?.signal.aborted) {
+                updateState({ loadingMessage: 'Đã dừng!', progress: 0 });
+            } else {
+                updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
+            }
         } finally {
+            abortControllerRef.current = null;
             setTimeout(() => updateState({ loadingMessage: null }), 3000);
+        }
+    };
+
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            updateState({ loadingMessage: 'Đang dừng...', progress: 0 });
         }
     };
 
@@ -167,6 +197,10 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         navigator.clipboard.writeText(text);
         alert("Đã sao chép!");
     };
+
+    const handleSelectHistory = (content: string) => {
+        updateState({ rewrittenText: content });
+    };
     
     const anyLoading = loadingMessage !== null || isEditing;
     const userLevelDescriptions: { [key: number]: string } = {
@@ -184,6 +218,8 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                 <InfoBox>
                     <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.
                 </InfoBox>
+
+                {!hasActiveSubscription && <UpgradePrompt />}
                 
                 <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
                     <h3 className="text-xl font-semibold text-gray-800">Cài đặt Viết lại Nhanh</h3>
@@ -228,13 +264,24 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                     <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
                     <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
                 </div>
-                 <button
-              onClick={handleSingleRewrite}
-              disabled={!hasActiveSubscription || !originalText.trim() || progress > 0}
-              className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {progress > 0 ? `Đang viết lại... (${progress}%)` : '✍️ Viết lại nội dung'}
-          </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleSingleRewrite}
+                        disabled={!hasActiveSubscription || !originalText.trim() || progress > 0}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                        {progress > 0 ? `Đang viết lại... (${progress}%)` : '✍️ Viết lại nội dung'}
+                    </button>
+                    {progress > 0 && (
+                        <button
+                            onClick={handleStop}
+                            className="bg-red-500 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors flex items-center"
+                            title="Dừng xử lý"
+                        >
+                            <StopCircle className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
                 {anyLoading && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
                 {error && <ErrorAlert message={error} />}
                 {editError && <ErrorAlert message={editError} />}
@@ -259,6 +306,12 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                          </div>
                      </div>
                 )}
+
+                {/* History Panel */}
+                <HistoryPanel 
+                    moduleKey={MODULE_KEYS.REWRITE}
+                    onSelectHistory={handleSelectHistory}
+                />
             </div>
         </ModuleContainer>
     );
