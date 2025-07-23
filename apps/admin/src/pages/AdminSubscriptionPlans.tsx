@@ -204,8 +204,7 @@ const AdminSubscriptionPlans: React.FC = () => {
                         <InputNumber 
                             min={0} 
                             style={{ width: '100%' }}
-                            formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+                            placeholder="299000"
                         />
                     </Form.Item>
                     
