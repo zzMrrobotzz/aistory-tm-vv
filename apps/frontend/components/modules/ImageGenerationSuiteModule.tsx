@@ -578,26 +578,17 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
                 </select>
             </div>
         </div>
-        {/* Engine Specific API Keys */}
-        {imageEngine === 'stability' && (
-            <div className="mt-4">
-                <label htmlFor="igsStabilityKey" className="block text-sm font-medium text-gray-700 mb-1">API Key Stability AI (SD3):</label>
-                <input type="password" id="igsStabilityKey" value={stabilityApiKey} onChange={(e) => updateState({ stabilityApiKey: e.target.value, settingsError: null })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="Nhập API Key Stability AI của bạn" disabled={isProcessing || isRefining}/>
+        {/* API Keys are now managed in Settings module */}
+        <div className="mt-4 p-4 border rounded-lg bg-blue-50 border-blue-200">
+            <div className="text-center">
+                <p className="text-sm text-blue-700 mb-2">
+                    🔑 <strong>API Keys được quản lý tại module Cài Đặt</strong>
+                </p>
+                <p className="text-xs text-blue-600">
+                    Truy cập <strong>Sidebar → Cài Đặt → Quản Lý API Keys</strong> để thêm/chỉnh sửa API keys cho {imageEngine}
+                </p>
             </div>
-        )}
-        {imageEngine === 'chatgpt' && (
-            <div className="mt-4">
-                <label htmlFor="igsChatGptKey" className="block text-sm font-medium text-gray-700 mb-1">API Key ChatGPT (DALL-E):</label>
-                <input type="password" id="igsChatGptKey" value={chatGptApiKey} onChange={(e) => updateState({ chatGptApiKey: e.target.value, settingsError: null })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="Nhập API Key OpenAI của bạn (dùng cho DALL-E)" disabled={isProcessing || isRefining}/>
-            </div>
-        )}
-         {imageEngine === 'deepseek' && (
-            <div className="mt-4">
-                <label htmlFor="igsDeepSeekImageKey" className="block text-sm font-medium text-gray-700 mb-1">API Key DeepSeek Image:</label>
-                <input type="password" id="igsDeepSeekImageKey" value={deepSeekImageApiKey} onChange={(e) => updateState({ deepSeekImageApiKey: e.target.value, settingsError: null })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="Nhập API Key DeepSeek Image (nếu riêng)" disabled={isProcessing || isRefining}/>
-                <p className="text-xs text-gray-500 mt-1">Nếu DeepSeek là nhà cung cấp AI văn bản chung và dùng chung key, bạn có thể để trống ô này nếu key đã được cấu hình ở Cài Đặt AI chung.</p>
-            </div>
-        )}
+        </div>
         {/* Stability AI Specific Settings */}
         {imageEngine === 'stability' && (
             <div className="mt-6 p-4 border-t-2 border-dashed border-gray-300">

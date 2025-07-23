@@ -26,38 +26,47 @@ const ApiSettingsComponent: React.FC<ApiSettingsProps> = ({ apiSettings, setApiS
   }, [apiSettings]);
 
   const loadApiKeysFromStorage = () => {
-    const activeApiSettings = ApiKeyStorage.getActiveApiSettings();
-    
-    // Update apiSettings with stored keys if available
-    const updatedSettings: ApiSettings = {
-      ...apiSettings,
-      apiKey: activeApiSettings.gemini || activeApiSettings.deepseek || apiSettings.apiKey
-    };
+    try {
+      const activeApiSettings = ApiKeyStorage.getActiveApiSettings();
+      
+      // Update apiSettings with stored keys if available
+      const updatedSettings: ApiSettings = {
+        ...apiSettings,
+        apiKey: activeApiSettings.gemini || activeApiSettings.deepseek || apiSettings.apiKey
+      };
 
-    // Determine provider based on available keys
-    if (activeApiSettings.deepseek && !activeApiSettings.gemini) {
-      updatedSettings.provider = 'deepseek';
-    } else if (activeApiSettings.gemini) {
-      updatedSettings.provider = 'gemini';
+      // Determine provider based on available keys
+      if (activeApiSettings.deepseek && !activeApiSettings.gemini) {
+        updatedSettings.provider = 'deepseek';
+      } else if (activeApiSettings.gemini) {
+        updatedSettings.provider = 'gemini';
+      }
+
+      setApiSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+    } catch (error) {
+      console.error('Error loading API keys from storage:', error);
+      // Fallback to current settings if there's an error
     }
-
-    setApiSettings(updatedSettings);
-    setLocalSettings(updatedSettings);
   };
 
-  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newProvider = e.target.value as ApiProvider;
-    const activeApiSettings = ApiKeyStorage.getActiveApiSettings();
-    
-    // Auto-load API key for the selected provider if available
-    let newApiKey = '';
-    if (newProvider === 'gemini' && activeApiSettings.gemini) {
-      newApiKey = activeApiSettings.gemini;
-    } else if (newProvider === 'deepseek' && activeApiSettings.deepseek) {
-      newApiKey = activeApiSettings.deepseek;
+  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectSelect>) => {
+    try {
+      const newProvider = e.target.value as ApiProvider;
+      const activeApiSettings = ApiKeyStorage.getActiveApiSettings();
+      
+      // Auto-load API key for the selected provider if available
+      let newApiKey = '';
+      if (newProvider === 'gemini' && activeApiSettings.gemini) {
+        newApiKey = activeApiSettings.gemini;
+      } else if (newProvider === 'deepseek' && activeApiSettings.deepseek) {
+        newApiKey = activeApiSettings.deepseek;
+      }
+      
+      setLocalSettings({ ...localSettings, provider: newProvider, apiKey: newApiKey });
+    } catch (error) {
+      console.error('Error changing provider:', error);
     }
-    
-    setLocalSettings({ ...localSettings, provider: newProvider, apiKey: newApiKey });
   };
 
   const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {

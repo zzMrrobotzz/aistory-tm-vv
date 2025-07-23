@@ -125,6 +125,18 @@ export const ApiKeyStorage = {
     };
   },
 
+  // Get all active API keys as an object (for backward compatibility)
+  getAllActiveApiKeys: () => {
+    const keys = ApiKeyStorage.getAllKeys();
+    const activeKeys = keys.filter(key => key.isActive);
+    
+    const result: Record<string, string> = {};
+    activeKeys.forEach(key => {
+      result[key.provider] = key.key;
+    });
+    return result;
+  },
+
   // Clear all API keys
   clearAllKeys: (): void => {
     try {

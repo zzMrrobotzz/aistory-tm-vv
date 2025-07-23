@@ -415,48 +415,17 @@ const TtsModule: React.FC<TtsModuleProps> = ({
                             </button>
                         </div>
                     </div>
-                    {selectedProvider === 'elevenlabs' && (
-                        <div className="p-4 border rounded-lg bg-white shadow-sm space-y-3">
-                            <h3 className="font-semibold text-gray-700">Cài đặt ElevenLabs (Nhiều API)</h3>
-                             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                                <p className="text-sm text-blue-700">Tổng số ký tự còn lại:</p>
-                                <p className="text-2xl font-bold text-blue-800">{isCheckingKeys ? '...' : totalCredits.toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">Nhập danh sách API Keys (mỗi key một dòng):</label>
-                                <textarea 
-                                    value={apiKeysInput}
-                                    onChange={e => setApiKeysInput(e.target.value)}
-                                    rows={4}
-                                    className="w-full mt-1 p-2 border border-gray-300 rounded-md font-mono text-xs"
-                                    placeholder="dán key 1...&#10;dán key 2...&#10;dán key 3..."
-                                    disabled={isProcessing || isCheckingKeys}
-                                />
-                            </div>
-                            <button onClick={handleCheckApiKeys} disabled={!hasActiveSubscription || isCheckingKeys || isProcessing} className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400">
-                                {isCheckingKeys ? <><Loader2 className="animate-spin mr-2" size={16}/> Đang kiểm tra...</> : <><Key className="mr-2" size={16}/> Kiểm Tra & Lưu API Keys</>}
-                            </button>
-                             <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                                {elevenLabsApiKeys.map((k, i) => (
-                                    <div key={i} className="text-xs p-2 border rounded-md flex justify-between items-center">
-                                        <span className="font-mono text-gray-500">...{k.key.slice(-4)}</span>
-                                        {k.status === 'checking' && <span className="text-blue-500">Đang check...</span>}
-                                        {k.status === 'valid' && <span className="text-green-600 flex items-center"><CheckCircle2 size={12} className="mr-1"/>{k.credits?.toLocaleString()} credits</span>}
-                                        {k.status === 'invalid' && <span className="text-red-500 flex items-center" title={k.error}><XCircle size={12} className="mr-1"/>Invalid</span>}
-                                    </div>
-                                ))}
-                            </div>
+                    {/* API Keys are now managed in Settings module */}
+                    <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
+                        <div className="text-center">
+                            <p className="text-sm text-blue-700 mb-2">
+                                🔑 <strong>API Keys được quản lý tại module Cài Đặt</strong>
+                            </p>
+                            <p className="text-xs text-blue-600">
+                                Truy cập <strong>Sidebar → Cài Đặt → Quản Lý API Keys</strong> để thêm/chỉnh sửa API keys
+                            </p>
                         </div>
-                    )}
-                     {selectedProvider === 'openai' && (
-                        <div className="p-4 border rounded-lg bg-white shadow-sm"><h3 className="font-semibold text-gray-700 mb-2">Cài đặt OpenAI</h3><input type="password" value={chatGptApiKey} onChange={e => updateState({ chatGptApiKey: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Dán OpenAI API Key" disabled={isProcessing}/><p className="text-xs text-gray-500 mt-1">Key này cũng có thể được dùng cho DALL-E trong Xưởng Ảnh.</p></div>
-                    )}
-                     {selectedProvider === 'google' && (
-                        <div className="p-4 border rounded-lg bg-white shadow-sm"><h3 className="font-semibold text-gray-700 mb-2">Cài đặt Google Cloud</h3><input type="password" value={googleCloudApiKey} onChange={e => updateState({ googleCloudApiKey: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Dán Google Cloud API Key" disabled={isProcessing}/></div>
-                    )}
-                     {selectedProvider === 'amazon' && (
-                        <div className="p-4 border rounded-lg bg-white shadow-sm space-y-2"><h3 className="font-semibold text-gray-700 mb-2">Cài đặt Amazon Polly</h3><input type="text" value={amazonRegion} onChange={e => updateState({ amazonRegion: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="AWS Region (e.g., us-east-1)" disabled={isProcessing}/><input type="password" value={amazonAccessKeyId} onChange={e => updateState({ amazonAccessKeyId: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Access Key ID" disabled={isProcessing}/><input type="password" value={amazonSecretAccessKey} onChange={e => updateState({ amazonSecretAccessKey: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Secret Access Key" disabled={isProcessing}/></div>
-                    )}
+                    </div>
                      <div className="p-4 border rounded-lg bg-white shadow-sm">
                          <button onClick={() => setShowSettings(!showSettings)} className="font-semibold text-gray-700 w-full text-left flex justify-between items-center">
                             <span>2. Cài đặt Nâng cao</span>

@@ -30,7 +30,7 @@ import {
 } from './constants';
 import Sidebar from './components/Sidebar';
 import MainHeader from './components/MainHeader';
-import ApiSettingsComponent from './components/ApiSettingsComponent';
+import Settings from './components/pages/Settings';
 import SuperAgentModule from './components/modules/SuperAgentModule';
 import CreativeLabModule from './components/modules/CreativeLabModule';
 import WriteStoryModule from './components/modules/WriteStoryModule';
@@ -1012,10 +1012,7 @@ const MainApp: React.FC = () => {
                   currentUser={currentUser} // Pass user profile
                 />;
       case ActiveModule.Settings:
-        return <ApiSettingsComponent 
-                  apiSettings={apiSettings}
-                  setApiSettings={setApiSettings}
-                />;
+        return <Settings />;
       default:
         return <SuperAgentModule 
                   apiSettings={apiSettings} 
