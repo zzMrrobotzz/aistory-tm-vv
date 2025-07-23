@@ -57,7 +57,7 @@ const MainApp: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.SuperAgent);
-  const [showApiSettings, setShowApiSettings] = useState(true); // Always show API settings for users.
+  // API Settings are now centralized in Settings module
   // Removed elevenLabsApiKeys state
   const [apiSettings, setApiSettings] = useState<ApiSettings>({
     provider: DEFAULT_API_PROVIDER as ApiProvider,
@@ -1039,12 +1039,6 @@ const MainApp: React.FC = () => {
       <div className="flex-1 ml-64">
         <MainHeader />
         <main className="p-8">
-          {showApiSettings && (
-            <ApiSettingsComponent
-              apiSettings={apiSettings}
-              setApiSettings={setApiSettings}
-            />
-          )}
           {renderActiveModule()}
         </main>
       </div>
