@@ -202,8 +202,8 @@ class PaymentService {
                         quantity: 1,
                         price: parseInt(plan.price)
                     }],
-                    returnUrl: returnUrl || 'https://toolviettruyen.netlify.app/user/billing?status=success',
-                    cancelUrl: cancelUrl || 'https://toolviettruyen.netlify.app/user/billing?status=cancelled'
+                    returnUrl: returnUrl || 'https://aistorytmvvfrontend.netlify.app/pricing?status=success',
+                    cancelUrl: cancelUrl || 'https://aistorytmvvfrontend.netlify.app/pricing?status=cancelled'
                 };
 
                 console.log('Using PayOS SDK to create subscription payment:', paymentData);
@@ -242,8 +242,8 @@ class PaymentService {
                             price: parseInt(amount)
                         }
                     ],
-                    returnUrl: returnUrl || 'https://toolviettruyen.netlify.app/return',
-                    cancelUrl: cancelUrl || 'https://toolviettruyen.netlify.app/cancel'
+                    returnUrl: returnUrl || 'https://aistorytmvvfrontend.netlify.app/pricing?status=success',
+                    cancelUrl: cancelUrl || 'https://aistorytmvvfrontend.netlify.app/pricing?status=cancelled'
                 };
 
                 console.log('Using PayOS SDK to create payment:', paymentData);

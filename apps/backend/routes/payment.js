@@ -224,7 +224,7 @@ router.post('/check-payos/:orderCode', async (req, res) => {
 // POST /api/payment/setup-webhook - Setup PayOS webhook URL
 router.post('/setup-webhook', async (req, res) => {
     try {
-        const webhookUrl = 'https://key-manager-backend.onrender.com/api/payment/webhook/payos';
+        const webhookUrl = 'https://aistory-backend.onrender.com/api/payment/webhook/payos';
         const result = await paymentService.setupWebhook(webhookUrl);
         
         return res.json({

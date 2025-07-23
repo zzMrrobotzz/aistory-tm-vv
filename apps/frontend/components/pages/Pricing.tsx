@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Crown, Zap } from 'lucide-react';
+import { Check, Crown, Zap, AlertCircle } from 'lucide-react';
+import { paymentService } from '../../services/paymentService';
 
 interface Package {
   _id: string;
@@ -16,6 +17,8 @@ const Pricing: React.FC = () => {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     fetchPackages();
@@ -52,18 +55,44 @@ const Pricing: React.FC = () => {
 
   const handleSelectPackage = async (packageData: Package) => {
     setSelectedPackage(packageData._id);
+    setError(null);
+    setProcessing(true);
     
-    // Create payment URL (replace with actual payment integration)
-    const paymentData = {
-      planId: packageData.planId,
-      amount: packageData.price,
-      description: `Thanh toán ${packageData.name}`
-    };
-    
-    console.log('Selected package:', paymentData);
-    
-    // TODO: Integrate with PayOS payment
-    alert(`Đã chọn gói: ${packageData.name}\nGiá: ${formatPrice(packageData.price)}\n\nTính năng thanh toán sẽ được tích hợp sớm!`);
+    try {
+      console.log('Creating payment for package:', packageData.planId);
+      
+      // Create payment
+      const paymentData = await paymentService.createPayment(packageData.planId);
+      
+      if (paymentData.success) {
+        // Show payment modal with QR and transfer info
+        paymentService.showPaymentModal(paymentData);
+        
+        // Optional: Process payment in popup window
+        try {
+          const paymentCompleted = await paymentService.processPayment(paymentData);
+          
+          if (paymentCompleted) {
+            alert(`✅ Thanh toán thành công cho gói ${packageData.name}!\n\nVui lòng tải lại trang để cập nhật trạng thái subscription.`);
+            window.location.reload();
+          } else {
+            alert('❌ Thanh toán chưa hoàn tất. Vui lòng kiểm tra và thử lại.');
+          }
+        } catch (paymentError: any) {
+          console.warn('Payment monitoring error:', paymentError.message);
+          // Still show success message since payment modal is displayed
+          alert('Vui lòng hoàn thành thanh toán trong cửa sổ đã mở và tải lại trang để cập nhật trạng thái.');
+        }
+      } else {
+        throw new Error(paymentData.error || 'Không thể tạo thanh toán');
+      }
+    } catch (error: any) {
+      console.error('Payment creation error:', error);
+      setError(error.message || 'Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.');
+    } finally {
+      setProcessing(false);
+      setSelectedPackage(null);
+    }
   };
 
   if (loading) {
@@ -85,6 +114,26 @@ const Pricing: React.FC = () => {
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Truy cập không giới hạn vào bộ công cụ AI viết truyện chuyên nghiệp
           </p>
+          
+          {/* Error message */}
+          {error && (
+            <div className="mt-6 max-w-md mx-auto bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                <span className="text-red-700">{error}</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Processing message */}
+          {processing && (
+            <div className="mt-6 max-w-md mx-auto bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
+                <span className="text-blue-700">Đang tạo thanh toán...</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pricing Cards */}
@@ -183,18 +232,18 @@ const Pricing: React.FC = () => {
               
               <button 
                 onClick={() => handleSelectPackage(pkg)}
-                disabled={selectedPackage === pkg._id}
+                disabled={processing || selectedPackage === pkg._id}
                 className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors ${
                   pkg.isPopular
                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                     : 'bg-gray-900 text-white hover:bg-gray-800'
                 } ${
-                  selectedPackage === pkg._id 
+                  processing || selectedPackage === pkg._id 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
                 }`}
               >
-                {selectedPackage === pkg._id ? 'Đang xử lý...' : 'Chọn gói này'}
+                {processing && selectedPackage === pkg._id ? 'Đang xử lý...' : 'Chọn gói này'}
               </button>
             </div>
           ))}
