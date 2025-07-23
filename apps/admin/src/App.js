@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Layout, Menu, Button, Card, Form, Input, message, Table, Tag, Space, Modal, Spin, Badge, InputNumber } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { saveAs } from 'file-saver';
+import PackageManagement from './components/PackageManagement';
 
 const { Header, Content, Footer } = Layout;
 const API_BASE = "https://key-manager-backend.onrender.com/api";
@@ -239,12 +240,15 @@ function App() {
                 <Menu theme="dark" mode="horizontal" selectedKeys={[currentView]} onClick={e => setCurrentView(e.key)}>
                     <Menu.Item key="keys">Quản lý Key</Menu.Item>
                     <Menu.Item key="providers">Quản lý API</Menu.Item>
+                    <Menu.Item key="packages">Quản lý Gói</Menu.Item>
                 </Menu>
                 <Button onClick={handleLogout} style={{ float: 'right', marginTop: 16 }}>Đăng xuất</Button>
             </Header>
             <Content style={{ padding: '0 50px', marginTop: 24 }}>
                 <div style={{ background: '#fff', padding: 24, minHeight: 280 }}>
-                    {currentView === 'keys' ? <KeyManager /> : <ApiProviderManager />}
+                    {currentView === 'keys' && <KeyManager />}
+                    {currentView === 'providers' && <ApiProviderManager />}
+                    {currentView === 'packages' && <PackageManagement />}
                 </div>
             </Content>
             <Footer style={{ textAlign: 'center' }}>Admin Panel ©{new Date().getFullYear()}</Footer>
