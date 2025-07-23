@@ -10,9 +10,9 @@ interface User {
   _id: string;
   username: string;
   email: string;
-  remainingCredits: number;
-  isActive: boolean;
-  subscriptionStatus: string;
+  remainingCredits?: number;
+  isActive?: boolean;
+  subscriptionType?: string;
   createdAt: string;
   lastLoginAt?: string;
 }
@@ -144,31 +144,40 @@ const UserManagement: React.FC = () => {
       title: 'Credits',
       dataIndex: 'remainingCredits',
       key: 'remainingCredits',
-      render: (credits: number) => (
-        <Tag color={credits > 100 ? 'green' : credits > 10 ? 'orange' : 'red'}>
-          {credits.toLocaleString()}
-        </Tag>
-      ),
+      render: (credits: number) => {
+        const creditValue = credits || 0;
+        return (
+          <Tag color={creditValue > 100 ? 'green' : creditValue > 10 ? 'orange' : 'red'}>
+            {creditValue.toLocaleString()}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Trạng thái',
       dataIndex: 'isActive',
       key: 'isActive',
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? 'Hoạt động' : 'Vô hiệu'}
-        </Tag>
-      ),
+      render: (isActive: boolean) => {
+        const status = isActive !== false; // Default to true if undefined
+        return (
+          <Tag color={status ? 'green' : 'red'}>
+            {status ? 'Hoạt động' : 'Vô hiệu'}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Subscription',
-      dataIndex: 'subscriptionStatus',
-      key: 'subscriptionStatus',
-      render: (status: string) => (
-        <Tag color={status === 'premium' ? 'gold' : 'blue'}>
-          {status || 'basic'}
-        </Tag>
-      ),
+      dataIndex: 'subscriptionType',
+      key: 'subscriptionType',
+      render: (status: string) => {
+        const subStatus = status || 'free';
+        return (
+          <Tag color={subStatus === 'lifetime' ? 'gold' : subStatus === 'monthly' ? 'blue' : 'default'}>
+            {subStatus}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Ngày tạo',
