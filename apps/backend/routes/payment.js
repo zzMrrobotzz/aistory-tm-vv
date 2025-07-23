@@ -361,6 +361,17 @@ router.post('/add-daily-packages', async (req, res) => {
                 isActive: true
             },
             {
+                planId: 'trial_5days',
+                name: 'Gói Dùng Thử 5 Ngày', 
+                description: 'Trải nghiệm đầy đủ tính năng trong 5 ngày',
+                price: 69000,
+                durationType: 'days',
+                durationValue: 5,
+                durationMonths: null,
+                isPopular: false,
+                isActive: true
+            },
+            {
                 planId: 'trial_7days',
                 name: 'Gói Dùng Thử 1 Tuần',
                 description: 'Trải nghiệm đầy đủ tính năng trong 7 ngày',
