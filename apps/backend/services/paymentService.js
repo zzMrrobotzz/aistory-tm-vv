@@ -579,10 +579,23 @@ qrCode: '',
                 const currentExpiry = user.subscriptionExpiresAt;
                 const startDate = (currentExpiry && currentExpiry > now) ? currentExpiry : now;
                 
-                if (plan.durationMonths >= 999) { // Lifetime plan
-                    newExpiryDate = new Date('2099-12-31');
+                // Handle new duration system
+                if (plan.durationType === 'days') {
+                    // Add days to subscription
+                    newExpiryDate = new Date(startDate);
+                    newExpiryDate.setDate(newExpiryDate.getDate() + plan.durationValue);
+                } else if (plan.durationType === 'months' || plan.durationMonths) {
+                    // Handle months (new system or backward compatibility)
+                    const monthsToAdd = plan.durationValue || plan.durationMonths;
+                    
+                    if (monthsToAdd >= 999) { // Lifetime plan
+                        newExpiryDate = new Date('2099-12-31');
+                    } else {
+                        newExpiryDate = new Date(startDate);
+                        newExpiryDate.setMonth(newExpiryDate.getMonth() + monthsToAdd);
+                    }
                 } else {
-                    newExpiryDate = new Date(startDate.setMonth(startDate.getMonth() + plan.durationMonths));
+                    throw new Error('Invalid plan duration configuration');
                 }
 
                 user.subscriptionType = plan.planId;

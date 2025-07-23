@@ -340,6 +340,104 @@ router.post('/init-packages', async (req, res) => {
     }
 });
 
+// POST /api/payment/add-daily-packages - Add daily trial packages
+router.post('/add-daily-packages', async (req, res) => {
+    try {
+        const CreditPackage = require('../models/CreditPackage');
+        
+        console.log('📦 Adding daily trial packages...');
+        
+        // Define daily trial packages
+        const dailyPackages = [
+            {
+                planId: 'trial_3days',
+                name: 'Gói Dùng Thử 3 Ngày',
+                description: 'Trải nghiệm đầy đủ tính năng trong 3 ngày',
+                price: 49000,
+                durationType: 'days',
+                durationValue: 3,
+                durationMonths: null,
+                isPopular: false,
+                isActive: true
+            },
+            {
+                planId: 'trial_7days',
+                name: 'Gói Dùng Thử 1 Tuần',
+                description: 'Trải nghiệm đầy đủ tính năng trong 7 ngày',
+                price: 99000,
+                durationType: 'days',
+                durationValue: 7,
+                durationMonths: null,
+                isPopular: true,
+                isActive: true
+            }
+        ];
+        
+        const createdPackages = [];
+        
+        for (const packageData of dailyPackages) {
+            // Check if package already exists
+            const existingPackage = await CreditPackage.findOne({ planId: packageData.planId });
+            
+            if (existingPackage) {
+                console.log(`⚠️ Package ${packageData.planId} already exists, skipping`);
+                continue;
+            }
+            
+            // Create new package
+            const newPackage = new CreditPackage(packageData);
+            await newPackage.save();
+            
+            console.log(`✅ Created package: ${newPackage.name}`);
+            createdPackages.push(newPackage);
+        }
+        
+        // Update existing packages to use new duration system
+        console.log('🔄 Updating existing packages for compatibility...');
+        
+        const existingPackages = await CreditPackage.find({ 
+            $or: [
+                { durationType: { $exists: false } },
+                { durationValue: { $exists: false } }
+            ]
+        });
+        
+        for (const pkg of existingPackages) {
+            if (!pkg.durationType) {
+                pkg.durationType = 'months';
+            }
+            if (!pkg.durationValue && pkg.durationMonths) {
+                pkg.durationValue = pkg.durationMonths;
+            }
+            await pkg.save();
+            console.log(`✅ Updated compatibility for: ${pkg.name}`);
+        }
+        
+        await createAuditLog('DAILY_PACKAGES_ADDED', `Added ${createdPackages.length} daily trial packages`);
+        
+        return res.json({
+            success: true,
+            message: `Added ${createdPackages.length} daily trial packages successfully`,
+            packages: createdPackages.map(pkg => ({
+                planId: pkg.planId,
+                name: pkg.name,
+                price: pkg.price,
+                durationType: pkg.durationType,
+                durationValue: pkg.durationValue
+            }))
+        });
+        
+    } catch (error) {
+        console.error('Add daily packages error:', error);
+        
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to add daily trial packages',
+            details: error.message
+        });
+    }
+});
+
 // POST /api/payment/cleanup - Cleanup expired payments (admin only)
 router.post('/cleanup', async (req, res) => {
     try {
