@@ -14,7 +14,7 @@ const UpgradePrompt: React.FC = () => {
             Tài khoản của bạn là tài khoản miễn phí. Vui lòng nâng cấp để sử dụng toàn bộ tính năng của công cụ.
           </p>
           <button 
-            onClick={() => { /* Navigate to pricing page later */ alert('Navigate to pricing page!'); }}
+            onClick={() => window.open('/pricing', '_blank')}
             className="mt-2 px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600"
           >
             Nâng cấp ngay
