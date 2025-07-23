@@ -20,15 +20,17 @@ const userSchema = new mongoose.Schema({
   },
   subscriptionType: {
     type: String,
-    enum: ['free', 'monthly', 'quarterly', 'lifetime'],
+    enum: ['free', 'monthly', 'lifetime'],
     default: 'free',
   },
   subscriptionExpiresAt: {
     type: Date,
+    // Only set for monthly subscriptions, lifetime = far future date
   },
   remainingCredits: {
     type: Number,
     default: 1000,
+    // Note: Credits kept for display purposes only, subscription-based access
   },
   isActive: {
     type: Boolean,

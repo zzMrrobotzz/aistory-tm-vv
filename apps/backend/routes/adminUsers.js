@@ -129,6 +129,50 @@ router.put('/:id/status', /* isAdmin, */ async (req, res) => {
   }
 });
 
+// @route   PUT /api/admin/users/:id/subscription
+// @desc    Update user subscription
+// @access  Admin only
+router.put('/:id/subscription', /* isAdmin, */ async (req, res) => {
+  try {
+    const { subscriptionType, subscriptionExpiresAt } = req.body;
+    
+    if (!subscriptionType || !['free', 'monthly', 'lifetime'].includes(subscriptionType)) {
+      return res.status(400).json({ success: false, message: 'Invalid subscription type' });
+    }
+    
+    const updateData = { subscriptionType };
+    
+    if (subscriptionType !== 'free') {
+      if (!subscriptionExpiresAt) {
+        return res.status(400).json({ success: false, message: 'Expiry date required for paid subscriptions' });
+      }
+      updateData.subscriptionExpiresAt = new Date(subscriptionExpiresAt);
+    } else {
+      // For free subscription, remove expiry date
+      updateData.subscriptionExpiresAt = null;
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Subscription updated successfully', 
+      user 
+    });
+  } catch (err) {
+    console.error('Error updating user subscription:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @route   DELETE /api/admin/users/:id
 // @desc    Delete user (soft delete)
 // @access  Admin only

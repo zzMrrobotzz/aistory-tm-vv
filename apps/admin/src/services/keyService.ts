@@ -441,6 +441,23 @@ export const updateUserStatus = async (userId: string, isActive: boolean) => {
     }
 };
 
+export const updateUserSubscription = async (userId: string, subscriptionType: string, subscriptionExpiresAt: string) => {
+    try {
+        const isAvailable = await checkBackendStatus();
+        if (!isAvailable) {
+            throw new Error('Backend không khả dụng. Vui lòng thử lại sau.');
+        }
+        const { data } = await apiClient.put(`/admin/users/${userId}/subscription`, { 
+            subscriptionType, 
+            subscriptionExpiresAt 
+        });
+        return data;
+    } catch (error) {
+        console.error('Error updating user subscription:', error);
+        throw new Error(error.response?.data?.message || 'Không thể cập nhật subscription. Vui lòng thử lại.');
+    }
+};
+
 // --- Backend Wake-up Function ---
 export const wakeUpBackend = async () => {
     try {

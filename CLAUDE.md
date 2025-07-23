@@ -99,22 +99,22 @@ git push origin main
 
 ## Tác vụ cần làm tiếp theo
 1. **Tích hợp PayOS payment gateway** cho subscription billing
-2. **Implement subscription management** - upgrade/downgrade user plans
-3. **Credit usage tracking** - connect AI modules với user credits
-4. **User dashboard** - hiển thị credit history, usage stats
-5. **Email notifications** cho subscription expiry, payment success
-6. **Admin payment management** - view payments, refunds, analytics
-7. **Test end-to-end workflow** từ register → pricing → payment → AI usage
-8. **Optimize performance** nếu cần (bundle size khá lớn: 806KB)
+2. **Email notifications** cho subscription expiry, payment success
+3. **Admin payment management** - view payments, refunds, analytics
+4. **User dashboard** - hiển thị subscription status, usage stats
+5. **Test end-to-end workflow** từ register → pricing → payment → AI usage
+6. **Optimize performance** nếu cần (bundle size khá lớn: 806KB)
 
 ## Ghi chú quan trọng
 - Backend URL chính xác: `https://aistory-backend.onrender.com`
 - Netlify auto-deploy khi push lên git main branch
+- **Model subscription thuần túy**: Không có credit system, chỉ subscription Monthly/Lifetime
 - User registration/login hoạt động với backend thật (đã remove demo fallback)
-- Admin panel `/api/admin/users` temporarily bypassed auth cho demo
-- User management: 5 users hiện tại trong database với default 1000 credits
+- Admin panel `/api/admin/users` có tính năng quản lý subscription đầy đủ
+- User management: 5 users hiện tại trong database
 - Subscription packages: Monthly (299k), Lifetime (2.99M) đã tạo trong DB
 - Pricing page: `/pricing` route available cho public access
+- **Users sử dụng API key riêng** - không có shared API pool
 - All API keys được quản lý qua frontend settings panel
 
 ## Liên hệ & Support
@@ -140,4 +140,9 @@ git push origin main
    - Integration: UpgradePrompt links to pricing
 6. **Database hiện có**: 5 real users với 1000 default credits mỗi user
 
-**Trạng thái hiện tại**: Fully functional user management và pricing system. Sẵn sàng tích hợp PayOS payment gateway.
+**Trạng thái hiện tại**: 
+- ✅ Subscription-based model hoàn chỉnh (không có credit system)
+- ✅ Admin panel quản lý subscription đầy đủ
+- ✅ Pricing page updated theo subscription model 
+- ✅ Frontend logic chỉ check subscription, không check credits
+- 🚀 Sẵn sàng tích hợp PayOS payment gateway

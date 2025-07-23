@@ -91,7 +91,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, curren
             <User className="w-4 h-4 mr-2" />
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium truncate">{currentUser.username}</p>
-              <p className="text-gray-400 text-xs">Credits: {currentUser.credits || 0}</p>
+              <p className="text-gray-400 text-xs">
+                {currentUser.subscriptionType === 'lifetime' ? 'Lifetime' : 
+                 currentUser.subscriptionType === 'monthly' ? 'Monthly' : 'Free'}
+              </p>
             </div>
           </div>
         )}

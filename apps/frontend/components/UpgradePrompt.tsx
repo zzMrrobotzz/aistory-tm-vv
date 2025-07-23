@@ -9,15 +9,15 @@ const UpgradePrompt: React.FC = () => {
           <ShieldAlert className="h-6 w-6 text-yellow-500 mr-4" />
         </div>
         <div>
-          <p className="font-bold">Tính năng này yêu cầu nâng cấp</p>
+          <p className="font-bold">Tính năng này yêu cầu subscription</p>
           <p className="text-sm">
-            Tài khoản của bạn là tài khoản miễn phí. Vui lòng nâng cấp để sử dụng toàn bộ tính năng của công cụ.
+            Để sử dụng tất cả 15 AI Tools, bạn cần đăng ký gói Monthly hoặc Lifetime. Với subscription, bạn sẽ có quyền truy cập không giới hạn + sử dụng API key riêng.
           </p>
           <button 
             onClick={() => window.open('/pricing', '_blank')}
             className="mt-2 px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600"
           >
-            Nâng cấp ngay
+            Xem gói đăng ký
           </button>
         </div>
       </div>

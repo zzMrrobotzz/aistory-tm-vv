@@ -102,15 +102,15 @@ const Pricing: React.FC = () => {
             <ul className="space-y-3 mb-8">
               <li className="flex items-center">
                 <Check className="h-5 w-5 text-green-500 mr-3" />
-                <span>1,000 credits miễn phí</span>
+                <span>Xem trước giao diện</span>
               </li>
               <li className="flex items-center">
                 <Check className="h-5 w-5 text-green-500 mr-3" />
-                <span>Truy cập module cơ bản</span>
+                <span>Tính năng cơ bản</span>
               </li>
               <li className="flex items-center">
                 <Check className="h-5 w-5 text-green-500 mr-3" />
-                <span>AI Gemini Flash</span>
+                <span>Cần API key riêng</span>
               </li>
             </ul>
             
@@ -153,14 +153,7 @@ const Pricing: React.FC = () => {
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center">
                   <Check className="h-5 w-5 text-green-500 mr-3" />
-                  <span>
-                    {pkg.durationMonths >= 999 ? '50,000' : '5,000'} credits
-                    {pkg.durationMonths < 999 && '/tháng'}
-                  </span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="h-5 w-5 text-green-500 mr-3" />
-                  <span>Tất cả modules Premium</span>
+                  <span>Tất cả 15 AI Tools không giới hạn</span>
                 </li>
                 <li className="flex items-center">
                   <Check className="h-5 w-5 text-green-500 mr-3" />
@@ -173,6 +166,10 @@ const Pricing: React.FC = () => {
                 <li className="flex items-center">
                   <Check className="h-5 w-5 text-green-500 mr-3" />
                   <span>Tạo ảnh AI không giới hạn</span>
+                </li>
+                <li className="flex items-center">
+                  <Check className="h-5 w-5 text-green-500 mr-3" />
+                  <span>Sử dụng API key riêng</span>
                 </li>
                 {pkg.durationMonths >= 999 && (
                   <li className="flex items-center">

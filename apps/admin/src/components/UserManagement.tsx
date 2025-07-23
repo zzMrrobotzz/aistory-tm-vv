@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Modal, message, InputNumber, Tooltip } from 'antd';
-import { SearchOutlined, UserOutlined, EditOutlined, StopOutlined, CheckOutlined } from '@ant-design/icons';
-import { fetchUsers, fetchUserStats, updateUserCredits, updateUserStatus } from '../services/keyService';
+import { Table, Button, Input, Select, Tag, Space, Modal, message, InputNumber, Tooltip, DatePicker } from 'antd';
+import { SearchOutlined, UserOutlined, EditOutlined, StopOutlined, CheckOutlined, CrownOutlined } from '@ant-design/icons';
+import { fetchUsers, fetchUserStats, updateUserCredits, updateUserStatus, updateUserSubscription } from '../services/keyService';
 
 const { Option } = Select;
 const { confirm } = Modal;
@@ -13,6 +13,7 @@ interface User {
   remainingCredits?: number;
   isActive?: boolean;
   subscriptionType?: string;
+  subscriptionExpiresAt?: string;
   createdAt: string;
   lastLoginAt?: string;
 }
@@ -39,6 +40,9 @@ const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newCredits, setNewCredits] = useState(0);
+  const [isSubscriptionModalVisible, setIsSubscriptionModalVisible] = useState(false);
+  const [newSubscriptionType, setNewSubscriptionType] = useState('free');
+  const [newSubscriptionExpiry, setNewSubscriptionExpiry] = useState('');
 
   const loadUsers = async (page = 1, search = searchText, status = statusFilter) => {
     setLoading(true);
@@ -88,8 +92,27 @@ const UserManagement: React.FC = () => {
 
   const handleEditCredits = (user: User) => {
     setEditingUser(user);
-    setNewCredits(user.remainingCredits);
+    setNewCredits(user.remainingCredits || 0);
     setIsModalVisible(true);
+  };
+
+  const handleEditSubscription = (user: User) => {
+    setEditingUser(user);
+    setNewSubscriptionType(user.subscriptionType || 'free');
+    
+    // Set expiry date - if lifetime, set far future date, if monthly, set 1 month from now
+    if (user.subscriptionType === 'lifetime') {
+      setNewSubscriptionExpiry('2099-12-31');
+    } else if (user.subscriptionType === 'monthly' && user.subscriptionExpiresAt) {
+      setNewSubscriptionExpiry(user.subscriptionExpiresAt.split('T')[0]);
+    } else {
+      // Default to 1 month from now for new monthly subscriptions
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      setNewSubscriptionExpiry(nextMonth.toISOString().split('T')[0]);
+    }
+    
+    setIsSubscriptionModalVisible(true);
   };
 
   const handleUpdateCredits = async () => {
@@ -103,6 +126,24 @@ const UserManagement: React.FC = () => {
       loadUsers(pagination.current);
     } catch (error) {
       message.error('Không thể cập nhật credits');
+    }
+  };
+
+  const handleUpdateSubscription = async () => {
+    if (!editingUser) return;
+
+    try {
+      const expiryDate = newSubscriptionType === 'lifetime' 
+        ? new Date('2099-12-31').toISOString()
+        : new Date(newSubscriptionExpiry).toISOString();
+
+      await updateUserSubscription(editingUser._id, newSubscriptionType, expiryDate);
+      message.success('Cập nhật subscription thành công!');
+      setIsSubscriptionModalVisible(false);
+      setEditingUser(null);
+      loadUsers(pagination.current);
+    } catch (error) {
+      message.error('Không thể cập nhật subscription');
     }
   };
 
@@ -170,12 +211,32 @@ const UserManagement: React.FC = () => {
       title: 'Subscription',
       dataIndex: 'subscriptionType',
       key: 'subscriptionType',
-      render: (status: string) => {
+      render: (status: string, record: User) => {
         const subStatus = status || 'free';
+        const isExpired = record.subscriptionExpiresAt && new Date(record.subscriptionExpiresAt) < new Date();
+        
+        let color = 'default';
+        let text = subStatus;
+        
+        if (subStatus === 'lifetime') {
+          color = 'gold';
+          text = 'Lifetime';
+        } else if (subStatus === 'monthly') {
+          color = isExpired ? 'red' : 'blue';
+          text = isExpired ? 'Monthly (Hết hạn)' : 'Monthly';
+        } else {
+          text = 'Free';
+        }
+        
         return (
-          <Tag color={subStatus === 'lifetime' ? 'gold' : subStatus === 'monthly' ? 'blue' : 'default'}>
-            {subStatus}
-          </Tag>
+          <div>
+            <Tag color={color}>{text}</Tag>
+            {record.subscriptionExpiresAt && subStatus !== 'free' && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                Hết hạn: {new Date(record.subscriptionExpiresAt).toLocaleDateString('vi-VN')}
+              </div>
+            )}
+          </div>
         );
       },
     },
@@ -190,9 +251,16 @@ const UserManagement: React.FC = () => {
       key: 'action',
       render: (_, record: User) => (
         <Space size="middle">
-          <Tooltip title="Chỉnh sửa credits">
+          <Tooltip title="Chỉnh sửa subscription">
             <Button
               type="primary"
+              icon={<CrownOutlined />}
+              size="small"
+              onClick={() => handleEditSubscription(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Chỉnh sửa credits">
+            <Button
               icon={<EditOutlined />}
               size="small"
               onClick={() => handleEditCredits(record)}
@@ -287,6 +355,65 @@ const UserManagement: React.FC = () => {
         scroll={{ x: 800 }}
       />
 
+      {/* Edit Subscription Modal */}
+      <Modal
+        title={`Quản lý Subscription - ${editingUser?.username}`}
+        visible={isSubscriptionModalVisible}
+        onOk={handleUpdateSubscription}
+        onCancel={() => {
+          setIsSubscriptionModalVisible(false);
+          setEditingUser(null);
+        }}
+        okText="Cập nhật"
+        cancelText="Hủy"
+        width={600}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>
+            <strong>User:</strong> {editingUser?.username} ({editingUser?.email})
+          </p>
+          <p>
+            <strong>Subscription hiện tại:</strong> {editingUser?.subscriptionType || 'free'}
+          </p>
+          {editingUser?.subscriptionExpiresAt && (
+            <p>
+              <strong>Hết hạn:</strong> {new Date(editingUser.subscriptionExpiresAt).toLocaleDateString('vi-VN')}
+            </p>
+          )}
+        </div>
+        
+        <div style={{ marginBottom: 16 }}>
+          <label>Loại subscription:</label>
+          <Select
+            value={newSubscriptionType}
+            onChange={setNewSubscriptionType}
+            style={{ width: '100%', marginTop: 8 }}
+          >
+            <Option value="free">Free</Option>
+            <Option value="monthly">Monthly</Option>
+            <Option value="lifetime">Lifetime</Option>
+          </Select>
+        </div>
+
+        {newSubscriptionType !== 'free' && (
+          <div>
+            <label>Ngày hết hạn:</label>
+            <Input
+              type="date"
+              value={newSubscriptionExpiry}
+              onChange={(e) => setNewSubscriptionExpiry(e.target.value)}
+              style={{ width: '100%', marginTop: 8 }}
+              disabled={newSubscriptionType === 'lifetime'}
+            />
+            {newSubscriptionType === 'lifetime' && (
+              <p style={{ fontSize: '12px', color: '#666', marginTop: 4 }}>
+                Lifetime subscription tự động set năm 2099
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
       {/* Edit Credits Modal */}
       <Modal
         title={`Chỉnh sửa Credits - ${editingUser?.username}`}
@@ -304,7 +431,7 @@ const UserManagement: React.FC = () => {
             <strong>User:</strong> {editingUser?.username} ({editingUser?.email})
           </p>
           <p>
-            <strong>Credits hiện tại:</strong> {editingUser?.remainingCredits}
+            <strong>Credits hiện tại:</strong> {editingUser?.remainingCredits || 0}
           </p>
         </div>
         <div>
@@ -317,6 +444,9 @@ const UserManagement: React.FC = () => {
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
           />
         </div>
+        <p style={{ fontSize: '12px', color: '#666', marginTop: 8 }}>
+          Lưu ý: Trong phiên bản mới, credits chỉ để hiển thị. Người dùng sử dụng subscription theo tháng.
+        </p>
       </Modal>
     </div>
   );
