@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Crown, Zap, AlertCircle } from 'lucide-react';
 import { paymentService } from '../../services/paymentService';
+import SubscriptionStatus from '../SubscriptionStatus';
 
 interface Package {
   _id: string;
@@ -8,7 +9,9 @@ interface Package {
   name: string;
   description: string;
   price: number;
-  durationMonths: number;
+  durationMonths?: number; // Backward compatibility
+  durationType?: 'days' | 'months';
+  durationValue?: number;
   isPopular: boolean;
   isActive: boolean;
 }
@@ -29,7 +32,29 @@ const Pricing: React.FC = () => {
       const response = await fetch('https://aistory-backend.onrender.com/api/packages');
       const data = await response.json();
       if (data.success) {
-        setPackages(data.packages);
+        // Sort packages: trial packages first, then monthly, then lifetime
+        const sortedPackages = data.packages.sort((a: Package, b: Package) => {
+          // Trial packages first
+          if (a.durationType === 'days' && b.durationType !== 'days') return -1;
+          if (b.durationType === 'days' && a.durationType !== 'days') return 1;
+          
+          // If both are trial packages, sort by duration
+          if (a.durationType === 'days' && b.durationType === 'days') {
+            return (a.durationValue || 0) - (b.durationValue || 0);
+          }
+          
+          // Monthly packages before lifetime
+          const aMonths = a.durationValue || a.durationMonths || 1;
+          const bMonths = b.durationValue || b.durationMonths || 1;
+          
+          if (aMonths >= 999 && bMonths < 999) return 1;
+          if (bMonths >= 999 && aMonths < 999) return -1;
+          
+          // Sort by price
+          return a.price - b.price;
+        });
+        
+        setPackages(sortedPackages);
       }
     } catch (error) {
       console.error('Failed to fetch packages:', error);
@@ -45,7 +70,15 @@ const Pricing: React.FC = () => {
     }).format(price);
   };
 
-  const formatDuration = (months: number) => {
+  const formatDuration = (pkg: Package) => {
+    // New duration system
+    if (pkg.durationType === 'days') {
+      return `${pkg.durationValue} ngày`;
+    }
+    
+    // New months system or backward compatibility
+    const months = pkg.durationValue || pkg.durationMonths || 1;
+    
     if (months >= 999) return 'Vĩnh viễn';
     if (months === 1) return '1 tháng';
     if (months === 3) return '3 tháng';
@@ -136,6 +169,11 @@ const Pricing: React.FC = () => {
           )}
         </div>
 
+        {/* Subscription Status */}
+        <div className="max-w-md mx-auto mb-12">
+          <SubscriptionStatus />
+        </div>
+
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {/* Free Plan */}
@@ -195,7 +233,7 @@ const Pricing: React.FC = () => {
                 <div className="text-4xl font-bold text-gray-900 mb-2">
                   {formatPrice(pkg.price)}
                 </div>
-                <p className="text-gray-600">{formatDuration(pkg.durationMonths)}</p>
+                <p className="text-gray-600">{formatDuration(pkg)}</p>
                 <p className="text-sm text-gray-500 mt-2">{pkg.description}</p>
               </div>
               
@@ -220,11 +258,20 @@ const Pricing: React.FC = () => {
                   <Check className="h-5 w-5 text-green-500 mr-3" />
                   <span>Sử dụng API key riêng</span>
                 </li>
-                {pkg.durationMonths >= 999 && (
+                {/* Special features based on package type */}
+                {((pkg.durationValue || pkg.durationMonths) >= 999) && (
                   <li className="flex items-center">
                     <Zap className="h-5 w-5 text-yellow-500 mr-3" />
                     <span className="font-semibold text-yellow-600">
                       Truy cập trọn đời
+                    </span>
+                  </li>
+                )}
+                {pkg.durationType === 'days' && (
+                  <li className="flex items-center">
+                    <Zap className="h-5 w-5 text-blue-500 mr-3" />
+                    <span className="font-semibold text-blue-600">
+                      Dùng thử không cam kết
                     </span>
                   </li>
                 )}
