@@ -3,13 +3,8 @@ import { GoogleGenAI, GenerateContentResponse, GenerateContentParameters, Part, 
 import { MODEL_TEXT, MODEL_IMAGE, GroundingChunk } from '../types';
 
 const getEnvApiKey = () => {
-  const apiKey = typeof window !== 'undefined' ? (window as any).process?.env?.API_KEY : process.env.API_KEY;
-  if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY_MUST_BE_SET_IN_ENVIRONMENT") {
-    // This console error is important for developers to see if the env key is missing.
-    // The UI or calling function should handle user-facing errors if no key is ultimately available.
-    console.error("Environment API_KEY for Gemini is not properly configured.");
-  }
-  return apiKey;
+  // No longer check environment variables - API keys are managed through ApiKeyStorage
+  return null;
 };
 
 let ai: GoogleGenAI | null = null;
@@ -17,11 +12,10 @@ let lastUsedEffectiveApiKey: string | undefined = undefined;
 
 
 const getAIInstance = (userApiKey?: string): GoogleGenAI => {
-  const envApiKey = getEnvApiKey();
-  const effectiveApiKey = (userApiKey && userApiKey.trim() !== "") ? userApiKey.trim() : envApiKey;
+  const effectiveApiKey = userApiKey && userApiKey.trim() !== "" ? userApiKey.trim() : null;
 
-  if (!effectiveApiKey || effectiveApiKey === "YOUR_GEMINI_API_KEY_MUST_BE_SET_IN_ENVIRONMENT") {
-    throw new Error("Invalid or missing Gemini API Key. Please ensure an API_KEY is correctly set in the UI or environment.");
+  if (!effectiveApiKey) {
+    throw new Error("Invalid or missing Gemini API Key. Please configure your API key in the settings panel.");
   }
 
   if (!ai || effectiveApiKey !== lastUsedEffectiveApiKey) {

@@ -2,7 +2,11 @@ import React from 'react';
 import { Settings as SettingsIcon, Info } from 'lucide-react';
 import ApiKeyManager from '../ApiKeyManager';
 
-const Settings: React.FC = () => {
+interface SettingsProps {
+  onApiKeysChange?: () => void;
+}
+
+const Settings: React.FC<SettingsProps> = ({ onApiKeysChange }) => {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
@@ -35,7 +39,7 @@ const Settings: React.FC = () => {
       </div>
 
       {/* API Key Management */}
-      <ApiKeyManager />
+      <ApiKeyManager onApiKeysChange={onApiKeysChange} />
 
       {/* Footer Info */}
       <div className="mt-8 p-4 bg-gray-50 rounded-lg border">

@@ -51,6 +51,7 @@ import CharacterStudioModule from './components/modules/CharacterStudioModule'; 
 import SupportModule from './components/modules/SupportModule'; // Added
 import { getUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
 
 // NOTE: Renaming the component back to MainApp from App
 const MainApp: React.FC = () => {
@@ -832,6 +833,25 @@ const MainApp: React.FC = () => {
     localStorage.setItem('ttsModuleState_v4', JSON.stringify(stateToSave));
   }, [ttsState]);
 
+  // Load API keys from localStorage on app initialization
+  useEffect(() => {
+    loadApiKeysFromStorage();
+  }, []);
+
+  const loadApiKeysFromStorage = () => {
+    const activeKeys = ApiKeyStorage.getActiveApiSettings();
+    if (activeKeys.gemini || activeKeys.deepseek) {
+      setApiSettings({
+        provider: activeKeys.deepseek ? 'deepseek' : 'gemini',
+        apiKey: activeKeys.deepseek || activeKeys.gemini || ''
+      });
+    }
+  };
+
+  const handleApiKeysChange = () => {
+    loadApiKeysFromStorage();
+  };
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -1012,7 +1032,7 @@ const MainApp: React.FC = () => {
                   currentUser={currentUser} // Pass user profile
                 />;
       case ActiveModule.Settings:
-        return <Settings />;
+        return <Settings onApiKeysChange={handleApiKeysChange} />;
       default:
         return <SuperAgentModule 
                   apiSettings={apiSettings} 
