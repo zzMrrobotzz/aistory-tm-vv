@@ -124,25 +124,49 @@ git push origin main
 - Hosting: Netlify (frontend/admin) + Render (backend)
 
 ---
-*Lưu trạng thái phiên 23/07/2025: Authentication system hoàn chỉnh, User Management working, Subscription & Pricing system implemented. Next: PayOS payment integration.*
+*Lưu trạng thái phiên 23/07/2025: PayOS payment integration hoàn chỉnh, Manual trial subscription system implemented, CORS fixes cho domain mới. All major features working.*
 
-## Tóm tắt cuộc trò chuyện này
-**Vấn đề ban đầu**: Admin panel không hiển thị users đã đăng ký, frontend chưa có hệ thống billing
+## Tóm tắt cuộc trò chuyện này (Phiên 2 - 23/07/2025)
+**Vấn đề ban đầu**: API key configuration không hoạt động, admin cần manual trial subscription, CORS lỗi với domain mới
 
-**Đã hoàn thành**:
-1. **Fixed registration system** - remove demo fallback, connect với backend thật
-2. **Created comprehensive User Management** cho admin panel với Ant Design UI
-3. **Fixed build errors** - missing dependencies và CSS issues  
-4. **Added backend User model fields** (remainingCredits, isActive) với default values
-5. **Created Subscription & Pricing system**:
-   - Backend: 2 packages (Monthly 299k, Lifetime 2.99M) 
-   - Frontend: Beautiful pricing page với feature comparison
-   - Integration: UpgradePrompt links to pricing
-6. **Database hiện có**: 5 real users với 1000 default credits mỗi user
+**Đã hoàn thành trong phiên này**:
+1. **Fixed API key configuration** (Commit: 7c3707f):
+   - Sửa geminiService.ts: loại bỏ environment variable checks hardcode
+   - MainApp.tsx: auto-load API keys từ localStorage khi khởi động app
+   - Callback support: realtime update khi thay đổi API keys trong Settings
+   - Users giờ có thể configure và sử dụng API keys ngay lập tức
+
+2. **Manual Trial Subscription System** (Commit: 2dc3082):
+   - Admin có thể manually set bất kỳ số ngày nào (1-365) cho khách hàng dùng thử
+   - UI: InputNumber với validation, preview expiry date, helper text
+   - Format lưu: trial_5days, trial_7days, trial_15days để dễ nhận diện
+   - Color coding: Cyan cho trial packages, Red khi hết hạn
+   - Use case: Khách liên hệ → Admin set trial → Dùng thử → Mua gói chính thức
+
+3. **User Management Enhancements** (Commit: 9538d4e):
+   - Load packages động từ API thay vì hardcode
+   - Hiển thị tên gói thực tế trong bảng và modal
+   - Auto-calculate expiry date khi chọn package type
+   - Support tất cả loại subscription: free, trial_Xdays, monthly, lifetime
+
+4. **CORS Fixes cho Domain Mới** (Commit: f803d4c):
+   - Thêm Cache-Control header vào backend allowedHeaders
+   - Fix lỗi "Request header field cache-control is not allowed" 
+   - Domain aistorymmo.top giờ có thể fetch packages từ backend
+   - Enhanced cache-busting với multiple headers (no-cache, pragma)
 
 **Trạng thái hiện tại**: 
-- ✅ Subscription-based model hoàn chỉnh (không có credit system)
-- ✅ Admin panel quản lý subscription đầy đủ
-- ✅ Pricing page updated theo subscription model 
-- ✅ Frontend logic chỉ check subscription, không check credits
-- 🚀 Sẵn sàng tích hợp PayOS payment gateway
+- ✅ API key configuration working hoàn toàn
+- ✅ Manual trial subscription system (1-365 ngày tùy ý)
+- ✅ PayOS payment integration đã hoàn chỉnh từ trước
+- ✅ CORS fixed cho domain aistorymmo.top
+- ✅ Package management system đầy đủ trong admin
+- 🔄 Backend đang redeploy trên Render (2-3 phút)
+
+**Workflow hoàn chỉnh**:
+1. Khách hàng đăng ký account
+2. Liên hệ để được dùng thử
+3. Admin manually set trial subscription (ví dụ: 5 ngày)
+4. Khách hàng trải nghiệm tất cả tính năng trong thời gian trial
+5. Hết hạn → Khách hàng mua gói chính thức qua PayOS payment
+6. Tự động upgrade subscription sau thanh toán thành công
