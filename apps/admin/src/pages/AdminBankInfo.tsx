@@ -23,7 +23,7 @@ const AdminBankInfo: React.FC = () => {
   const fetchBankInfo = async () => {
     try {
       setFetching(true);
-      const response = await fetch('https://key-manager-backend.onrender.com/api/bank-info');
+      const response = await fetch('https://aistory-backend.onrender.com/api/bank-info');
       const data = await response.json();
       
       if (data.success && data.bankInfo) {
@@ -47,7 +47,7 @@ const AdminBankInfo: React.FC = () => {
   const handleSubmit = async (values: BankInfo) => {
     try {
       setLoading(true);
-      const response = await fetch('https://key-manager-backend.onrender.com/api/bank-info', {
+      const response = await fetch('https://aistory-backend.onrender.com/api/bank-info', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,7 +89,7 @@ const AdminBankInfo: React.FC = () => {
         <BankOutlined /> Quản Lý Thông Tin Ngân Hàng
       </Title>
       <Text type="secondary">
-        Quản lý thông tin chuyển khoản hiển thị cho người dùng khi nạp credit
+        Quản lý thông tin chuyển khoản hiển thị cho người dùng khi mua subscription
       </Text>
       
       <Divider />

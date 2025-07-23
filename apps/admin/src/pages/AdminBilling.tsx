@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, message, Modal, Form, Input, InputNumber, Switch, Popconfirm, Space, Typography } from 'antd';
 import { CreditPackage } from '../types';
 import { PlusOutlined, EditOutlined, DeleteOutlined, DollarOutlined } from '@ant-design/icons';
+import { fetchPackages, createPackage, updatePackage, deletePackage } from '../services/keyService';
 
 const { Title, Text } = Typography;
 
@@ -15,13 +16,12 @@ const AdminBilling: React.FC = () => {
     const loadPackages = async () => {
         setLoading(true);
         try {
-            const response = await fetch('https://key-manager-backend.onrender.com/api/packages');
-            const data = await response.json();
-            
-            if (data.success) {
+            const data = await fetchPackages();
+            if (Array.isArray(data)) {
+                setPackages(data);
+            } else if (data.success) {
                 setPackages(data.packages || []);
             } else {
-                message.error('Không thể tải danh sách gói cước');
                 setPackages([]);
             }
         } catch (error: any) {
@@ -51,11 +51,7 @@ const AdminBilling: React.FC = () => {
 
     const handleDelete = async (packageId: string) => {
         try {
-            const response = await fetch(`https://key-manager-backend.onrender.com/api/packages/${packageId}`, {
-                method: 'DELETE'
-            });
-            const data = await response.json();
-            
+            const data = await deletePackage(packageId);
             if (data.success) {
                 message.success('Xóa gói cước thành công!');
                 loadPackages();
@@ -72,19 +68,13 @@ const AdminBilling: React.FC = () => {
         try {
             const values = await form.validateFields();
             const isEdit = editingPackage?._id;
-            const url = isEdit 
-                ? `https://key-manager-backend.onrender.com/api/packages/${editingPackage._id}`
-                : 'https://key-manager-backend.onrender.com/api/packages';
             
-            const response = await fetch(url, {
-                method: isEdit ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(values),
-            });
-
-            const data = await response.json();
+            let data;
+            if (isEdit) {
+                data = await updatePackage(editingPackage._id, values);
+            } else {
+                data = await createPackage(values);
+            }
             
             if (data.success) {
                 message.success(isEdit ? 'Cập nhật gói cước thành công!' : 'Tạo gói cước mới thành công!');
@@ -128,14 +118,14 @@ const AdminBilling: React.FC = () => {
     return (
         <div style={{ padding: 24 }}>
             <Title level={2}>
-                <DollarOutlined /> Gói Cước & Thanh Toán
+                <DollarOutlined /> Gói Subscription & Thanh Toán
             </Title>
             <Text type="secondary">
-                Quản lý các gói nạp credit và theo dõi thanh toán
+                Quản lý các gói subscription (Monthly/Lifetime) và theo dõi thanh toán
             </Text>
             
             <Card 
-                title="Danh Sách Gói Credit"
+                title="Danh Sách Gói Subscription"
                 extra={
                     <Button type="primary" icon={<PlusOutlined />} onClick={handleAddNew}>
                         Thêm Gói Mới
@@ -149,7 +139,7 @@ const AdminBilling: React.FC = () => {
                     loading={loading}
                     rowKey="_id"
                     pagination={false}
-                    locale={{ emptyText: 'Chưa có gói credit nào' }}
+                    locale={{ emptyText: 'Chưa có gói subscription nào' }}
                 />
             </Card>
             <Modal
