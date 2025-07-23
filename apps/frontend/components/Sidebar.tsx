@@ -92,8 +92,24 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, curren
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium truncate">{currentUser.username}</p>
               <p className="text-gray-400 text-xs">
-                {currentUser.subscriptionType === 'lifetime' ? 'Lifetime' : 
-                 currentUser.subscriptionType === 'monthly' ? 'Monthly' : 'Free'}
+                {(() => {
+                  if (!currentUser.subscriptionType || currentUser.subscriptionType === 'free') {
+                    return 'Free';
+                  }
+                  if (currentUser.subscriptionType.startsWith('trial_')) {
+                    // Ví dụ: trial_3days
+                    const days = currentUser.subscriptionType.match(/trial_(\d+)days/);
+                    return days ? `Dùng Thử ${days[1]} Ngày${currentUser.subscriptionExpiresAt ? ` (Hết hạn: ${new Date(currentUser.subscriptionExpiresAt).toLocaleDateString('vi-VN')})` : ''}` : 'Trial';
+                  }
+                  if (currentUser.subscriptionType === 'lifetime') {
+                    return 'Lifetime';
+                  }
+                  if (currentUser.subscriptionType === 'monthly') {
+                    return `Monthly${currentUser.subscriptionExpiresAt ? ` (Hết hạn: ${new Date(currentUser.subscriptionExpiresAt).toLocaleDateString('vi-VN')})` : ''}`;
+                  }
+                  // Custom planId
+                  return `${currentUser.subscriptionType}${currentUser.subscriptionExpiresAt ? ` (Hết hạn: ${new Date(currentUser.subscriptionExpiresAt).toLocaleDateString('vi-VN')})` : ''}`;
+                })()}
               </p>
             </div>
           </div>
