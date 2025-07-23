@@ -3,12 +3,21 @@ const router = express.Router();
 const CreditPackage = require('../models/CreditPackage');
 const { createAuditLog } = require('../utils/auditLogger');
 
-// GET /api/packages - Lấy tất cả gói cước
+// GET /api/packages - Lấy tất cả gói cước active cho frontend
 router.get('/', async (req, res) => {
     try {
-        const packages = await CreditPackage.find().sort({ price: 1 });
+        // Chỉ lấy packages active cho frontend public
+        const packages = await CreditPackage.find({ isActive: true }).sort({ 
+            durationType: 1, // days first, then months
+            durationValue: 1, // sort by duration value
+            price: 1 // then by price
+        });
+        
+        console.log(`📦 Public packages API: Found ${packages.length} active packages`);
+        
         res.json({ success: true, packages });
     } catch (error) {
+        console.error('Public packages API error:', error);
         res.status(500).json({ success: false, error: 'Lỗi máy chủ' });
     }
 });
