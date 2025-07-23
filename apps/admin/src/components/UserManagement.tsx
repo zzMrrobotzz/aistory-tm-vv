@@ -26,9 +26,19 @@ interface UserStats {
   recentUsers: User[];
 }
 
+interface Package {
+  _id: string;
+  planId: string;
+  name: string;
+  durationType: 'days' | 'months';
+  durationValue: number;
+  isActive: boolean;
+}
+
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -74,7 +84,20 @@ const UserManagement: React.FC = () => {
   useEffect(() => {
     loadUsers();
     loadUserStats();
+    loadPackages();
   }, []);
+
+  const loadPackages = async () => {
+    try {
+      const response = await fetch('https://aistory-backend.onrender.com/api/admin/packages');
+      const data = await response.json();
+      if (data.success) {
+        setPackages(data.packages.filter((pkg: Package) => pkg.isActive));
+      }
+    } catch (error) {
+      console.error('Error loading packages:', error);
+    }
+  };
 
   const handleSearch = (value: string) => {
     setSearchText(value);
@@ -133,9 +156,20 @@ const UserManagement: React.FC = () => {
     if (!editingUser) return;
 
     try {
-      const expiryDate = newSubscriptionType === 'lifetime' 
-        ? new Date('2099-12-31').toISOString()
-        : new Date(newSubscriptionExpiry).toISOString();
+      let expiryDate: string;
+      
+      if (newSubscriptionType === 'free') {
+        expiryDate = new Date().toISOString(); // Set to now for free accounts
+      } else {
+        const selectedPackage = packages.find(pkg => pkg.planId === newSubscriptionType);
+        if (selectedPackage && selectedPackage.durationValue >= 999) {
+          // Lifetime package
+          expiryDate = new Date('2099-12-31').toISOString();
+        } else {
+          // Use the manually set expiry date
+          expiryDate = new Date(newSubscriptionExpiry).toISOString();
+        }
+      }
 
       await updateUserSubscription(editingUser._id, newSubscriptionType, expiryDate);
       message.success('Cập nhật subscription thành công!');
@@ -218,14 +252,35 @@ const UserManagement: React.FC = () => {
         let color = 'default';
         let text = subStatus;
         
-        if (subStatus === 'lifetime') {
-          color = 'gold';
-          text = 'Lifetime';
-        } else if (subStatus === 'monthly') {
-          color = isExpired ? 'red' : 'blue';
-          text = isExpired ? 'Monthly (Hết hạn)' : 'Monthly';
-        } else {
+        if (subStatus === 'free') {
           text = 'Free';
+          color = 'default';
+        } else {
+          // Find package info
+          const packageInfo = packages.find(pkg => pkg.planId === subStatus);
+          if (packageInfo) {
+            text = packageInfo.name;
+            if (packageInfo.durationType === 'days') {
+              color = isExpired ? 'red' : 'cyan';
+            } else if (packageInfo.durationValue >= 999) {
+              color = 'gold'; // Lifetime
+            } else {
+              color = isExpired ? 'red' : 'blue'; // Monthly
+            }
+          } else {
+            // Fallback for old subscription types
+            if (subStatus === 'lifetime' || subStatus.includes('lifetime')) {
+              color = 'gold';
+              text = 'Lifetime';
+            } else if (subStatus === 'monthly' || subStatus.includes('monthly')) {
+              color = isExpired ? 'red' : 'blue';
+              text = 'Monthly';
+            }
+          }
+          
+          if (isExpired) {
+            text += ' (Hết hạn)';
+          }
         }
         
         return (
@@ -373,7 +428,14 @@ const UserManagement: React.FC = () => {
             <strong>User:</strong> {editingUser?.username} ({editingUser?.email})
           </p>
           <p>
-            <strong>Subscription hiện tại:</strong> {editingUser?.subscriptionType || 'free'}
+            <strong>Subscription hiện tại:</strong> {
+              (() => {
+                const currentSub = editingUser?.subscriptionType || 'free';
+                if (currentSub === 'free') return 'Free';
+                const packageInfo = packages.find(pkg => pkg.planId === currentSub);
+                return packageInfo ? packageInfo.name : currentSub;
+              })()
+            }
           </p>
           {editingUser?.subscriptionExpiresAt && (
             <p>
@@ -386,12 +448,35 @@ const UserManagement: React.FC = () => {
           <label>Loại subscription:</label>
           <Select
             value={newSubscriptionType}
-            onChange={setNewSubscriptionType}
+            onChange={(value) => {
+              setNewSubscriptionType(value);
+              // Auto-set expiry date based on package type
+              if (value !== 'free') {
+                const selectedPackage = packages.find(pkg => pkg.planId === value);
+                if (selectedPackage) {
+                  const now = new Date();
+                  if (selectedPackage.durationType === 'days') {
+                    now.setDate(now.getDate() + selectedPackage.durationValue);
+                  } else if (selectedPackage.durationType === 'months') {
+                    if (selectedPackage.durationValue >= 999) {
+                      // Lifetime package
+                      now.setFullYear(2099);
+                    } else {
+                      now.setMonth(now.getMonth() + selectedPackage.durationValue);
+                    }
+                  }
+                  setNewSubscriptionExpiry(now.toISOString().split('T')[0]);
+                }
+              }
+            }}
             style={{ width: '100%', marginTop: 8 }}
           >
-            <Option value="free">Free</Option>
-            <Option value="monthly">Monthly</Option>
-            <Option value="lifetime">Lifetime</Option>
+            <Option value="free">Free (Miễn phí)</Option>
+            {packages.map(pkg => (
+              <Option key={pkg.planId} value={pkg.planId}>
+                {pkg.name} ({pkg.durationValue} {pkg.durationType === 'days' ? 'ngày' : 'tháng'})
+              </Option>
+            ))}
           </Select>
         </div>
 
