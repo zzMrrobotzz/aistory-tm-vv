@@ -183,40 +183,7 @@ const Pricing: React.FC = () => {
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {/* Free Plan */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Miễn phí</h3>
-              <div className="text-4xl font-bold text-gray-900 mb-2">
-                0₫
-              </div>
-              <p className="text-gray-600">Dùng thử các tính năng cơ bản</p>
-            </div>
-            
-            <ul className="space-y-3 mb-8">
-              <li className="flex items-center">
-                <Check className="h-5 w-5 text-green-500 mr-3" />
-                <span>Xem trước giao diện</span>
-              </li>
-              <li className="flex items-center">
-                <Check className="h-5 w-5 text-green-500 mr-3" />
-                <span>Tính năng cơ bản</span>
-              </li>
-              <li className="flex items-center">
-                <Check className="h-5 w-5 text-green-500 mr-3" />
-                <span>Cần API key riêng</span>
-              </li>
-            </ul>
-            
-            <button 
-              className="w-full py-3 px-6 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-              disabled
-            >
-              Gói hiện tại
-            </button>
-          </div>
-
-          {/* Paid Plans */}
+          {/* Paid Plans from Database */}
           {packages.map((pkg) => (
             <div 
               key={pkg._id}
@@ -268,7 +235,7 @@ const Pricing: React.FC = () => {
                   <span>Sử dụng API key riêng</span>
                 </li>
                 {/* Special features based on package type */}
-                {((pkg.durationValue || pkg.durationMonths) >= 999) && (
+                {(((pkg.durationValue || pkg.durationMonths) || 0) >= 999) && (
                   <li className="flex items-center">
                     <Zap className="h-5 w-5 text-yellow-500 mr-3" />
                     <span className="font-semibold text-yellow-600">
