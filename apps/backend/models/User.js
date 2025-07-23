@@ -20,8 +20,8 @@ const userSchema = new mongoose.Schema({
   },
   subscriptionType: {
     type: String,
-    enum: ['free', 'monthly', 'lifetime'],
     default: 'free',
+    // Removed enum restriction to allow flexible subscription types including trial packages
   },
   subscriptionExpiresAt: {
     type: Date,

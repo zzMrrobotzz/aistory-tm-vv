@@ -29,7 +29,14 @@ const Pricing: React.FC = () => {
 
   const fetchPackages = async () => {
     try {
-      const response = await fetch('https://aistory-backend.onrender.com/api/packages');
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await fetch(`https://aistory-backend.onrender.com/api/packages?t=${timestamp}`, {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
       const data = await response.json();
       if (data.success) {
         // Sort packages: trial packages first, then monthly, then lifetime

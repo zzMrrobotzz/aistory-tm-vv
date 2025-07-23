@@ -136,7 +136,13 @@ router.put('/:id/subscription', /* isAdmin, */ async (req, res) => {
   try {
     const { subscriptionType, subscriptionExpiresAt } = req.body;
     
-    if (!subscriptionType || !['free', 'monthly', 'lifetime'].includes(subscriptionType)) {
+    if (!subscriptionType) {
+      return res.status(400).json({ success: false, message: 'Subscription type is required' });
+    }
+    
+    // Allow more flexible subscription types including trial packages and custom planIds
+    // Basic validation: must be a non-empty string
+    if (typeof subscriptionType !== 'string' || subscriptionType.trim().length === 0) {
       return res.status(400).json({ success: false, message: 'Invalid subscription type' });
     }
     
