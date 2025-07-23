@@ -463,6 +463,7 @@ app.use('/api/settings', settingsRouter);
 
 // Mount new routes
 app.use('/api/admin/stats', adminStatsRouter);
+app.use('/api/admin/users', require('./routes/adminUsers'));
 app.use('/api/ai', aiProxyRouter);
 app.use('/api/auth', require('./routes/auth'));
 

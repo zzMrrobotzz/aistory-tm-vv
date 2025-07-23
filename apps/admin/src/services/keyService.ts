@@ -372,6 +372,75 @@ export const deletePackage = async (packageId: string) => {
     }
 };
 
+// --- User Management Functions ---
+
+export const fetchUsers = async (page = 1, limit = 10, search = '', status = 'all') => {
+    return handleApiCall(
+        async () => {
+            const response = await apiClient.get('/admin/users', {
+                params: { page, limit, search, status }
+            });
+            if (response.data.success) {
+                return response.data;
+            }
+            throw new Error('API response not successful');
+        },
+        {
+            users: [],
+            pagination: { current: 1, pages: 1, total: 0 }
+        },
+        'fetchUsers'
+    );
+};
+
+export const fetchUserStats = async () => {
+    return handleApiCall(
+        async () => {
+            const response = await apiClient.get('/admin/users/stats/summary');
+            if (response.data.success) {
+                return response.data.stats;
+            }
+            throw new Error('API response not successful');
+        },
+        {
+            totalUsers: 0,
+            activeUsers: 0,
+            inactiveUsers: 0,
+            newUsersThisMonth: 0,
+            recentUsers: []
+        },
+        'fetchUserStats'
+    );
+};
+
+export const updateUserCredits = async (userId: string, credits: number) => {
+    try {
+        const isAvailable = await checkBackendStatus();
+        if (!isAvailable) {
+            throw new Error('Backend không khả dụng. Vui lòng thử lại sau.');
+        }
+        const { data } = await apiClient.put(`/admin/users/${userId}/credits`, { credits });
+        return data;
+    } catch (error) {
+        console.error('Error updating user credits:', error);
+        throw new Error(error.response?.data?.message || 'Không thể cập nhật credits. Vui lòng thử lại.');
+    }
+};
+
+export const updateUserStatus = async (userId: string, isActive: boolean) => {
+    try {
+        const isAvailable = await checkBackendStatus();
+        if (!isAvailable) {
+            throw new Error('Backend không khả dụng. Vui lòng thử lại sau.');
+        }
+        const { data } = await apiClient.put(`/admin/users/${userId}/status`, { isActive });
+        return data;
+    } catch (error) {
+        console.error('Error updating user status:', error);
+        throw new Error(error.response?.data?.message || 'Không thể cập nhật trạng thái user. Vui lòng thử lại.');
+    }
+};
+
 // --- Backend Wake-up Function ---
 export const wakeUpBackend = async () => {
     try {
