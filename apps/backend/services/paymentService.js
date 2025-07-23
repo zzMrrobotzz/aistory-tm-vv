@@ -196,7 +196,7 @@ class PaymentService {
                 const paymentData = {
                     orderCode: parseInt(orderCode),
                     amount: parseInt(plan.price),
-                    description: `Dang ky goi ${plan.name}`,
+                    description: plan.planId === 'monthly_premium' ? 'Goi Hang Thang' : 'Goi Vinh Vien',
                     items: [{
                         name: plan.name,
                         quantity: 1,
@@ -433,7 +433,7 @@ qrCode: '',
             const paymentId = uuidv4();
             const orderCode = Date.now(); // Unique order code for PayOS
             const transferContent = this.generateTransferContent(userKey, paymentId);
-            const description = `Nap ${creditAmount} credit`; // Max 25 chars for PayOS
+            const description = `Credit ${creditAmount}`.substring(0, 25); // Max 25 chars for PayOS
             
             const paymentData = {
                 amount: price,
