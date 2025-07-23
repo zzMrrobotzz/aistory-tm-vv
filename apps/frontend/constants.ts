@@ -45,6 +45,13 @@ export const NAVIGATION_GROUPS = [
        { id: ActiveModule.SuperAgent, label: "Siêu Trợ Lý AI", icon: "🚀" },
        { id: ActiveModule.Support, label: "Hỗ Trợ & Liên Hệ", icon: "📞" },
     ]
+  },
+  {
+    title: "Cài Đặt",
+    icon: "⚙️",
+    subItems: [
+       { id: ActiveModule.Settings, label: "Quản Lý API Keys", icon: "🔑" },
+    ]
   }
 ];
 

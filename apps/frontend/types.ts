@@ -21,6 +21,7 @@ export enum ActiveModule {
   Dream100CompetitorAnalysis = "dream-100-competitor-analysis", // Added
   CharacterStudio = "character-studio", // Added for Character Locking Prompts
   Support = "support", // Added
+  Settings = "settings", // Added for API key management
 }
 
 // Interface for ElevenLabs API key management

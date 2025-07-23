@@ -1011,6 +1011,11 @@ const MainApp: React.FC = () => {
         return <SupportModule 
                   currentUser={currentUser} // Pass user profile
                 />;
+      case ActiveModule.Settings:
+        return <ApiSettingsComponent 
+                  apiSettings={apiSettings}
+                  setApiSettings={setApiSettings}
+                />;
       default:
         return <SuperAgentModule 
                   apiSettings={apiSettings} 

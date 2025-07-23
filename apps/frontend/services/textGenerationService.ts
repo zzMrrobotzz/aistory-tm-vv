@@ -2,6 +2,7 @@
 import { ApiSettings, GroundingChunk } from '../types';
 import * as geminiService from './geminiService';
 import * as deepseekService from './deepseekService';
+import { ApiKeyStorage } from '../utils/apiKeyStorage';
 
 /**
  * Generates text from a prompt, dispatching to the correct service based on ApiSettings.
@@ -18,17 +19,33 @@ export const generateText = async (
   useGoogleSearch?: boolean,
   apiSettings?: ApiSettings
 ): Promise<{ text: string; groundingChunks?: GroundingChunk[] }> => {
-  // Default to Gemini if DeepSeek is not explicitly chosen and configured
-  if (apiSettings?.provider === 'deepseek' && apiSettings.apiKey) {
+  // If no apiSettings provided, load from storage
+  let effectiveApiSettings = apiSettings;
+  if (!effectiveApiSettings) {
+    const activeKeys = ApiKeyStorage.getActiveApiSettings();
+    if (activeKeys.deepseek) {
+      effectiveApiSettings = { provider: 'deepseek', apiKey: activeKeys.deepseek };
+    } else {
+      effectiveApiSettings = { provider: 'gemini', apiKey: activeKeys.gemini || '' };
+    }
+  }
+
+  // Use DeepSeek if explicitly chosen and has key
+  if (effectiveApiSettings?.provider === 'deepseek' && effectiveApiSettings.apiKey) {
     if (useGoogleSearch) {
       console.warn("DeepSeek does not support Google Search grounding. Proceeding without it.");
     }
-    const text = await deepseekService.generateText(prompt, systemInstruction, apiSettings.apiKey);
+    // Update last used timestamp
+    ApiKeyStorage.updateLastUsed('deepseek');
+    const text = await deepseekService.generateText(prompt, systemInstruction, effectiveApiSettings.apiKey);
     return { text, groundingChunks: undefined };
   }
   
   // Default to Gemini for all other cases
-  return geminiService.generateText(prompt, systemInstruction, useGoogleSearch, apiSettings?.apiKey);
+  if (effectiveApiSettings?.apiKey) {
+    ApiKeyStorage.updateLastUsed('gemini');
+  }
+  return geminiService.generateText(prompt, systemInstruction, useGoogleSearch, effectiveApiSettings?.apiKey);
 };
 
 /**
@@ -44,11 +61,27 @@ export const generateTextWithJsonOutput = async <T,>(
   systemInstruction?: string,
   apiSettings?: ApiSettings
 ): Promise<T> => {
-   // Default to Gemini if DeepSeek is not explicitly chosen and configured
-  if (apiSettings?.provider === 'deepseek' && apiSettings.apiKey) {
-    return deepseekService.generateTextWithJsonOutput<T>(prompt, apiSettings.apiKey);
+  // If no apiSettings provided, load from storage
+  let effectiveApiSettings = apiSettings;
+  if (!effectiveApiSettings) {
+    const activeKeys = ApiKeyStorage.getActiveApiSettings();
+    if (activeKeys.deepseek) {
+      effectiveApiSettings = { provider: 'deepseek', apiKey: activeKeys.deepseek };
+    } else {
+      effectiveApiSettings = { provider: 'gemini', apiKey: activeKeys.gemini || '' };
+    }
+  }
+
+  // Use DeepSeek if explicitly chosen and has key
+  if (effectiveApiSettings?.provider === 'deepseek' && effectiveApiSettings.apiKey) {
+    // Update last used timestamp
+    ApiKeyStorage.updateLastUsed('deepseek');
+    return deepseekService.generateTextWithJsonOutput<T>(prompt, effectiveApiSettings.apiKey);
   }
 
   // Default to Gemini for all other cases
-  return geminiService.generateTextWithJsonOutput<T>(prompt, systemInstruction, apiSettings?.apiKey);
+  if (effectiveApiSettings?.apiKey) {
+    ApiKeyStorage.updateLastUsed('gemini');
+  }
+  return geminiService.generateTextWithJsonOutput<T>(prompt, systemInstruction, effectiveApiSettings?.apiKey);
 };
