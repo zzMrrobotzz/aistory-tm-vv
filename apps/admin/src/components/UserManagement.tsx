@@ -53,6 +53,7 @@ const UserManagement: React.FC = () => {
   const [isSubscriptionModalVisible, setIsSubscriptionModalVisible] = useState(false);
   const [newSubscriptionType, setNewSubscriptionType] = useState('free');
   const [newSubscriptionExpiry, setNewSubscriptionExpiry] = useState('');
+  const [manualTrialDays, setManualTrialDays] = useState(3);
 
   const loadUsers = async (page = 1, search = searchText, status = statusFilter) => {
     setLoading(true);
@@ -157,10 +158,20 @@ const UserManagement: React.FC = () => {
 
     try {
       let expiryDate: string;
+      let subscriptionTypeToSave: string;
       
       if (newSubscriptionType === 'free') {
         expiryDate = new Date().toISOString(); // Set to now for free accounts
+        subscriptionTypeToSave = 'free';
+      } else if (newSubscriptionType === 'manual_trial') {
+        // Manual trial - save as trial_Xdays format
+        subscriptionTypeToSave = `trial_${manualTrialDays}days`;
+        const now = new Date();
+        now.setDate(now.getDate() + manualTrialDays);
+        expiryDate = now.toISOString();
       } else {
+        // Regular package
+        subscriptionTypeToSave = newSubscriptionType;
         const selectedPackage = packages.find(pkg => pkg.planId === newSubscriptionType);
         if (selectedPackage && selectedPackage.durationValue >= 999) {
           // Lifetime package
@@ -171,8 +182,8 @@ const UserManagement: React.FC = () => {
         }
       }
 
-      await updateUserSubscription(editingUser._id, newSubscriptionType, expiryDate);
-      message.success('Cập nhật subscription thành công!');
+      await updateUserSubscription(editingUser._id, subscriptionTypeToSave, expiryDate);
+      message.success(`Cập nhật subscription thành công! ${newSubscriptionType === 'manual_trial' ? `Khách hàng được dùng thử ${manualTrialDays} ngày.` : ''}`);
       setIsSubscriptionModalVisible(false);
       setEditingUser(null);
       loadUsers(pagination.current);
@@ -255,6 +266,14 @@ const UserManagement: React.FC = () => {
         if (subStatus === 'free') {
           text = 'Free';
           color = 'default';
+        } else if (subStatus.startsWith('trial_') && subStatus.endsWith('days')) {
+          // Manual trial format: trial_5days
+          const days = subStatus.match(/trial_(\d+)days/)?.[1];
+          text = `🎯 Dùng Thử ${days} Ngày`;
+          color = isExpired ? 'red' : 'cyan';
+          if (isExpired) {
+            text += ' (Hết hạn)';
+          }
         } else {
           // Find package info
           const packageInfo = packages.find(pkg => pkg.planId === subStatus);
@@ -432,6 +451,10 @@ const UserManagement: React.FC = () => {
               (() => {
                 const currentSub = editingUser?.subscriptionType || 'free';
                 if (currentSub === 'free') return 'Free';
+                if (currentSub.startsWith('trial_') && currentSub.endsWith('days')) {
+                  const days = currentSub.match(/trial_(\d+)days/)?.[1];
+                  return `🎯 Dùng Thử ${days} Ngày`;
+                }
                 const packageInfo = packages.find(pkg => pkg.planId === currentSub);
                 return packageInfo ? packageInfo.name : currentSub;
               })()
@@ -450,8 +473,13 @@ const UserManagement: React.FC = () => {
             value={newSubscriptionType}
             onChange={(value) => {
               setNewSubscriptionType(value);
-              // Auto-set expiry date based on package type
-              if (value !== 'free') {
+              // Auto-set expiry date based on selection
+              if (value === 'manual_trial') {
+                // Manual trial - calculate from current date + manual days
+                const now = new Date();
+                now.setDate(now.getDate() + manualTrialDays);
+                setNewSubscriptionExpiry(now.toISOString().split('T')[0]);
+              } else if (value !== 'free') {
                 const selectedPackage = packages.find(pkg => pkg.planId === value);
                 if (selectedPackage) {
                   const now = new Date();
@@ -471,14 +499,42 @@ const UserManagement: React.FC = () => {
             }}
             style={{ width: '100%', marginTop: 8 }}
           >
-            <Option value="free">Free (Miễn phí)</Option>
+            <Option value="free">🆓 Free (Miễn phí)</Option>
+            <Option value="manual_trial">🎯 Dùng Thử Tùy Chỉnh (Theo Ngày)</Option>
+            <hr style={{ margin: '8px 0', borderColor: '#d9d9d9' }} />
             {packages.map(pkg => (
               <Option key={pkg.planId} value={pkg.planId}>
-                {pkg.name} ({pkg.durationValue} {pkg.durationType === 'days' ? 'ngày' : 'tháng'})
+                {pkg.durationType === 'days' ? '⏰' : pkg.durationValue >= 999 ? '👑' : '📅'} {pkg.name} ({pkg.durationValue} {pkg.durationType === 'days' ? 'ngày' : 'tháng'})
               </Option>
             ))}
           </Select>
         </div>
+
+        {/* Manual Trial Days Input */}
+        {newSubscriptionType === 'manual_trial' && (
+          <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#e6f7ff', borderRadius: 4, border: '1px solid #91d5ff' }}>
+            <label>Số ngày dùng thử:</label>
+            <InputNumber
+              value={manualTrialDays}
+              onChange={(value) => {
+                setManualTrialDays(value || 1);
+                // Auto-update expiry date when days change
+                const now = new Date();
+                now.setDate(now.getDate() + (value || 1));
+                setNewSubscriptionExpiry(now.toISOString().split('T')[0]);
+              }}
+              min={1}
+              max={365}
+              style={{ width: '100%', marginTop: 8 }}
+              placeholder="Nhập số ngày (1-365)"
+            />
+            <div style={{ fontSize: '12px', color: '#1890ff', marginTop: 4 }}>
+              💡 Khách hàng sẽ được dùng thử tất cả tính năng trong {manualTrialDays} ngày
+              <br />
+              📅 Hết hạn: {new Date(Date.now() + manualTrialDays * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN')}
+            </div>
+          </div>
+        )}
 
         {newSubscriptionType !== 'free' && (
           <div>
