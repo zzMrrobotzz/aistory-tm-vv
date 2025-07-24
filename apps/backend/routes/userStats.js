@@ -58,10 +58,17 @@ router.get('/usage-stats', auth, async (req, res) => {
       .reduce((sum, day) => sum + (day.apiCalls || 0), 0);
 
     // Find favorite module
-    const moduleUsage = user.usageStats.moduleUsage || {};
-    const favoriteModule = Object.keys(moduleUsage).reduce((a, b) => 
-      moduleUsage[a] > moduleUsage[b] ? a : b, 'Viết Truyện'
-    ) || 'Viết Truyện';
+    const moduleUsage = user.usageStats.moduleUsage || new Map();
+    let favoriteModule = 'Viết Truyện';
+    if (moduleUsage.size > 0) {
+      let maxUsage = 0;
+      for (const [moduleName, usage] of moduleUsage) {
+        if (usage > maxUsage) {
+          maxUsage = usage;
+          favoriteModule = moduleName;
+        }
+      }
+    }
 
     // Response data
     const usageStats = {
@@ -118,7 +125,7 @@ router.post('/log-usage', auth, async (req, res) => {
         favoriteModule: 'Viết Truyện',
         lastActiveDate: new Date(),
         dailyUsage: [],
-        moduleUsage: {}
+        moduleUsage: new Map()
       };
     }
 
@@ -145,7 +152,7 @@ router.post('/log-usage', auth, async (req, res) => {
 
     // Update overall stats
     user.usageStats.totalApiCalls += count;
-    user.usageStats.moduleUsage[module] = (user.usageStats.moduleUsage[module] || 0) + count;
+    user.usageStats.moduleUsage.set(module, (user.usageStats.moduleUsage.get(module) || 0) + count);
     user.usageStats.lastActiveDate = today;
 
     // Update specific counters based on action
@@ -170,12 +177,19 @@ router.post('/log-usage', auth, async (req, res) => {
       new Date(day.date) >= ninetyDaysAgo
     );
 
-    await user.save();
-
-    res.json({
-      success: true,
-      message: 'Usage logged successfully'
-    });
+    try {
+      await user.save();
+      res.json({
+        success: true,
+        message: 'Usage logged successfully'
+      });
+    } catch (saveError) {
+      console.error('Error saving user usage stats:', saveError);
+      res.status(500).json({
+        success: false,
+        message: 'Error saving usage statistics'
+      });
+    }
 
   } catch (error) {
     console.error('Error logging usage:', error);
