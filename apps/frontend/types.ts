@@ -1,6 +1,7 @@
 
 
 export enum ActiveModule {
+  Dashboard = "dashboard", // Added for user dashboard
   SuperAgent = "super-agent",
   CreativeLab = "creative-lab",
   // HookGenerator = "hook-generator", // Removed

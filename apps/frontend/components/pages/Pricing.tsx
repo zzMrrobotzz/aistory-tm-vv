@@ -31,10 +31,11 @@ const Pricing: React.FC = () => {
     try {
       // Add timestamp to prevent caching
       const timestamp = new Date().getTime();
-      const response = await fetch(`https://aistory-backend.onrender.com/api/packages?t=${timestamp}`, {
+      const response = await fetch(`https://aistory-backend.onrender.com/api/packages?t=${timestamp}&v=2`, {
         cache: 'no-cache',
         headers: {
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
       });
       const data = await response.json();

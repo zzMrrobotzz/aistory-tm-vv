@@ -7,6 +7,13 @@ export const APP_SUBTITLE = "Powered by Gemini AI";
 
 export const NAVIGATION_GROUPS = [
   {
+    title: "Dashboard",
+    icon: "📊",
+    subItems: [
+      { id: ActiveModule.Dashboard, label: "Tổng Quan Dashboard", icon: "📊" },
+    ]
+  },
+  {
     title: "Viết Truyện",
     icon: "✍️",
     subItems: [

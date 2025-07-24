@@ -31,6 +31,7 @@ import {
 import Sidebar from './components/Sidebar';
 import MainHeader from './components/MainHeader';
 import Settings from './components/pages/Settings';
+import Dashboard from './components/pages/Dashboard'; // Added for Dashboard
 import SuperAgentModule from './components/modules/SuperAgentModule';
 import CreativeLabModule from './components/modules/CreativeLabModule';
 import WriteStoryModule from './components/modules/WriteStoryModule';
@@ -58,7 +59,7 @@ import Pricing from './components/pages/Pricing'; // Added for Pricing module
 const MainApp: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.SuperAgent);
+  const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.Dashboard);
   // API Settings are now centralized in Settings module
   // Removed elevenLabsApiKeys state
   const [apiSettings, setApiSettings] = useState<ApiSettings>({
@@ -918,6 +919,8 @@ const MainApp: React.FC = () => {
 
   const renderActiveModule = () => {
     switch (activeModule) {
+      case ActiveModule.Dashboard:
+        return <Dashboard currentUser={currentUser} setActiveModule={setActiveModule} />;
       case ActiveModule.SuperAgent:
         return <SuperAgentModule 
                   apiSettings={apiSettings} 
@@ -1037,12 +1040,7 @@ const MainApp: React.FC = () => {
       case ActiveModule.Pricing:
         return <Pricing />;
       default:
-        return <SuperAgentModule 
-                  apiSettings={apiSettings} 
-                  moduleState={superAgentState}
-                  setModuleState={setSuperAgentState}
-                  currentUser={currentUser} // Pass user profile
-                />;
+        return <Dashboard currentUser={currentUser} setActiveModule={setActiveModule} />;
     }
   };
 
