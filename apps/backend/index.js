@@ -467,6 +467,7 @@ app.use('/api/admin/stats', adminStatsRouter);
 app.use('/api/admin/users', require('./routes/adminUsers'));
 app.use('/api/admin', require('./routes/adminPackages')); // Package management
 app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment management
+app.use('/api/admin/anti-sharing', require('./routes/adminAntiSharing')); // Anti-sharing management
 app.use('/api/ai', aiProxyRouter);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/user', require('./routes/userStats')); // User statistics

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, DollarSign, Edit, Trash2, PlusCircle } from 'lucide-react';
-import { Card, Button, message, Modal, Form, Input, InputNumber, Switch, Popconfirm, Space, Spin, Typography } from 'antd';
+import { Edit, Trash2, PlusCircle } from 'lucide-react';
+import { message, Modal, Form, Input, InputNumber, Switch, Popconfirm, Space, Spin } from 'antd';
 import { fetchPackages, createPackage, updatePackage, deletePackage } from '../services/keyService';
 
-const { Title, Text } = Typography;
+// const { Title } = Typography; // Currently unused
 
 interface SubscriptionPlan {
   _id: string;

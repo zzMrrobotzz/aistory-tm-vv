@@ -3,6 +3,8 @@ const router = express.Router();
 const { authenticateUser } = require('../middleware/adminAuth');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
+const { updateSessionActivity, checkAccountBlock } = require('../middleware/antiSharing');
+const { validateActiveSession } = require('../middleware/singleSession');
 
 // Import logging models (create simplified versions if they don't exist)
 let ApiRequestLog, ApiProvider;
@@ -47,7 +49,7 @@ router.get('/providers', async (req, res) => {
 });
 
 // POST /ai/generate - Proxy AI text generation
-router.post('/generate', aiRequestLimiter, async (req, res) => {
+router.post('/generate', aiRequestLimiter, validateActiveSession, checkAccountBlock, updateSessionActivity, async (req, res) => {
   try {
     const { prompt, systemInstruction, provider, model, useGoogleSearch, options } = req.body;
     const userId = req.headers.authorization?.split(' ')[1]; // Lấy user key từ authorization header
@@ -233,7 +235,7 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
 });
 
 // POST /ai/generate-image - Proxy AI image generation
-router.post('/generate-image', aiRequestLimiter, async (req, res) => {
+router.post('/generate-image', aiRequestLimiter, validateActiveSession, checkAccountBlock, updateSessionActivity, async (req, res) => {
   try {
     const { prompt, aspectRatio, provider } = req.body;
     const userId = req.headers.authorization?.split(' ')[1]; // Lấy user key từ authorization header

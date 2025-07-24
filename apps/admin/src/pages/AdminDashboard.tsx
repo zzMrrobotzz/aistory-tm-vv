@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import StatCard from '../components/StatCard';
 import { fetchKeys, fetchDashboardStats, fetchAuditLogs, fetchApiProviders, fetchDailyApiStats, wakeUpBackend } from '../services/keyService';
-import { DollarSign, KeyRound, Users, Activity, Cpu, Cloud, Shield, CreditCard, Server, WifiOff } from 'lucide-react';
+import { DollarSign, KeyRound, Users, Activity, Cpu, Cloud, Shield, CreditCard, Server } from 'lucide-react';
 import { message, Empty, Row, Col, List, Card as AntCard, Spin, Skeleton, Result, Button } from 'antd';
 import { AdminKey, ManagedApiProvider } from '../types';
 

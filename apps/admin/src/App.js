@@ -5,9 +5,10 @@ import { Layout, Menu, Button, Card, Form, Input, message, Table, Tag, Space, Mo
 import { PlusOutlined } from '@ant-design/icons';
 import { saveAs } from 'file-saver';
 import PackageManagement from './components/PackageManagement';
+import AdminAntiSharing from './pages/AdminAntiSharing';
 
 const { Header, Content, Footer } = Layout;
-const API_BASE = "https://key-manager-backend.onrender.com/api";
+const API_BASE = "https://aistory-backend.onrender.com/api";
 
 // --- Admin Login ---
 const ADMIN_USER = "admin";
@@ -241,6 +242,7 @@ function App() {
                     <Menu.Item key="keys">Quản lý Key</Menu.Item>
                     <Menu.Item key="providers">Quản lý API</Menu.Item>
                     <Menu.Item key="packages">Quản lý Gói</Menu.Item>
+                    <Menu.Item key="anti-sharing">Chống Chia Sẻ</Menu.Item>
                 </Menu>
                 <Button onClick={handleLogout} style={{ float: 'right', marginTop: 16 }}>Đăng xuất</Button>
             </Header>
@@ -249,6 +251,7 @@ function App() {
                     {currentView === 'keys' && <KeyManager />}
                     {currentView === 'providers' && <ApiProviderManager />}
                     {currentView === 'packages' && <PackageManagement />}
+                    {currentView === 'anti-sharing' && <AdminAntiSharing />}
                 </div>
             </Content>
             <Footer style={{ textAlign: 'center' }}>Admin Panel ©{new Date().getFullYear()}</Footer>

@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
     Table, Button, Modal, Form, Input, Select, Switch, Space, message, 
     Popconfirm, Badge, Tag, Card, Row, Col, Statistic, Tooltip, 
-    InputNumber, Spin, Empty, Typography 
+    InputNumber, Empty, Typography 
 } from 'antd';
 import { 
-    Plus, Wifi, WifiOff, TestTube, Play, Settings, BarChart3, 
-    Globe, Shield, Clock, CheckCircle, XCircle, AlertCircle 
+    Plus, Wifi, TestTube, Play, Settings, BarChart3, 
+    Globe, Shield, CheckCircle, XCircle 
 } from 'lucide-react';
-import { ProxyItem, ProxyStatistics, ProxyTestResult } from '../types';
+import { ProxyItem, ProxyStatistics } from '../types';
 import { 
     fetchProxies, createProxy, updateProxy, deleteProxy, 
     testProxy, batchTestProxies, autoAssignProxies, fetchProxyStats,
@@ -49,6 +49,7 @@ const AdminProxyManagement: React.FC = () => {
     useEffect(() => {
         loadProxies();
         loadStatistics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pagination.current, pagination.pageSize, filters]);
 
     const loadProxies = async () => {

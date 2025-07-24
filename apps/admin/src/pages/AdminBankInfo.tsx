@@ -73,6 +73,7 @@ const AdminBankInfo: React.FC = () => {
 
   useEffect(() => {
     fetchBankInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (fetching) {

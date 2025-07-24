@@ -106,8 +106,8 @@ const checkBackendStatus = async () => {
 
     try {
         console.log('🔍 Checking backend status...');
-        const response = await apiClient.get('/status');
-        console.log('✅ Backend status check successful:', response.data);
+        await apiClient.get('/status');
+        console.log('✅ Backend status check successful');
         isBackendAvailable = true;
         lastBackendCheck = now;
         return true;
@@ -472,7 +472,7 @@ export const wakeUpBackend = async () => {
         
         // Fallback: Try with fetch (no-cors mode for debugging)
         try {
-            const response = await fetch(`${API_BASE}/status`, {
+            await fetch(`${API_BASE}/status`, {
                 method: 'GET',
                 mode: 'no-cors', // Bypass CORS for testing
                 headers: {

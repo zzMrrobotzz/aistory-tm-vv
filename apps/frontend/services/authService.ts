@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { LoginData, RegisterData, UserProfile } from '../types';
+import { deviceFingerprinter } from '../utils/deviceFingerprint.js';
+import { sessionService } from './sessionService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com/api';
 
@@ -17,16 +19,40 @@ const setAuthToken = (token: string | null) => {
   }
 };
 
+// Helper function to get device fingerprint
+const getDeviceFingerprint = async () => {
+  try {
+    const fingerprintData = await deviceFingerprinter.generateFingerprint();
+    console.log('🔍 Device fingerprint generated:', fingerprintData.confidence + '% confidence');
+    return fingerprintData;
+  } catch (error) {
+    console.warn('❌ Failed to generate device fingerprint:', error);
+    return null;
+  }
+};
+
 export const register = async (userData: RegisterData) => {
   try {
     console.log('Attempting registration with:', userData.username, userData.email);
+    
+    // Generate device fingerprint
+    const fingerprintData = await getDeviceFingerprint();
+    
+    const requestBody = {
+      ...userData,
+      ...(fingerprintData && {
+        fingerprint: fingerprintData.fingerprint,
+        deviceInfo: fingerprintData.deviceInfo,
+        sessionToken: `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      })
+    };
     
     const response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(userData),
+      body: JSON.stringify(requestBody),
     });
     
     console.log('Registration response status:', response.status);
@@ -42,6 +68,12 @@ export const register = async (userData: RegisterData) => {
     
     if (data.token) {
       setAuthToken(data.token);
+      // Store session token for anti-sharing tracking
+      if (data.sessionToken) {
+        localStorage.setItem('sessionToken', data.sessionToken);
+        // Set session token header for future requests
+        authApi.defaults.headers.common['x-session-token'] = data.sessionToken;
+      }
       // Remove any demo user data
       localStorage.removeItem('demo_user');
     }
@@ -59,12 +91,26 @@ export const register = async (userData: RegisterData) => {
 export const login = async (userData: LoginData) => {
   // Try with fetch first to bypass CORS
   try {
+    console.log('Attempting login with:', userData.email);
+    
+    // Generate device fingerprint
+    const fingerprintData = await getDeviceFingerprint();
+    
+    const requestBody = {
+      ...userData,
+      ...(fingerprintData && {
+        fingerprint: fingerprintData.fingerprint,
+        deviceInfo: fingerprintData.deviceInfo,
+        sessionToken: `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      })
+    };
+    
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(userData),
+      body: JSON.stringify(requestBody),
     });
     
     if (!response.ok) {
@@ -75,7 +121,26 @@ export const login = async (userData: LoginData) => {
     const data = await response.json();
     if (data.token) {
       setAuthToken(data.token);
+      // Store session token for anti-sharing tracking
+      if (data.sessionToken) {
+        localStorage.setItem('sessionToken', data.sessionToken);
+        // Set session token header for future requests
+        authApi.defaults.headers.common['x-session-token'] = data.sessionToken;
+      }
     }
+    
+    console.log('Login successful, received data:', data);
+    
+    // Initialize session monitoring for single session mode
+    if (data.singleSession) {
+      sessionService.initialize(() => {
+        // Handle session termination
+        console.log('Session terminated, redirecting to login...');
+        logout();
+        window.location.replace('/login');
+      });
+    }
+    
     return data;
   } catch (error) {
     console.warn('Backend login failed, checking demo mode:', error.message);
@@ -97,8 +162,15 @@ export const login = async (userData: LoginData) => {
 };
 
 export const logout = () => {
+  // Cleanup session monitoring
+  sessionService.cleanup();
+  
+  // Clear all auth-related data
   localStorage.removeItem('userToken');
+  localStorage.removeItem('sessionToken');
   setAuthToken(null);
+  // Remove session token header
+  delete authApi.defaults.headers.common['x-session-token'];
 };
 
 export const getCurrentUserToken = () => {
@@ -137,6 +209,17 @@ export const getUserProfile = async (): Promise<UserProfile> => {
 
 // Make sure setAuthToken is called on initial load if token exists
 const token = getCurrentUserToken();
+const sessionToken = localStorage.getItem('sessionToken');
 if (token) {
     setAuthToken(token);
+    if (sessionToken) {
+        authApi.defaults.headers.common['x-session-token'] = sessionToken;
+        
+        // Initialize session monitoring if we have a valid session
+        sessionService.initialize(() => {
+          console.log('Session terminated on app load, redirecting to login...');
+          logout();
+          window.location.replace('/login');
+        });
+    }
 } 
