@@ -16,6 +16,7 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import { Languages, StopCircle } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
+import { logApiCall, logStoryGenerated } from '../../services/usageService';
 
 interface WriteStoryModuleProps {
   apiSettings: ApiSettings;
@@ -155,6 +156,10 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         const hookTitle = storyInputForHook.split('\n')[0]?.trim().substring(0, 50) || 'Hooks không tiêu đề';
         HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY + '_hooks', hookTitle, result.text);
       }
+      
+      // Log usage statistics for hooks generation
+      logApiCall('write-story', 1); // 1 API call for hooks
+      logStoryGenerated('write-story', hookCount); // Log number of hooks generated
     } catch (e: any) {
       if (e.name === 'AbortError') {
         updateState({ hookError: 'Tạo hook đã bị hủy.', hookLoadingMessage: 'Đã hủy.' });
@@ -386,6 +391,10 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         const storyTitle = storyOutline.split('\n')[0]?.trim() || 'Truyện không tiêu đề';
         HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY, storyTitle, editedStory);
       }
+      
+      // Log usage statistics for story generation
+      logApiCall('write-story', 2); // Typically uses 2 API calls (generate + edit)
+      logStoryGenerated('write-story', 1); // Log 1 story generated
     } catch (e: any) {
       if (e.name === 'AbortError') {
          updateState({ storyError: 'Biên tập truyện đã bị hủy.', storyLoadingMessage: 'Đã hủy biên tập.', singleStoryEditProgress: null, hasSingleStoryBeenEditedSuccessfully: false });
@@ -466,6 +475,10 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         const lessonTitle = storyInputForLesson.split('\n')[0]?.trim().substring(0, 50) || 'Bài học không tiêu đề';
         HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY + '_lessons', lessonTitle, result.text);
       }
+      
+      // Log usage statistics for lesson generation
+      logApiCall('write-story', 1); // 1 API call for lesson
+      logStoryGenerated('write-story', 1); // Log 1 lesson generated
     } catch (e: any) {
        if (e.name === 'AbortError') {
         updateState({ lessonError: 'Tạo bài học đã bị hủy.', lessonLoadingMessage: 'Đã hủy.' });

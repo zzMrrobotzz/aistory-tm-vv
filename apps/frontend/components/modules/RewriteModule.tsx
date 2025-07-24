@@ -13,6 +13,7 @@ import { generateText } from '../../services/textGenerationService';
 import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
+import { logApiCall, logTextRewritten } from '../../services/usageService';
 
 
 interface RewriteModuleProps {
@@ -139,6 +140,10 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 HistoryStorage.saveToHistory(MODULE_KEYS.REWRITE, title, fullRewrittenText.trim());
             }
             
+            // Log usage statistics
+            logApiCall('rewrite', numChunks); // Log API calls used
+            logTextRewritten('rewrite', 1); // Log 1 text rewritten
+            
             // Reset progress to 0 after completion to enable button
             setTimeout(() => updateState({ progress: 0 }), 1500);
         } catch (e) {
@@ -188,6 +193,9 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         try {
             const result = await generateText(editPrompt, undefined, false, apiSettings);
             updateState({ rewrittenText: result?.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true });
+            
+            // Log usage statistics for post-edit
+            logApiCall('rewrite', 1); // Log 1 additional API call for editing
         } catch (e) {
             updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
         } finally {
