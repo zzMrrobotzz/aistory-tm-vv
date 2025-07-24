@@ -146,20 +146,29 @@ router.get('/', async (req, res) => {
 // POST /api/packages - Tạo gói cước mới
 router.post('/', async (req, res) => {
     try {
-        const { planId, name, description, price, durationMonths, isPopular, isActive } = req.body;
+        const { planId, name, description, price, durationMonths, durationType, durationValue, isPopular, isActive } = req.body;
+        
+        console.log('📦 Creating new package:', { planId, name, price, durationType, durationValue });
+        
         const newPackage = new CreditPackage({ 
             planId,
             name,
             description,
             price,
-            durationMonths,
+            durationType: durationType || 'months',
+            durationValue: durationValue || durationMonths || 1,
+            durationMonths, // Keep for backward compatibility
             isPopular: isPopular || false,
             isActive: isActive !== undefined ? isActive : true,
         });
+        
         await newPackage.save();
+        console.log('✅ Package created successfully:', newPackage.planId);
+        
         await createAuditLog('CREATE_PACKAGE', `Gói cước "${name}" đã được tạo.`);
         res.status(201).json({ success: true, package: newPackage });
     } catch (error) {
+        console.error('❌ Error creating package:', error);
         res.status(400).json({ success: false, error: 'Dữ liệu không hợp lệ', details: error.message });
     }
 });
@@ -167,18 +176,38 @@ router.post('/', async (req, res) => {
 // PUT /api/packages/:id - Cập nhật gói cước
 router.put('/:id', async (req, res) => {
     try {
-        const { planId, name, description, price, durationMonths, isPopular, isActive } = req.body;
+        const { planId, name, description, price, durationMonths, durationType, durationValue, isPopular, isActive } = req.body;
+        
+        console.log(`📦 Updating package ${req.params.id}:`, { planId, name, price, durationType, durationValue });
+        
+        const updateData = {
+            planId,
+            name,
+            description,
+            price,
+            durationType: durationType || 'months',
+            durationValue: durationValue || durationMonths || 1,
+            durationMonths, // Keep for backward compatibility
+            isPopular,
+            isActive
+        };
+        
         const updatedPackage = await CreditPackage.findByIdAndUpdate(
             req.params.id,
-            { planId, name, description, price, durationMonths, isPopular, isActive },
+            updateData,
             { new: true, runValidators: true }
         );
+        
         if (!updatedPackage) {
             return res.status(404).json({ success: false, error: 'Không tìm thấy gói cước' });
         }
+        
+        console.log('✅ Package updated successfully:', updatedPackage.planId);
+        
         await createAuditLog('UPDATE_PACKAGE', `Gói cước "${updatedPackage.name}" đã được cập nhật.`);
         res.json({ success: true, package: updatedPackage });
     } catch (error) {
+        console.error('❌ Error updating package:', error);
         res.status(400).json({ success: false, error: 'Dữ liệu không hợp lệ', details: error.message });
     }
 });
