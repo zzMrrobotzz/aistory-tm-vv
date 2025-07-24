@@ -138,6 +138,9 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 const title = `Viết lại - ${new Date().toLocaleString('vi-VN')}`;
                 HistoryStorage.saveToHistory(MODULE_KEYS.REWRITE, title, fullRewrittenText.trim());
             }
+            
+            // Reset progress to 0 after completion to enable button
+            setTimeout(() => updateState({ progress: 0 }), 1500);
         } catch (e) {
             if (abortControllerRef.current?.signal.aborted) {
                 updateState({ loadingMessage: 'Đã dừng!', progress: 0 });
