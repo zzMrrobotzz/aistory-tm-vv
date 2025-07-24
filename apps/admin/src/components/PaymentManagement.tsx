@@ -24,7 +24,7 @@ interface Payment {
   planId?: string;
   creditAmount?: number;
   price: number;
-  status: 'pending' | 'completed' | 'failed' | 'expired';
+  status: 'pending' | 'completed' | 'failed' | 'expired' | 'refunded';
   paymentMethod: string;
   transactionId?: string;
   createdAt: string;
@@ -414,6 +414,7 @@ const PaymentManagement: React.FC = () => {
             <Option value="pending">Đang chờ</Option>
             <Option value="failed">Thất bại</Option>
             <Option value="expired">Hết hạn</Option>
+            <Option value="refunded">Hoàn tiền</Option>
           </Select>
           <Select
             value={paymentMethodFilter}
