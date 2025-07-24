@@ -469,6 +469,7 @@ app.use('/api/admin', require('./routes/adminPackages')); // Package management
 app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment management
 app.use('/api/ai', aiProxyRouter);
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/user', require('./routes/userStats')); // User statistics
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {

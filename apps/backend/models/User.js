@@ -43,6 +43,48 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  usageStats: {
+    totalApiCalls: {
+      type: Number,
+      default: 0
+    },
+    storiesGenerated: {
+      type: Number,
+      default: 0
+    },
+    imagesGenerated: {
+      type: Number,
+      default: 0
+    },
+    textRewritten: {
+      type: Number,
+      default: 0
+    },
+    videosCreated: {
+      type: Number,
+      default: 0
+    },
+    favoriteModule: {
+      type: String,
+      default: 'Viết Truyện'
+    },
+    lastActiveDate: {
+      type: Date,
+      default: Date.now
+    },
+    dailyUsage: [{
+      date: Date,
+      apiCalls: Number,
+      modules: {
+        type: Map,
+        of: Number
+      }
+    }],
+    moduleUsage: {
+      type: Map,
+      of: Number
+    }
+  },
 });
 
 const bcrypt = require('bcryptjs');

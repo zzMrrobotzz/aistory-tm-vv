@@ -56,42 +56,34 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setActiveModule }) =
       });
 
       if (!response.ok) {
-        // If API endpoint doesn't exist yet, use mock data
-        if (response.status === 404) {
-          setUsageStats({
-            totalApiCalls: 1247,
-            todayApiCalls: 23,
-            weeklyApiCalls: 156,
-            monthlyApiCalls: 642,
-            favoriteModule: 'Viết Truyện',
-            lastActiveDate: new Date().toISOString(),
-            storiesGenerated: 89,
-            imagesGenerated: 245,
-            textRewritten: 167,
-            videosCreated: 12
-          });
-        } else {
-          throw new Error('Không thể lấy thống kê sử dụng');
-        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setUsageStats(result.data);
       } else {
-        const data = await response.json();
-        setUsageStats(data);
+        throw new Error('Invalid response format');
       }
     } catch (error: any) {
       console.error('Error fetching usage stats:', error);
-      // Fallback to mock data for now
-      setUsageStats({
-        totalApiCalls: 1247,
-        todayApiCalls: 23,
-        weeklyApiCalls: 156,
-        monthlyApiCalls: 642,
-        favoriteModule: 'Viết Truyện',
-        lastActiveDate: new Date().toISOString(),
-        storiesGenerated: 89,
-        imagesGenerated: 245,
-        textRewritten: 167,
-        videosCreated: 12
-      });
+      setError(`Không thể lấy thống kê sử dụng: ${error.message}`);
+      
+      // Fallback to basic stats based on user account
+      const basicStats = {
+        totalApiCalls: 0,
+        todayApiCalls: 0,
+        weeklyApiCalls: 0,
+        monthlyApiCalls: 0,
+        favoriteModule: 'Chưa có hoạt động',
+        lastActiveDate: currentUser?.createdAt || new Date().toISOString(),
+        storiesGenerated: 0,
+        imagesGenerated: 0,
+        textRewritten: 0,
+        videosCreated: 0
+      };
+      setUsageStats(basicStats);
     } finally {
       setLoading(false);
     }

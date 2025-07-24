@@ -54,6 +54,7 @@ import { getUserProfile, logout } from './services/authService'; // Import getUs
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
 import Pricing from './components/pages/Pricing'; // Added for Pricing module
+import { logModuleAccess } from './services/usageService'; // Import usage tracking
 
 // NOTE: Renaming the component back to MainApp from App
 const MainApp: React.FC = () => {
@@ -879,6 +880,12 @@ const MainApp: React.FC = () => {
     fetchUserProfile();
   }, [navigate]);
 
+  // Track module usage when activeModule changes
+  useEffect(() => {
+    if (currentUser && activeModule !== ActiveModule.Dashboard) {
+      logModuleAccess(activeModule);
+    }
+  }, [activeModule, currentUser]);
 
   useEffect(() => {
      if(outlineForSuperAgent){
