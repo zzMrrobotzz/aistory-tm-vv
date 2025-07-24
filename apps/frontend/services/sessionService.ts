@@ -1,4 +1,4 @@
-import { message } from 'antd';
+// Note: Using browser native notifications instead of antd for better compatibility
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com/api';
 
@@ -140,12 +140,8 @@ class SessionService {
     localStorage.removeItem('userToken');
     localStorage.removeItem('sessionToken');
     
-    // Show notification
-    message.error({
-      content: reason,
-      duration: 5,
-      key: 'session-terminated'
-    });
+    // Show notification using browser native API
+    this.showNotification('Session Terminated', reason, 'error');
     
     // Call termination handler
     if (this.onSessionTerminated) {
@@ -161,6 +157,26 @@ class SessionService {
   private defaultSessionTerminatedHandler() {
     // Redirect to login page
     window.location.replace('/login');
+  }
+
+  /**
+   * Show notification using browser native API or fallback to console
+   */
+  private showNotification(title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
+    console.log(`${type.toUpperCase()}: ${title} - ${message}`);
+    
+    // Try to use browser notification API
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, {
+        body: message,
+        icon: type === 'error' ? '❌' : type === 'warning' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️'
+      });
+    } else {
+      // Fallback to alert for important notifications
+      if (type === 'error' || type === 'warning') {
+        alert(`${title}: ${message}`);
+      }
+    }
   }
 
   /**
@@ -216,15 +232,15 @@ class SessionService {
       const data = await response.json();
       
       if (data.success) {
-        message.success(data.message);
+        this.showNotification('Success', data.message, 'success');
         return true;
       } else {
-        message.error(data.message);
+        this.showNotification('Error', data.message, 'error');
         return false;
       }
     } catch (error) {
       console.error('❌ Force logout failed:', error);
-      message.error('Lỗi ngắt kết nối phiên đăng nhập');
+      this.showNotification('Error', 'Lỗi ngắt kết nối phiên đăng nhập', 'error');
       return false;
     }
   }
@@ -254,11 +270,11 @@ class SessionService {
     if (response && response.error) {
       switch (response.error) {
         case 'SESSION_TERMINATED':
-          message.error({
-            content: response.message || 'Phiên đăng nhập đã bị ngắt kết nối',
-            duration: 5,
-            key: 'session-error'
-          });
+          sessionService.showNotification(
+            'Session Terminated',
+            response.message || 'Phiên đăng nhập đã bị ngắt kết nối',
+            'error'
+          );
           
           // Redirect to login after delay
           setTimeout(() => {
@@ -267,11 +283,11 @@ class SessionService {
           return false;
 
         case 'SESSION_EXPIRED':
-          message.warning({
-            content: response.message || 'Phiên đăng nhập đã hết hạn',
-            duration: 5,
-            key: 'session-error'
-          });
+          sessionService.showNotification(
+            'Session Expired',
+            response.message || 'Phiên đăng nhập đã hết hạn',
+            'warning'
+          );
           
           // Redirect to login after delay
           setTimeout(() => {
@@ -281,11 +297,11 @@ class SessionService {
 
         case 'SESSION_REQUIRED':
         case 'SESSION_INVALID':
-          message.error({
-            content: response.message || 'Phiên đăng nhập không hợp lệ',
-            duration: 3,
-            key: 'session-error'
-          });
+          sessionService.showNotification(
+            'Session Invalid',
+            response.message || 'Phiên đăng nhập không hợp lệ',
+            'error'
+          );
           
           // Redirect to login
           setTimeout(() => {
