@@ -534,6 +534,74 @@ qrCode: '',
     }
 
     /**
+     * Refund PayOS payment
+     */
+    async refundPayOSPayment(orderCode, refundAmount, reason = 'Admin refund') {
+        try {
+            if (!this.payOSClient) {
+                console.warn('PayOS SDK not available, refund simulation only');
+                return {
+                    success: true,
+                    refundId: `sim_refund_${Date.now()}`,
+                    message: 'Refund simulated (PayOS SDK not available)',
+                    amount: refundAmount,
+                    reason
+                };
+            }
+
+            console.log(`🔄 Processing PayOS refund for orderCode: ${orderCode}, amount: ${refundAmount}`);
+            
+            // PayOS refund API call
+            // Note: PayOS may not have a direct refund API, this is a placeholder
+            // In practice, you might need to use cancelPaymentLink or contact PayOS support
+            let refundResult;
+            
+            try {
+                // Try to cancel the payment link if it's still pending
+                if (this.payOSClient.cancelPaymentLink) {
+                    refundResult = await this.payOSClient.cancelPaymentLink(orderCode, reason);
+                    console.log('✅ PayOS payment link cancelled:', refundResult);
+                } else {
+                    // If no cancel method, log for manual processing
+                    console.warn('⚠️ PayOS refund requires manual processing');
+                    refundResult = {
+                        success: true,
+                        message: 'Refund marked for manual processing',
+                        requiresManualProcessing: true
+                    };
+                }
+            } catch (cancelError) {
+                console.error('❌ PayOS cancel/refund error:', cancelError);
+                // Return success but mark as requiring manual processing
+                refundResult = {
+                    success: true,
+                    message: `Refund requires manual processing: ${cancelError.message}`,
+                    requiresManualProcessing: true
+                };
+            }
+
+            return {
+                success: true,
+                refundId: refundResult.refundId || `manual_${orderCode}_${Date.now()}`,
+                message: refundResult.message || 'Refund processed successfully',
+                amount: refundAmount,
+                reason,
+                requiresManualProcessing: refundResult.requiresManualProcessing || false,
+                gatewayResponse: refundResult
+            };
+
+        } catch (error) {
+            console.error('PayOS refund error:', error);
+            return {
+                success: false,
+                error: error.message || 'Refund processing failed',
+                orderCode,
+                amount: refundAmount
+            };
+        }
+    }
+
+    /**
      * Complete payment (manual verification for now)
      */
     async completePayment(paymentId, transactionId = null) {

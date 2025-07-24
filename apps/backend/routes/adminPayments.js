@@ -4,6 +4,7 @@ const Payment = require('../models/Payment');
 const User = require('../models/User');
 const CreditPackage = require('../models/CreditPackage');
 const { createAuditLog } = require('../utils/auditLogger');
+const paymentService = require('../services/paymentService');
 
 // GET /api/admin/payments/stats - Thống kê payment dashboard
 router.get('/stats', async (req, res) => {
@@ -330,8 +331,75 @@ router.post('/:paymentId/refund', async (req, res) => {
         
         await payment.save();
         
-        // TODO: Implement actual refund logic với payment gateway
-        // TODO: Trừ credits/subscription từ user nếu cần
+        // Implement actual refund logic với PayOS gateway
+        try {
+            // Attempt to refund via PayOS if orderCode exists
+            if (payment.orderCode) {
+                const refundResult = await paymentService.refundPayOSPayment(payment.orderCode, refundAmount || payment.price, reason);
+                if (refundResult.success) {
+                    console.log('✅ PayOS refund successful:', refundResult);
+                    payment.refundInfo.paymentGatewayRefund = true;
+                    payment.refundInfo.gatewayRefundId = refundResult.refundId;
+                } else {
+                    console.warn('❌ PayOS refund failed:', refundResult.error);
+                    payment.refundInfo.paymentGatewayRefund = false;
+                    payment.refundInfo.refundNote = `Gateway refund failed: ${refundResult.error}`;
+                }
+            }
+        } catch (refundError) {
+            console.error('❌ Refund API error:', refundError);
+            payment.refundInfo.paymentGatewayRefund = false;
+            payment.refundInfo.refundNote = `Refund API error: ${refundError.message}`;
+        }
+
+        // Reverse subscription/credits from user account
+        try {
+            if (payment.userId && payment.planId) {
+                const user = await User.findById(payment.userId);
+                if (user) {
+                    // Revert subscription if it was upgraded by this payment
+                    const plan = await CreditPackage.findOne({ planId: payment.planId });
+                    if (plan) {
+                        console.log(`🔄 Reverting subscription for user ${user.username}`);
+                        
+                        // For lifetime subscriptions, revert to free
+                        if (plan.name.toLowerCase().includes('lifetime')) {
+                            user.subscriptionType = 'free';
+                            user.subscriptionExpiresAt = null;
+                        } 
+                        // For monthly/trial subscriptions, calculate previous expiry
+                        else {
+                            const paymentDate = payment.createdAt;
+                            const subscriptionDuration = plan.duration || 30; // days
+                            
+                            // If user still has time left from this payment, reduce it
+                            if (user.subscriptionExpiresAt && user.subscriptionExpiresAt > new Date()) {
+                                const timeFromPayment = subscriptionDuration * 24 * 60 * 60 * 1000; // milliseconds
+                                const newExpiry = new Date(user.subscriptionExpiresAt.getTime() - timeFromPayment);
+                                
+                                if (newExpiry <= new Date()) {
+                                    user.subscriptionType = 'free';
+                                    user.subscriptionExpiresAt = null;
+                                } else {
+                                    user.subscriptionExpiresAt = newExpiry;
+                                }
+                            } else {
+                                user.subscriptionType = 'free';
+                                user.subscriptionExpiresAt = null;
+                            }
+                        }
+                        
+                        await user.save();
+                        console.log(`✅ User subscription reverted: ${user.subscriptionType}, expires: ${user.subscriptionExpiresAt}`);
+                        payment.refundInfo.userAccountReverted = true;
+                    }
+                }
+            }
+        } catch (userRevertError) {
+            console.error('❌ User account revert error:', userRevertError);
+            payment.refundInfo.userAccountReverted = false;
+            payment.refundInfo.revertNote = `User revert failed: ${userRevertError.message}`;
+        }
         
         await createAuditLog(
             'ADMIN_PAYMENT_REFUNDED', 

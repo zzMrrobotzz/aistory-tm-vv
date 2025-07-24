@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateUser } = require('../middleware/adminAuth');
 const rateLimit = require('express-rate-limit');
+const User = require('../models/User');
 
 // Import logging models (create simplified versions if they don't exist)
 let ApiRequestLog, ApiProvider;
@@ -87,14 +88,14 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
       });
     }
 
-    // TODO: Trừ credit trước khi gọi AI
-    // const creditResult = await consumeCredit(userId, 1);
-    // if (!creditResult.success) {
-    //   return res.status(402).json({
-    //     success: false,
-    //     message: creditResult.message
-    //   });
-    // }
+    // Kiểm tra subscription validity trước khi gọi AI
+    const subscriptionCheck = await validateUserSubscription(userId);
+    if (!subscriptionCheck.success) {
+      return res.status(402).json({
+        success: false,
+        message: subscriptionCheck.message
+      });
+    }
 
     // Lấy API key từ database (sử dụng key đầu tiên)
     const apiKey = providerRecord.apiKeys[0];
@@ -213,8 +214,8 @@ router.post('/generate', aiRequestLimiter, async (req, res) => {
         console.error('Error logging failed request:', logError);
       }
       
-      // TODO: Hoàn trả credit nếu có lỗi
-      // await refundCredit(userId, 1);
+      // Note: No need to refund for subscription-based system
+      // Subscription validity already checked before API call
 
       res.status(500).json({
         success: false,
@@ -282,14 +283,14 @@ router.post('/generate-image', aiRequestLimiter, async (req, res) => {
       });
     }
 
-    // TODO: Trừ credit cho image generation (thường cao hơn text)
-    // const creditResult = await consumeCredit(userId, 2);
-    // if (!creditResult.success) {
-    //   return res.status(402).json({
-    //     success: false,
-    //     message: creditResult.message
-    //   });
-    // }
+    // Kiểm tra subscription validity cho image generation
+    const subscriptionCheck = await validateUserSubscription(userId);
+    if (!subscriptionCheck.success) {
+      return res.status(402).json({
+        success: false,
+        message: subscriptionCheck.message
+      });
+    }
 
     // Lấy API key từ database (sử dụng key đầu tiên)
     const apiKey = providerRecord.apiKeys[0];
@@ -322,8 +323,8 @@ router.post('/generate-image', aiRequestLimiter, async (req, res) => {
     } catch (aiError) {
       console.error(`Image API error - Provider: ${provider}, Error:`, aiError);
       
-      // TODO: Hoàn trả credit nếu có lỗi
-      // await refundCredit(userId, 2);
+      // Note: No need to refund for subscription-based system
+      // Subscription validity already checked before API call
 
       res.status(500).json({
         success: false,
@@ -491,6 +492,72 @@ async function callStabilityImageAPI(prompt, aspectRatio, apiKey) {
     };
   } else {
     throw new Error('No image data received from Stability API');
+  }
+}
+
+// Helper function to validate user subscription before AI operations
+async function validateUserSubscription(userId) {
+  try {
+    // Find user by username (userId is actually username in this system)
+    const user = await User.findOne({ username: userId });
+    
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not found'
+      };
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return {
+        success: false,
+        message: 'Your account has been deactivated. Please contact support.'
+      };
+    }
+
+    // Check subscription status
+    const now = new Date();
+    const subscriptionType = user.subscriptionType || 'free';
+
+    // Free users have limited access
+    if (subscriptionType === 'free') {
+      return {
+        success: false,
+        message: 'Please upgrade to a paid subscription to use AI features. Visit the pricing page to subscribe.'
+      };
+    }
+
+    // Lifetime subscription - always valid
+    if (subscriptionType === 'lifetime') {
+      return {
+        success: true,
+        message: 'Valid lifetime subscription'
+      };
+    }
+
+    // Check expiration for time-limited subscriptions (monthly, trial)
+    if (user.subscriptionExpiresAt) {
+      if (now > user.subscriptionExpiresAt) {
+        return {
+          success: false,
+          message: 'Your subscription has expired. Please renew your subscription to continue using AI features.'
+        };
+      }
+    }
+
+    // Valid subscription
+    return {
+      success: true,
+      message: `Valid ${subscriptionType} subscription`
+    };
+
+  } catch (error) {
+    console.error('Error validating user subscription:', error);
+    return {
+      success: false,
+      message: 'Error checking subscription status'
+    };
   }
 }
 
