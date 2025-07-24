@@ -55,7 +55,7 @@ export interface PaymentStats {
     userKey?: string;
     planId?: string;
     price: number;
-    status: string;
+    status: 'pending' | 'completed' | 'failed' | 'expired' | 'refunded';
     createdAt: string;
     completedAt?: string;
     paymentMethod: string;
