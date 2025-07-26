@@ -14,7 +14,8 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextWithJsonOutput, generateImage as generateGeminiImage, generateTextFromImageAndText } from '../../services/geminiService';
+import { generateTextWithJsonOutput as geminiGenerateTextWithJsonOutput, generateImage as generateGeminiImage, generateTextFromImageAndText } from '../../services/geminiService';
+import { generateTextWithJsonOutput } from '../../services/textGenerationService';
 import { generateStabilityImage, refineStabilityImage } from '../../services/stabilityAiService';
 import { generateDallEImage, editDallEImage } from '../../services/openaiService'; 
 import { generateDeepSeekImage, refineDeepSeekImage } from '../../services/deepseekService'; 
@@ -147,7 +148,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     `;
     const systemInstructionForSubPrompts = `You are an AI assistant that analyzes text (hooks or stories), identifies key visual scenes, and generates multiple detailed image prompts in English, suitable for AI image generation, formatted as a JSON array. You will apply contextualization and art style instructions as provided.`;
     
-    const subPromptsResult = await generateTextWithJsonOutput<GeminiSubPromptsResponse>(subPromptsGenerationPrompt, systemInstructionForSubPrompts, geminiUserApiKey);
+    const subPromptsResult = await generateTextWithJsonOutput<GeminiSubPromptsResponse>(subPromptsGenerationPrompt, apiSettings);
     
     if (!subPromptsResult || !subPromptsResult.image_prompts || subPromptsResult.image_prompts.length === 0) {
       throw new Error("Không thể tạo danh sách prompt con từ nội dung được cung cấp.");
