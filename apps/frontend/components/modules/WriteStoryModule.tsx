@@ -14,7 +14,7 @@ import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService';
 import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
-import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle } from 'lucide-react';
+import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle, Loader2, X } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logStoryGenerated } from '../../services/usageService';
 
@@ -1171,6 +1171,45 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       );
     }
 
+    // Show queue button for story and hook tabs when queue is enabled
+    const showQueueButton = (activeWriteTab === 'singleStory' && storyQueueSystem.isEnabled) || 
+                           (activeWriteTab === 'hookGenerator' && hookQueueSystem.isEnabled);
+    
+    if (showQueueButton) {
+      let queueButtonText = "";
+      let queueActionHandler: () => void = () => {};
+      let queueDisabled = disabled;
+      
+      if (activeWriteTab === 'singleStory') {
+        queueButtonText = "➕ Thêm vào Hàng Chờ";
+        queueActionHandler = () => addToStoryQueue(storyOutline, `Truyện ${storyQueue.length + 1}`);
+        queueDisabled = queueDisabled || !storyOutline.trim();
+      } else if (activeWriteTab === 'hookGenerator') {
+        queueButtonText = "➕ Thêm Hook vào Hàng Chờ";
+        queueActionHandler = () => addToHookQueue(storyInputForHook, `Hook ${hookQueue.length + 1}`);
+        queueDisabled = queueDisabled || !storyInputForHook.trim();
+      }
+      
+      return (
+        <div className="flex space-x-3">
+          <button 
+            onClick={actionHandler} 
+            disabled={disabled}
+            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {buttonText}
+          </button>
+          <button 
+            onClick={queueActionHandler} 
+            disabled={queueDisabled}
+            className="flex-1 bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {queueButtonText}
+          </button>
+        </div>
+      );
+    }
+    
     return (
       <button 
         onClick={actionHandler} 
@@ -1276,6 +1315,191 @@ Provide ONLY the numbered hooks, no additional explanations.`;
 
       {activeWriteTab === 'singleStory' && (
          <div role="tabpanel" id="single-story-panel" className="animate-fadeIn space-y-6">
+            
+            {/* Story Queue System */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                        <Clock className="w-5 h-5 text-green-600 mr-2" />
+                        <h3 className="text-lg font-semibold text-green-800">🔄 Hệ Thống Hàng Chờ Viết Truyện</h3>
+                    </div>
+                    <button
+                        onClick={toggleStoryQueueMode}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                            storyQueueSystem.isEnabled
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                        }`}
+                    >
+                        {storyQueueSystem.isEnabled ? 'Tắt Hàng Chờ' : 'Bật Hàng Chờ'}
+                    </button>
+                </div>
+
+                {storyQueueSystem.isEnabled && (
+                    <div className="space-y-3">
+                        {/* Queue Stats */}
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                            <div className="bg-white p-3 rounded-lg">
+                                <div className="text-2xl font-bold text-green-600">{storyQueue.length}</div>
+                                <div className="text-sm text-gray-600">Tổng cộng</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg">
+                                <div className="text-2xl font-bold text-blue-600">{storyQueueSystem.completedCount}</div>
+                                <div className="text-sm text-gray-600">Hoàn thành</div>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg">
+                                <div className="text-2xl font-bold text-orange-600">
+                                    {storyQueue.filter(item => item.status === 'waiting').length}
+                                </div>
+                                <div className="text-sm text-gray-600">Đang chờ</div>
+                            </div>
+                        </div>
+
+                        {/* Queue Controls */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    if (!storyQueueSystem.isProcessing) {
+                                        processStoryQueue();
+                                    } else {
+                                        pauseResumeStoryQueue();
+                                    }
+                                }}
+                                disabled={storyQueue.filter(item => item.status === 'waiting').length === 0}
+                                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {storyQueueSystem.isProcessing ? (
+                                    storyQueueSystem.isPaused ? (
+                                        <>
+                                            <Play className="w-4 h-4 mr-2" />
+                                            Tiếp tục
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Pause className="w-4 h-4 mr-2" />
+                                            Tạm dừng
+                                        </>
+                                    )
+                                ) : (
+                                    <>
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Bắt đầu
+                                    </>
+                                )}
+                            </button>
+                            
+                            <button
+                                onClick={clearStoryQueue}
+                                disabled={storyQueue.length === 0}
+                                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Xóa tất cả
+                            </button>
+                        </div>
+
+                        {/* Queue Items List */}
+                        {storyQueue.length > 0 && (
+                            <div className="mt-4 p-3 border rounded-lg bg-white">
+                                <h4 className="text-md font-semibold mb-3">📋 Danh sách hàng chờ ({storyQueue.length} mục)</h4>
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {storyQueue.map((item, index) => (
+                                        <div key={item.id} className={`p-3 border rounded-lg ${
+                                            item.status === 'processing' ? 'bg-yellow-50 border-yellow-300' :
+                                            item.status === 'completed' ? 'bg-green-50 border-green-300' :
+                                            item.status === 'error' ? 'bg-red-50 border-red-300' :
+                                            'bg-gray-50 border-gray-300'
+                                        }`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center">
+                                                    <span className="text-sm font-medium text-gray-600 mr-2">#{index + 1}</span>
+                                                    {item.status === 'processing' && <div className="animate-spin w-4 h-4 border-2 border-yellow-600 border-t-transparent rounded-full mr-2"></div>}
+                                                    {item.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-600 mr-2" />}
+                                                    {item.status === 'error' && <AlertCircle className="w-4 h-4 text-red-600 mr-2" />}
+                                                    {item.status === 'waiting' && <Clock className="w-4 h-4 text-gray-400 mr-2" />}
+                                                    <span className="font-semibold truncate max-w-md">{item.title}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {item.status === 'processing' && (
+                                                        <span className="text-sm text-gray-600">{item.progress}%</span>
+                                                    )}
+                                                    {item.status === 'waiting' && (
+                                                        <button
+                                                            onClick={() => removeFromStoryQueue(item.id)}
+                                                            className="text-red-500 hover:text-red-700"
+                                                            title="Xóa khỏi hàng chờ"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Progress bar for processing items */}
+                                            {item.status === 'processing' && (
+                                                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                                    <div
+                                                        className="bg-yellow-600 h-2 rounded-full transition-all duration-300"
+                                                        style={{ width: `${item.progress}%` }}
+                                                    ></div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Show completed story with statistics */}
+                                            {item.status === 'completed' && item.generatedStory && (
+                                                <div className="text-sm text-gray-600 mb-2">
+                                                    <details>
+                                                        <summary className="cursor-pointer hover:text-gray-800 text-green-700 font-medium">Kết quả truyện</summary>
+                                                        <div className="mt-2 p-2 bg-green-100 rounded text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                                            {item.generatedStory}
+                                                        </div>
+                                                        
+                                                        {/* Word Statistics */}
+                                                        {item.wordStats && (
+                                                            <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                                                                <h5 className="text-xs font-semibold text-blue-800 mb-2">📊 Thống kê từ:</h5>
+                                                                <div className="grid grid-cols-3 gap-2 text-xs">
+                                                                    <div className="text-center">
+                                                                        <div className="font-bold text-gray-800">{item.wordStats.outlineWords}</div>
+                                                                        <div className="text-gray-600">Từ dàn ý</div>
+                                                                    </div>
+                                                                    <div className="text-center">
+                                                                        <div className="font-bold text-green-600">{item.wordStats.storyWords}</div>
+                                                                        <div className="text-gray-600">Từ truyện</div>
+                                                                    </div>
+                                                                    <div className="text-center">
+                                                                        <div className="font-bold text-purple-600">{item.wordStats.expansionRatio}x</div>
+                                                                        <div className="text-gray-600">Tỷ lệ mở rộng</div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <button
+                                                            onClick={() => copyToClipboard(item.generatedStory || '')}
+                                                            className="mt-2 px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                        >
+                                                            Sao chép kết quả
+                                                        </button>
+                                                    </details>
+                                                </div>
+                                            )}
+
+                                            {/* Show error for failed items */}
+                                            {item.status === 'error' && item.error && (
+                                                <div className="text-sm text-red-600">
+                                                    <span className="font-medium">Lỗi:</span> {item.error}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             <div className="flex justify-between items-center">
                 <label htmlFor="storyOutline" className="text-lg font-semibold text-gray-700">
                     Dàn ý truyện (Bước 1: Nhập dàn ý):
@@ -1517,6 +1741,179 @@ Provide ONLY the numbered hooks, no additional explanations.`;
                 </button>
               </div>
             )}
+
+            {/* Hook Queue UI */}
+            <div className="mt-6 p-4 border-2 border-orange-200 rounded-lg bg-orange-50">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-orange-800">🎯 Hàng Chờ Hook Generator</h3>
+                <button
+                  onClick={() => updateState(prev => ({
+                    ...prev,
+                    hookQueueSystem: { ...prev.hookQueueSystem, isEnabled: !prev.hookQueueSystem.isEnabled }
+                  }))}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    hookQueueSystem.isEnabled 
+                      ? 'bg-orange-600 text-white hover:bg-orange-700' 
+                      : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                  }`}
+                >
+                  {hookQueueSystem.isEnabled ? '🟢 Bật' : '🔴 Tắt'}
+                </button>
+              </div>
+
+              {hookQueueSystem.isEnabled && (
+                <>
+                  {/* Hook Queue Statistics */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-white p-3 rounded-lg border border-orange-200">
+                      <div className="text-sm text-orange-600 font-medium">Tổng Hook</div>
+                      <div className="text-2xl font-bold text-orange-800">{hookQueue.length}</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-orange-200">
+                      <div className="text-sm text-orange-600 font-medium">Chờ Xử Lý</div>
+                      <div className="text-2xl font-bold text-orange-800">
+                        {hookQueue.filter(item => item.status === 'waiting').length}
+                      </div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-orange-200">
+                      <div className="text-sm text-orange-600 font-medium">Hoàn Thành</div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {hookQueue.filter(item => item.status === 'completed').length}
+                      </div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-orange-200">
+                      <div className="text-sm text-orange-600 font-medium">Trung Bình</div>
+                      <div className="text-2xl font-bold text-orange-800">
+                        {hookQueueSystem.averageProcessingTime > 0 
+                          ? `${Math.round(hookQueueSystem.averageProcessingTime)}s` 
+                          : '-'
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hook Queue Controls */}
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    <button
+                      onClick={processHookQueue}
+                      disabled={hookQueue.length === 0 || hookQueueSystem.isProcessing || anyLoadingOperation}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {hookQueueSystem.isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+                          Đang Xử Lý...
+                        </>
+                      ) : (
+                        <>▶️ Bắt Đầu Xử Lý ({hookQueue.filter(item => item.status === 'waiting').length})</>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={() => updateState(prev => ({
+                        ...prev,
+                        hookQueueSystem: { ...prev.hookQueueSystem, isPaused: !prev.hookQueueSystem.isPaused }
+                      }))}
+                      disabled={!hookQueueSystem.isProcessing}
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {hookQueueSystem.isPaused ? '▶️ Tiếp Tục' : '⏸️ Tạm Dừng'}
+                    </button>
+
+                    <button
+                      onClick={() => updateState(prev => ({ ...prev, hookQueue: [] }))}
+                      disabled={hookQueueSystem.isProcessing}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      🗑️ Xóa Tất Cả
+                    </button>
+                  </div>
+
+                  {/* Hook Queue Items List */}
+                  {hookQueue.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-orange-800">Danh Sách Hook Queue:</h4>
+                      {hookQueue.map((item, index) => (
+                        <div key={item.id} className="bg-white p-4 rounded-lg border border-orange-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-3">
+                              <span className="font-medium text-gray-800">#{index + 1} {item.title}</span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                item.status === 'waiting' ? 'bg-gray-100 text-gray-600' :
+                                item.status === 'processing' ? 'bg-blue-100 text-blue-600' :
+                                item.status === 'completed' ? 'bg-green-100 text-green-600' :
+                                'bg-red-100 text-red-600'
+                              }`}>
+                                {item.status === 'waiting' ? 'Chờ' :
+                                 item.status === 'processing' ? 'Đang Xử Lý' :
+                                 item.status === 'completed' ? 'Hoàn Thành' : 'Lỗi'}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => updateState(prev => ({
+                                ...prev,
+                                hookQueue: prev.hookQueue.filter(q => q.id !== item.id)
+                              }))}
+                              disabled={hookQueueSystem.isProcessing}
+                              className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          
+                          {item.status === 'processing' && (
+                            <div className="mb-3">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                  style={{ width: `${item.progress}%` }}
+                                ></div>
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">{item.progress}% hoàn thành</div>
+                            </div>
+                          )}
+                          
+                          <div className="text-sm text-gray-600 mb-2">
+                            <strong>Story Input:</strong> {item.storyInput.length > 100 ? item.storyInput.substring(0, 100) + '...' : item.storyInput}
+                          </div>
+
+                          <div className="text-xs text-gray-500">
+                            Thêm lúc: {item.addedAt.toLocaleString('vi-VN')}
+                            {item.estimatedTimeRemaining && item.status === 'processing' && (
+                              <span className="ml-4">Còn lại: ~{Math.round(item.estimatedTimeRemaining)}s</span>
+                            )}
+                          </div>
+
+                          {item.error && (
+                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                              <strong>Lỗi:</strong> {item.error}
+                            </div>
+                          )}
+
+                          {item.generatedHooks && (
+                            <div className="mt-3">
+                              <div className="text-sm font-medium text-gray-700 mb-1">Hooks Đã Tạo:</div>
+                              <textarea 
+                                value={item.generatedHooks} 
+                                readOnly 
+                                rows={6} 
+                                className="w-full p-2 text-sm border border-gray-300 rounded-md bg-gray-50"
+                              />
+                              <button
+                                onClick={() => copyToClipboard(item.generatedHooks!, `copyHook${item.id}`)}
+                                className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                              >
+                                📋 Sao chép
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
          </div>
       )}
 
