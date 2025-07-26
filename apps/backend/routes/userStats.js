@@ -58,11 +58,11 @@ router.get('/usage-stats', auth, async (req, res) => {
       .reduce((sum, day) => sum + (day.apiCalls || 0), 0);
 
     // Find favorite module
-    const moduleUsage = user.usageStats.moduleUsage || new Map();
+    const moduleUsage = user.usageStats.moduleUsage || {};
     let favoriteModule = 'Viết Truyện';
-    if (moduleUsage.size > 0) {
+    if (Object.keys(moduleUsage).length > 0) {
       let maxUsage = 0;
-      for (const [moduleName, usage] of moduleUsage) {
+      for (const [moduleName, usage] of Object.entries(moduleUsage)) {
         if (usage > maxUsage) {
           maxUsage = usage;
           favoriteModule = moduleName;
@@ -125,8 +125,13 @@ router.post('/log-usage', auth, async (req, res) => {
         favoriteModule: 'Viết Truyện',
         lastActiveDate: new Date(),
         dailyUsage: [],
-        moduleUsage: new Map()
+        moduleUsage: {}
       };
+    }
+
+    // Ensure moduleUsage is an object, not a Map
+    if (!user.usageStats.moduleUsage || typeof user.usageStats.moduleUsage !== 'object') {
+      user.usageStats.moduleUsage = {};
     }
 
     const today = new Date();
@@ -152,7 +157,7 @@ router.post('/log-usage', auth, async (req, res) => {
 
     // Update overall stats
     user.usageStats.totalApiCalls += count;
-    user.usageStats.moduleUsage.set(module, (user.usageStats.moduleUsage.get(module) || 0) + count);
+    user.usageStats.moduleUsage[module] = (user.usageStats.moduleUsage[module] || 0) + count;
     user.usageStats.lastActiveDate = today;
 
     // Update specific counters based on action

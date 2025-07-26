@@ -74,15 +74,18 @@ const userSchema = new mongoose.Schema({
     },
     dailyUsage: [{
       date: Date,
-      apiCalls: Number,
+      apiCalls: {
+        type: Number,
+        default: 0
+      },
       modules: {
-        type: Map,
-        of: Number
+        type: Object,
+        default: {}
       }
     }],
     moduleUsage: {
-      type: Map,
-      of: Number
+      type: Object,
+      default: {}
     }
   },
 });

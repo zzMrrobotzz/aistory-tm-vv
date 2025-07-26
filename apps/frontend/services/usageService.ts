@@ -74,7 +74,14 @@ class UsageService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // Ignore JSON parse error, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -82,6 +89,8 @@ class UsageService {
 
     } catch (error) {
       console.error('Error logging usage:', error);
+      // Don't fail the main operation if logging fails
+      // Just log the error and continue
       return false;
     } finally {
       this.isLogging = false;
