@@ -298,12 +298,13 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
     // Process individual queue item (extracted from handleSingleRewrite)
     const processQueueItem = async (item: RewriteQueueItem) => {
         const CHUNK_CHAR_COUNT = 4000;
-        const numChunks = Math.ceil(item.originalText.length / CHUNK_CHAR_COUNT);
+        // Use minimum chunks for better progress visualization
+        const numChunks = Math.max(3, Math.ceil(item.originalText.length / CHUNK_CHAR_COUNT)); 
         let fullRewrittenText = '';
 
         for (let i = 0; i < numChunks; i++) {
-            // Update progress
-            const currentProgress = Math.round(((i + 1) / numChunks) * 100);
+            // Update progress with more granular steps (leave 10% for completion)
+            const currentProgress = Math.round(((i + 1) / numChunks) * 90);
             setModuleState(prev => ({
                 ...prev,
                 queue: prev.queue.map(qItem =>
@@ -415,7 +416,8 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         abortControllerRef.current = new AbortController();
         
         const CHUNK_CHAR_COUNT = 4000;
-        const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
+        // Use minimum chunks for better progress visualization
+        const numChunks = Math.max(3, Math.ceil(originalText.length / CHUNK_CHAR_COUNT));
         let fullRewrittenText = '';
 
         try {
@@ -425,7 +427,9 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                     setModuleState(prev => ({ ...prev, loadingMessage: 'Đã dừng!', progress: 0 }));
                     return;
                 }
-                setModuleState(prev => ({ ...prev, progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` }));
+                // Update progress with more granular steps (leave 10% for completion)
+                const currentProgress = Math.round(((i + 1) / numChunks) * 90);
+                setModuleState(prev => ({ ...prev, progress: currentProgress, loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` }));
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
                 
                 let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;

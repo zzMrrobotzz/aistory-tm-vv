@@ -289,36 +289,47 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
 
   // Process individual story queue item
   const processStoryQueueItem = async (item: WriteStoryQueueItem) => {
-    const CHUNK_CHAR_COUNT = 4000;
-    const numChunks = Math.ceil(item.storyOutline.length / CHUNK_CHAR_COUNT);
+    const CHUNK_WORD_COUNT = 1000; // Base chunks on target word count, not character count
+    const currentTargetLengthNum = parseInt(targetLength);
+    const numChunks = Math.max(1, Math.ceil(currentTargetLengthNum / CHUNK_WORD_COUNT)); // Ensure at least 1 chunk
     let fullGeneratedStory = '';
 
     for (let i = 0; i < numChunks; i++) {
-      // Update progress
-      const currentProgress = Math.round(((i + 1) / numChunks) * 100);
+      // Update progress with more granular steps
+      const baseProgress = Math.round((i / numChunks) * 90); // Leave 10% for completion
       setModuleState(prev => ({
         ...prev,
         storyQueue: prev.storyQueue.map(qItem =>
           qItem.id === item.id
-            ? { ...qItem, progress: currentProgress }
+            ? { ...qItem, progress: baseProgress }
             : qItem
         ),
       }));
 
-      const outlineChunk = item.storyOutline.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
-      
-      // Build story generation prompt
-      const prompt = `You are an expert storyteller. Generate a compelling story based on the provided outline.
+      // Update progress to show we're generating this chunk
+      const chunkProgress = Math.round((i / numChunks) * 90) + Math.round((10 / numChunks) * 0.5); // Small increment during generation
+      setModuleState(prev => ({
+        ...prev,
+        storyQueue: prev.storyQueue.map(qItem =>
+          qItem.id === item.id
+            ? { ...qItem, progress: chunkProgress }
+            : qItem
+        ),
+      }));
+
+      // Build story generation prompt (use full outline, focus on the current section)
+      const prompt = `You are an expert storyteller. Generate part ${i + 1} of ${numChunks} of a compelling story based on the provided outline.
 
 **Settings:**
-- Target Length: ${targetLength} words
+- Target Length for this section: ~${CHUNK_WORD_COUNT} words
+- Total Target Length: ${targetLength} words  
 - Writing Style: ${writingStyle === 'custom' ? customWritingStyle : writingStyle}
 - Output Language: ${outputLanguage}
 - Reference Style: ${referenceViralStoryForStyle || 'N/A'}
 
-**Outline to Expand:**
+**Complete Outline:**
 ---
-${outlineChunk}
+${item.storyOutline}
 ---
 
 **Previous Story Context:**
@@ -326,18 +337,30 @@ ${outlineChunk}
 ${fullGeneratedStory || "This is the beginning of the story."}
 ---
 
-**Instructions:**
-- Create engaging, coherent narrative that flows naturally from previous context
-- Maintain consistent characters, plot, and tone throughout
-- Use vivid descriptions and compelling dialogue
-- Ensure the story chunk connects smoothly with previous content
+**Instructions for Part ${i + 1}/${numChunks}:**
+- Continue the story naturally from the previous context
+- ${i === 0 ? 'Start with a compelling opening that hooks the reader' : 'Maintain narrative flow and character consistency'}
+- ${i === numChunks - 1 ? 'Work towards a satisfying conclusion' : 'Advance the plot while leaving room for continuation'}
+- Aim for approximately ${CHUNK_WORD_COUNT} words in this section
 - Write in ${outputLanguage} language
+- Use vivid descriptions and compelling dialogue
 
-Provide ONLY the story content for this section, no introductions or explanations.`;
+Provide ONLY the story content for this section:`;
       
       await delay(500);
       const result = await generateText(prompt, undefined, false, apiSettings);
       fullGeneratedStory += (fullGeneratedStory ? '\n\n' : '') + (result?.text || '').trim();
+      
+      // Update progress after chunk completion
+      const completedProgress = Math.round(((i + 1) / numChunks) * 90);
+      setModuleState(prev => ({
+        ...prev,
+        storyQueue: prev.storyQueue.map(qItem =>
+          qItem.id === item.id
+            ? { ...qItem, progress: completedProgress }
+            : qItem
+        ),
+      }));
     }
 
     // Calculate word statistics
@@ -573,12 +596,24 @@ Provide ONLY the story content for this section, no introductions or explanation
     const { hookSettings } = item;
     let fullGeneratedHooks = '';
 
-    // Update progress to 50% while generating
+    // Update progress to show preparation phase
     setModuleState(prev => ({
       ...prev,
       hookQueue: prev.hookQueue.map(qItem =>
         qItem.id === item.id
-          ? { ...qItem, progress: 50 }
+          ? { ...qItem, progress: 10 }
+          : qItem
+      ),
+    }));
+
+    await delay(300); // Small delay to show progress
+
+    // Update progress to show generation phase
+    setModuleState(prev => ({
+      ...prev,
+      hookQueue: prev.hookQueue.map(qItem =>
+        qItem.id === item.id
+          ? { ...qItem, progress: 30 }
           : qItem
       ),
     }));
@@ -609,9 +644,31 @@ ${item.storyInput}
 
 Provide ONLY the numbered hooks, no additional explanations.`;
     
-    await delay(1000);
+    // Update progress to show API call in progress
+    setModuleState(prev => ({
+      ...prev,
+      hookQueue: prev.hookQueue.map(qItem =>
+        qItem.id === item.id
+          ? { ...qItem, progress: 70 }
+          : qItem
+      ),
+    }));
+
+    await delay(500);
     const result = await generateText(prompt, undefined, false, apiSettings);
     fullGeneratedHooks = (result?.text || '').trim();
+
+    // Update progress to show post-processing
+    setModuleState(prev => ({
+      ...prev,
+      hookQueue: prev.hookQueue.map(qItem =>
+        qItem.id === item.id
+          ? { ...qItem, progress: 90 }
+          : qItem
+      ),
+    }));
+
+    await delay(200); // Small delay to show progress
 
     // Update progress to 100%
     setModuleState(prev => ({
