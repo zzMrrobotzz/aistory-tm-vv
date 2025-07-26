@@ -268,6 +268,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
   };
   
   const handleGenerateIntelligentContextPromptsOnly = async () => {
+    console.log('🚀 handleGenerateIntelligentContextPromptsOnly started');
     if (!hookTextForCtxPrompts.trim()) {
       updateState({ ctxPromptsError: 'Vui lòng nhập đoạn Hook hoặc Nội dung truyện của bạn.' });
       return;
@@ -280,26 +281,35 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     setIsProcessing(true);
 
     try {
+      console.log('📝 About to call generateSubPrompts with:', { hookTextLength: hookTextForCtxPrompts.length, imageCount });
       let subPrompts = await generateSubPrompts(hookTextForCtxPrompts, true); // true for contextual
+      console.log('✅ generateSubPrompts returned:', subPrompts);
       
       // Limit subPrompts to user's imageCount setting
       if (subPrompts.length > imageCount) {
+        console.log('✂️ Limiting subPrompts from', subPrompts.length, 'to', imageCount);
         subPrompts = subPrompts.slice(0, imageCount);
+        console.log('✅ After slice:', subPrompts);
       }
       
+      console.log('🔄 About to updateState with subPrompts:', subPrompts.length);
       updateState({ 
           generatedCtxPrompts: subPrompts, 
           ctxPromptsLoadingMessage: `Hoàn thành! Đã tạo ${subPrompts.length} prompt.`,
           ctxPromptsError: null
       });
+      console.log('✅ updateState completed successfully');
     } catch (e) {
+      console.error('❌ Error in handleGenerateIntelligentContextPromptsOnly:', e);
       updateState({ 
           ctxPromptsError: `Lỗi khi tạo prompts: ${(e as Error).message}`, 
           ctxPromptsLoadingMessage: null 
       });
     } finally {
+      console.log('🏁 Setting isProcessing to false');
       setIsProcessing(false);
       setTimeout(() => {
+        console.log('🧹 Clearing loading message after 3 seconds');
         setModuleState(prev => 
             (prev.ctxPromptsLoadingMessage?.includes("Hoàn thành!") || prev.ctxPromptsError )? 
             {...prev, ctxPromptsLoadingMessage: null} : prev
@@ -840,7 +850,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
                 <div className="mt-6 p-4 border rounded-lg bg-gray-50">
                     <h4 className="text-lg font-semibold text-gray-700 mb-2">Danh Sách Prompt Đã Tạo (Tiếng Anh):</h4>
                     <textarea 
-                        value={generatedCtxPrompts.join('\n\n')} 
+                        value={Array.isArray(generatedCtxPrompts) ? generatedCtxPrompts.join('\n\n') : ''} 
                         readOnly 
                         rows={Math.min(15, generatedCtxPrompts.length * 2 + 2)} 
                         className="w-full p-3 border-2 border-gray-200 rounded-md bg-white whitespace-pre-wrap leading-relaxed"
@@ -848,7 +858,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
                     />
                     <button 
                         id="copyCtxPromptsBtn" 
-                        onClick={() => copyToClipboard(generatedCtxPrompts.join('\n\n'), "copyCtxPromptsBtn")} 
+                        onClick={() => copyToClipboard(Array.isArray(generatedCtxPrompts) ? generatedCtxPrompts.join('\n\n') : '', "copyCtxPromptsBtn")} 
                         className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                         disabled={isProcessing || isRefining}
                     >
