@@ -49,6 +49,40 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
     // Generate unique ID
     const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
+    // Calculate word statistics for rewrite
+    const calculateWordStats = (originalText: string, rewrittenText: string) => {
+        const countWords = (text: string) => {
+            return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+        };
+
+        const originalWords = countWords(originalText);
+        const rewrittenWords = countWords(rewrittenText);
+        
+        // Simple word change calculation - could be improved with more sophisticated diff
+        const originalWordsArray = originalText.toLowerCase().trim().split(/\s+/);
+        const rewrittenWordsArray = rewrittenText.toLowerCase().trim().split(/\s+/);
+        
+        let wordsChanged = 0;
+        const maxLength = Math.max(originalWordsArray.length, rewrittenWordsArray.length);
+        
+        for (let i = 0; i < maxLength; i++) {
+            const originalWord = originalWordsArray[i] || '';
+            const rewrittenWord = rewrittenWordsArray[i] || '';
+            if (originalWord !== rewrittenWord) {
+                wordsChanged++;
+            }
+        }
+
+        const changePercentage = originalWords > 0 ? Math.round((wordsChanged / originalWords) * 100) : 0;
+
+        return {
+            originalWords,
+            rewrittenWords,
+            wordsChanged,
+            changePercentage
+        };
+    };
+
     // Queue management functions
     const addToQueue = (text: string, title?: string) => {
         setModuleState(prev => {
@@ -338,12 +372,20 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + (result?.text || '').trim();
         }
 
-        // Update final result
+        // Calculate word statistics
+        const finalRewrittenText = fullRewrittenText.trim();
+        const wordStats = calculateWordStats(item.originalText, finalRewrittenText);
+        
+        // Update final result with statistics
         setModuleState(prev => ({
             ...prev,
             queue: prev.queue.map(qItem =>
                 qItem.id === item.id
-                    ? { ...qItem, rewrittenText: fullRewrittenText.trim() }
+                    ? { 
+                        ...qItem, 
+                        rewrittenText: finalRewrittenText,
+                        wordStats: wordStats
+                    }
                     : qItem
             ),
         }));
@@ -767,6 +809,37 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                      <div className="mt-6 p-4 border rounded-lg bg-gray-50">
                          <h3 className="text-lg font-semibold mb-2">Văn bản đã viết lại:</h3>
                          <textarea value={rewrittenText} readOnly rows={10} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
+                         
+                         {/* Single rewrite word statistics */}
+                         {originalText && rewrittenText && (
+                             <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                 <h4 className="text-sm font-semibold text-blue-800 mb-2">📊 Thống kê từ:</h4>
+                                 {(() => {
+                                     const stats = calculateWordStats(originalText, rewrittenText);
+                                     return (
+                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                             <div className="text-center">
+                                                 <div className="text-lg font-bold text-gray-800">{stats.originalWords.toLocaleString()}</div>
+                                                 <div className="text-gray-600">Từ gốc</div>
+                                             </div>
+                                             <div className="text-center">
+                                                 <div className="text-lg font-bold text-green-600">{stats.rewrittenWords.toLocaleString()}</div>
+                                                 <div className="text-gray-600">Từ mới</div>
+                                             </div>
+                                             <div className="text-center">
+                                                 <div className="text-lg font-bold text-orange-600">{stats.wordsChanged.toLocaleString()}</div>
+                                                 <div className="text-gray-600">Từ thay đổi</div>
+                                             </div>
+                                             <div className="text-center">
+                                                 <div className="text-lg font-bold text-purple-600">{stats.changePercentage}%</div>
+                                                 <div className="text-gray-600">% Thay đổi</div>
+                                             </div>
+                                         </div>
+                                     );
+                                 })()}
+                             </div>
+                         )}
+
                          <div className="mt-3 flex gap-2">
                             <button 
                                 onClick={() => copyToClipboard(rewrittenText)} 
@@ -858,6 +931,32 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                                                 <div className="mt-2 p-2 bg-green-100 rounded text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
                                                     {item.rewrittenText}
                                                 </div>
+                                                
+                                                {/* Word Statistics */}
+                                                {item.wordStats && (
+                                                    <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                                                        <h4 className="text-xs font-semibold text-blue-800 mb-2">📊 Thống kê từ:</h4>
+                                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-600">Từ gốc:</span>
+                                                                <span className="font-semibold text-gray-800">{item.wordStats.originalWords.toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-600">Từ mới:</span>
+                                                                <span className="font-semibold text-green-600">{item.wordStats.rewrittenWords.toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-600">Từ thay đổi:</span>
+                                                                <span className="font-semibold text-orange-600">{item.wordStats.wordsChanged.toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-600">% Thay đổi:</span>
+                                                                <span className="font-semibold text-purple-600">{item.wordStats.changePercentage}%</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <button
                                                     onClick={() => copyToClipboard(item.rewrittenText || '')}
                                                     className="mt-2 px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"

@@ -254,6 +254,12 @@ export interface RewriteQueueItem {
     startedAt: Date | null;
     completedAt: Date | null;
     estimatedTimeRemaining: number | null; // seconds
+    wordStats?: {
+        originalWords: number;
+        rewrittenWords: number;
+        wordsChanged: number;
+        changePercentage: number;
+    };
 }
 
 // Queue System State
