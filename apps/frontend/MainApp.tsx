@@ -145,6 +145,27 @@ const MainApp: React.FC = () => {
     lessonError: null,
     lessonLoadingMessage: null,
     storyTranslation: { translatedText: null, isTranslating: false, error: null }, // Added
+    // Queue Systems
+    storyQueue: [],
+    storyQueueSystem: {
+      isEnabled: false,
+      isPaused: false,
+      isProcessing: false,
+      currentItem: null,
+      completedCount: 0,
+      totalCount: 0,
+      averageProcessingTime: 60,
+    },
+    hookQueue: [],
+    hookQueueSystem: {
+      isEnabled: false,
+      isPaused: false,
+      isProcessing: false,
+      currentItem: null,
+      completedCount: 0,
+      totalCount: 0,
+      averageProcessingTime: 60,
+    },
     // Batch story fields removed
   };
 
