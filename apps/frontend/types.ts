@@ -241,6 +241,32 @@ export interface WriteStoryModuleState {
 }
 
 // Rewrite Module - SIMPLIFIED STRUCTURE
+// Queue Item for Rewrite Module
+export interface RewriteQueueItem {
+    id: string;
+    title: string; // User-provided title or auto-generated from content
+    originalText: string;
+    status: 'waiting' | 'processing' | 'completed' | 'error';
+    progress: number; // 0-100
+    rewrittenText: string | null;
+    error: string | null;
+    addedAt: Date;
+    startedAt: Date | null;
+    completedAt: Date | null;
+    estimatedTimeRemaining: number | null; // seconds
+}
+
+// Queue System State
+export interface QueueSystemState {
+    isEnabled: boolean;
+    isPaused: boolean;
+    isProcessing: boolean;
+    currentItem: RewriteQueueItem | null;
+    completedCount: number;
+    totalCount: number;
+    averageProcessingTime: number; // seconds per item
+}
+
 export interface RewriteModuleState {
     rewriteLevel: number;
     sourceLanguage: string;
@@ -262,6 +288,9 @@ export interface RewriteModuleState {
         isTranslating: boolean;
         error: string | null;
     };
+    // Queue System
+    queue: RewriteQueueItem[];
+    queueSystem: QueueSystemState;
 }
 
 

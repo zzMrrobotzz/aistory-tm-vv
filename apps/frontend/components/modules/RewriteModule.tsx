@@ -1,8 +1,8 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
-import { StopCircle, Languages } from 'lucide-react';
-import { ApiSettings, RewriteModuleState, UserProfile } from '../../types';
+import { StopCircle, Languages, Plus, Play, Pause, Trash2, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { ApiSettings, RewriteModuleState, UserProfile, RewriteQueueItem } from '../../types';
 import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS, TRANSLATE_LANGUAGE_OPTIONS, TRANSLATE_STYLE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
@@ -47,6 +47,245 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
 
     const updateState = (updates: Partial<RewriteModuleState>) => {
         setModuleState(prev => ({ ...prev, ...updates }));
+    };
+
+    // Generate unique ID
+    const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+    // Queue management functions
+    const addToQueue = (text: string, title?: string) => {
+        const newItem: RewriteQueueItem = {
+            id: generateId(),
+            title: title || `Bài ${moduleState.queue.length + 1} - ${text.substring(0, 30)}...`,
+            originalText: text,
+            status: 'waiting',
+            progress: 0,
+            rewrittenText: null,
+            error: null,
+            addedAt: new Date(),
+            startedAt: null,
+            completedAt: null,
+            estimatedTimeRemaining: null,
+        };
+
+        updateState({
+            queue: [...moduleState.queue, newItem],
+            queueSystem: {
+                ...moduleState.queueSystem,
+                totalCount: moduleState.queue.length + 1,
+            },
+        });
+
+        // Start processing if not already processing
+        setTimeout(() => {
+            if (!moduleState.queueSystem.isProcessing && moduleState.queueSystem.isEnabled) {
+                processQueue();
+            }
+        }, 100);
+    };
+
+    const removeFromQueue = (id: string) => {
+        const updatedQueue = moduleState.queue.filter(item => item.id !== id);
+        updateState({
+            queue: updatedQueue,
+            queueSystem: {
+                ...moduleState.queueSystem,
+                totalCount: updatedQueue.length,
+            },
+        });
+    };
+
+    const clearQueue = () => {
+        updateState({
+            queue: [],
+            queueSystem: {
+                ...moduleState.queueSystem,
+                totalCount: 0,
+                completedCount: 0,
+                currentItem: null,
+                isProcessing: false,
+            },
+        });
+    };
+
+    const toggleQueueMode = () => {
+        updateState({
+            queueSystem: {
+                ...moduleState.queueSystem,
+                isEnabled: !moduleState.queueSystem.isEnabled,
+            },
+        });
+    };
+
+    const pauseResumeQueue = () => {
+        updateState({
+            queueSystem: {
+                ...moduleState.queueSystem,
+                isPaused: !moduleState.queueSystem.isPaused,
+            },
+        });
+    };
+
+    // Process queue items one by one
+    const processQueue = async () => {
+        const waitingItems = moduleState.queue.filter(item => item.status === 'waiting');
+        if (waitingItems.length === 0 || moduleState.queueSystem.isPaused) {
+            updateState({
+                queueSystem: {
+                    ...moduleState.queueSystem,
+                    isProcessing: false,
+                    currentItem: null,
+                },
+            });
+            return;
+        }
+
+        const currentItem = waitingItems[0];
+        const startTime = Date.now();
+
+        // Update current item status
+        updateState({
+            queueSystem: {
+                ...moduleState.queueSystem,
+                isProcessing: true,
+                currentItem: currentItem,
+            },
+            queue: moduleState.queue.map(item =>
+                item.id === currentItem.id
+                    ? { ...item, status: 'processing', startedAt: new Date() }
+                    : item
+            ),
+        });
+
+        try {
+            // Use existing rewrite logic
+            await processQueueItem(currentItem);
+            
+            const endTime = Date.now();
+            const processingTime = (endTime - startTime) / 1000; // seconds
+            
+            // Update completion stats
+            updateState({
+                queueSystem: {
+                    ...moduleState.queueSystem,
+                    completedCount: moduleState.queueSystem.completedCount + 1,
+                    averageProcessingTime: 
+                        (moduleState.queueSystem.averageProcessingTime + processingTime) / 2,
+                },
+                queue: moduleState.queue.map(item =>
+                    item.id === currentItem.id
+                        ? { ...item, status: 'completed', completedAt: new Date(), progress: 100 }
+                        : item
+                ),
+            });
+
+        } catch (error) {
+            // Mark current item as error
+            updateState({
+                queue: moduleState.queue.map(item =>
+                    item.id === currentItem.id
+                        ? { ...item, status: 'error', error: (error as Error).message }
+                        : item
+                ),
+            });
+        }
+
+        // Continue with next item after a short delay
+        setTimeout(() => {
+            if (!moduleState.queueSystem.isPaused && moduleState.queueSystem.isEnabled) {
+                processQueue();
+            }
+        }, 1000);
+    };
+
+    // Process individual queue item (extracted from handleSingleRewrite)
+    const processQueueItem = async (item: RewriteQueueItem) => {
+        const CHUNK_CHAR_COUNT = 4000;
+        const numChunks = Math.ceil(item.originalText.length / CHUNK_CHAR_COUNT);
+        let fullRewrittenText = '';
+
+        for (let i = 0; i < numChunks; i++) {
+            // Update progress
+            const currentProgress = Math.round(((i + 1) / numChunks) * 100);
+            updateState({
+                queue: moduleState.queue.map(qItem =>
+                    qItem.id === item.id
+                        ? { ...qItem, progress: currentProgress }
+                        : qItem
+                ),
+            });
+
+            const textChunk = item.originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
+            
+            let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
+            
+            const levelDescriptions: {[key: number]: string} = {
+                0: 'only fix spelling and grammar. Keep the original story 100%.',
+                25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning and plot.',
+                50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but MUST keep the main character names and core plot points.',
+                75: 'creatively reimagine the story. You can change character names and some settings. The plot may have new developments, but it MUST retain the spirit of the original script.',
+                100: 'completely rewrite into a new script. Only retain the "soul" (core idea, main theme) of the original story.'
+            };
+            const descriptionKey = Math.round(rewriteLevel / 25) * 25;
+            const levelDescription = levelDescriptions[descriptionKey];
+
+            const selectedSourceLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === sourceLanguage)?.label || sourceLanguage;
+            const selectedTargetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === targetLanguage)?.label || targetLanguage;
+
+            let localizationRequest = '';
+            if (targetLanguage !== sourceLanguage && adaptContext) {
+                localizationRequest = `\n- **Cultural Localization Required:** Deeply adapt the cultural context, social norms, proper names, and other details to make the story feel natural and appropriate for a ${selectedTargetLangLabel}-speaking audience.`;
+            }
+
+            let rewriteStyleInstructionPromptSegment = '';
+            if (rewriteStyle === 'custom') {
+                rewriteStyleInstructionPromptSegment = `Apply the following custom rewrite instructions: "${customRewriteStyle}"`;
+            } else {
+                rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${effectiveStyle}.`;
+            }
+
+            const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
+
+**Instructions:**
+- **Source Language:** ${selectedSourceLangLabel}
+- **Target Language:** ${selectedTargetLangLabel}
+- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.
+- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}
+- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
+- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.
+${localizationRequest}
+
+**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**
+---
+${fullRewrittenText || "This is the first chunk."}
+---
+
+**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**
+---
+${textChunk}
+---
+
+**Your Task:**
+Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
+`;
+            
+            await delay(500);
+            const result = await generateText(prompt, undefined, false, apiSettings);
+            fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + (result?.text || '').trim();
+        }
+
+        // Update final result
+        updateState({
+            queue: moduleState.queue.map(qItem =>
+                qItem.id === item.id
+                    ? { ...qItem, rewrittenText: fullRewrittenText.trim() }
+                    : qItem
+            ),
+        });
+
+        // Log usage statistics
+        logApiCall('rewrite', numChunks);
+        logTextRewritten('rewrite', 1);
     };
 
     useEffect(() => {
@@ -268,9 +507,116 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
              <div className="space-y-6 animate-fadeIn">
                 <InfoBox>
                     <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.
+                    <br /><br />
+                    <strong>🆕 Chế độ Hàng Chờ:</strong> Bật chế độ này để nhập liên tục nhiều bài và để tool tự động xử lý từng bài một theo thứ tự.
                 </InfoBox>
 
                 {!hasActiveSubscription && <UpgradePrompt />}
+
+                {/* Queue Mode Toggle */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                            <Clock className="w-5 h-5 text-blue-600 mr-2" />
+                            <h3 className="text-lg font-semibold text-blue-800">Hệ Thống Hàng Chờ</h3>
+                        </div>
+                        <button
+                            onClick={toggleQueueMode}
+                            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                                moduleState.queueSystem.isEnabled
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                    : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                            }`}
+                        >
+                            {moduleState.queueSystem.isEnabled ? 'Tắt Hàng Chờ' : 'Bật Hàng Chờ'}
+                        </button>
+                    </div>
+
+                    {moduleState.queueSystem.isEnabled && (
+                        <div className="space-y-3">
+                            {/* Queue Stats */}
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div className="bg-white p-3 rounded-lg">
+                                    <div className="text-2xl font-bold text-blue-600">{moduleState.queue.length}</div>
+                                    <div className="text-sm text-gray-600">Tổng cộng</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-lg">
+                                    <div className="text-2xl font-bold text-green-600">{moduleState.queueSystem.completedCount}</div>
+                                    <div className="text-sm text-gray-600">Hoàn thành</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-lg">
+                                    <div className="text-2xl font-bold text-orange-600">
+                                        {moduleState.queue.filter(item => item.status === 'waiting').length}
+                                    </div>
+                                    <div className="text-sm text-gray-600">Đang chờ</div>
+                                </div>
+                            </div>
+
+                            {/* Queue Controls */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        if (!moduleState.queueSystem.isProcessing) {
+                                            processQueue();
+                                        } else {
+                                            pauseResumeQueue();
+                                        }
+                                    }}
+                                    disabled={moduleState.queue.filter(item => item.status === 'waiting').length === 0}
+                                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {moduleState.queueSystem.isProcessing ? (
+                                        moduleState.queueSystem.isPaused ? (
+                                            <>
+                                                <Play className="w-4 h-4 mr-2" />
+                                                Tiếp tục
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Pause className="w-4 h-4 mr-2" />
+                                                Tạm dừng
+                                            </>
+                                        )
+                                    ) : (
+                                        <>
+                                            <Play className="w-4 h-4 mr-2" />
+                                            Bắt đầu
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={clearQueue}
+                                    disabled={moduleState.queue.length === 0}
+                                    className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Xóa hết
+                                </button>
+                            </div>
+
+                            {/* Current Processing Status */}
+                            {moduleState.queueSystem.currentItem && (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-yellow-800">Đang xử lý:</span>
+                                        <span className="text-sm text-yellow-600">
+                                            {moduleState.queueSystem.currentItem.progress}%
+                                        </span>
+                                    </div>
+                                    <div className="text-sm text-yellow-700 truncate">
+                                        {moduleState.queueSystem.currentItem.title}
+                                    </div>
+                                    <div className="w-full bg-yellow-200 rounded-full h-2 mt-2">
+                                        <div
+                                            className="bg-yellow-600 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${moduleState.queueSystem.currentItem.progress}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
                 
                 <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
                     <h3 className="text-xl font-semibold text-gray-800">Cài đặt Viết lại Nhanh</h3>
@@ -316,13 +662,29 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                     <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
                 </div>
                 <div className="flex gap-3">
-                    <button
-                        onClick={handleSingleRewrite}
-                        disabled={!hasActiveSubscription || !originalText.trim() || progress > 0}
-                        className="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
-                    >
-                        {progress > 0 ? `Đang viết lại... (${progress}%)` : '✍️ Viết lại nội dung'}
-                    </button>
+                    {moduleState.queueSystem.isEnabled ? (
+                        <button
+                            onClick={() => {
+                                if (originalText.trim()) {
+                                    addToQueue(originalText.trim());
+                                    updateState({ originalText: '' }); // Clear input for next item
+                                }
+                            }}
+                            disabled={!hasActiveSubscription || !originalText.trim()}
+                            className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center"
+                        >
+                            <Plus className="w-5 h-5 mr-2" />
+                            Thêm vào hàng chờ
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleSingleRewrite}
+                            disabled={!hasActiveSubscription || !originalText.trim() || progress > 0}
+                            className="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                            {progress > 0 ? `Đang viết lại... (${progress}%)` : '✍️ Viết lại nội dung'}
+                        </button>
+                    )}
                     {progress > 0 && (
                         <button
                             onClick={handleStop}
@@ -364,6 +726,104 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                             </button>
                          </div>
                      </div>
+                )}
+
+                {/* Queue Items List */}
+                {moduleState.queueSystem.isEnabled && moduleState.queue.length > 0 && (
+                    <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+                        <h3 className="text-lg font-semibold mb-4">📋 Danh sách hàng chờ ({moduleState.queue.length} mục)</h3>
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {moduleState.queue.map((item, index) => (
+                                <div key={item.id} className={`p-3 border rounded-lg ${
+                                    item.status === 'processing' ? 'bg-yellow-50 border-yellow-300' :
+                                    item.status === 'completed' ? 'bg-green-50 border-green-300' :
+                                    item.status === 'error' ? 'bg-red-50 border-red-300' :
+                                    'bg-white border-gray-300'
+                                }`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center">
+                                            <span className="text-sm font-medium text-gray-600 mr-2">#{index + 1}</span>
+                                            {item.status === 'processing' && <div className="animate-spin w-4 h-4 border-2 border-yellow-600 border-t-transparent rounded-full mr-2"></div>}
+                                            {item.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-600 mr-2" />}
+                                            {item.status === 'error' && <AlertCircle className="w-4 h-4 text-red-600 mr-2" />}
+                                            {item.status === 'waiting' && <Clock className="w-4 h-4 text-gray-400 mr-2" />}
+                                            <span className="font-semibold truncate max-w-md">{item.title}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {item.status === 'processing' && (
+                                                <span className="text-sm text-gray-600">{item.progress}%</span>
+                                            )}
+                                            {item.status === 'waiting' && (
+                                                <button
+                                                    onClick={() => removeFromQueue(item.id)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                    title="Xóa khỏi hàng chờ"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Progress bar for processing items */}
+                                    {item.status === 'processing' && (
+                                        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                            <div
+                                                className="bg-yellow-600 h-2 rounded-full transition-all duration-300"
+                                                style={{ width: `${item.progress}%` }}
+                                            ></div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Show content preview */}
+                                    <div className="text-sm text-gray-600 mb-2">
+                                        <details>
+                                            <summary className="cursor-pointer hover:text-gray-800">Nội dung gốc</summary>
+                                            <div className="mt-2 p-2 bg-gray-100 rounded text-xs whitespace-pre-wrap max-h-20 overflow-y-auto">
+                                                {item.originalText}
+                                            </div>
+                                        </details>
+                                    </div>
+
+                                    {/* Show result for completed items */}
+                                    {item.status === 'completed' && item.rewrittenText && (
+                                        <div className="text-sm text-gray-600 mb-2">
+                                            <details>
+                                                <summary className="cursor-pointer hover:text-gray-800 text-green-700 font-medium">Kết quả viết lại</summary>
+                                                <div className="mt-2 p-2 bg-green-100 rounded text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                                    {item.rewrittenText}
+                                                </div>
+                                                <button
+                                                    onClick={() => copyToClipboard(item.rewrittenText || '')}
+                                                    className="mt-2 px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                                                >
+                                                    Sao chép kết quả
+                                                </button>
+                                            </details>
+                                        </div>
+                                    )}
+
+                                    {/* Show error for failed items */}
+                                    {item.status === 'error' && item.error && (
+                                        <div className="text-sm text-red-600">
+                                            <span className="font-medium">Lỗi:</span> {item.error}
+                                        </div>
+                                    )}
+
+                                    {/* Timestamps */}
+                                    <div className="text-xs text-gray-400 flex gap-4">
+                                        <span>Thêm: {new Date(item.addedAt).toLocaleTimeString('vi-VN')}</span>
+                                        {item.startedAt && (
+                                            <span>Bắt đầu: {new Date(item.startedAt).toLocaleTimeString('vi-VN')}</span>
+                                        )}
+                                        {item.completedAt && (
+                                            <span>Hoàn thành: {new Date(item.completedAt).toLocaleTimeString('vi-VN')}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 )}
 
                 {/* Translation Section */}

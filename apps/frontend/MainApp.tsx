@@ -188,6 +188,17 @@ const MainApp: React.FC = () => {
     editLoadingMessage: null,
     hasBeenEdited: false,
     translation: { translatedText: null, isTranslating: false, error: null },
+    // Queue System
+    queue: [],
+    queueSystem: {
+      isEnabled: false,
+      isPaused: false,
+      isProcessing: false,
+      currentItem: null,
+      completedCount: 0,
+      totalCount: 0,
+      averageProcessingTime: 60, // 60 seconds default
+    },
   };
 
   const [rewriteState, setRewriteState] = useState<RewriteModuleState>(() => {
@@ -212,6 +223,17 @@ const MainApp: React.FC = () => {
                 editLoadingMessage: null,
                 hasBeenEdited: false,
                 translation: { translatedText: null, isTranslating: false, error: null },
+                // Reset queue system
+                queue: [],
+                queueSystem: {
+                  isEnabled: false,
+                  isPaused: false,
+                  isProcessing: false,
+                  currentItem: null,
+                  completedCount: 0,
+                  totalCount: 0,
+                  averageProcessingTime: 60,
+                },
             };
         } catch (e) {
             console.error("Error parsing saved RewriteModuleState from localStorage", e);
