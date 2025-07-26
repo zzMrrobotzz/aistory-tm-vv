@@ -95,10 +95,15 @@ export const generateDeepSeekImage = async (
     const modelName = "deepseek-image";
 
     try {
+        // Get session token for backend authentication
+        const sessionToken = localStorage.getItem('userToken');
+        
         const response = await fetch(apiURL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionToken}`,
+                'x-session-token': sessionToken || ''
             },
             body: JSON.stringify({
                 prompt: prompt,
