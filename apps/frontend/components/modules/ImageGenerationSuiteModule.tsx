@@ -173,6 +173,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
 
 
   const executeImageGenerationFromHook = async (isContextualImageGeneratorTab: boolean) => {
+    console.log('🖼️ executeImageGenerationFromHook started', { isContextualImageGeneratorTab, hookTextLength: hookText.length });
     if (!hookText.trim()) {
       updateState({ singleImageOverallError: 'Vui lòng nhập đoạn Hook hoặc Nội dung truyện của bạn.' });
       return;
@@ -190,6 +191,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       return;
     }
 
+    console.log('🧹 Clearing previous state and starting image generation');
     updateState({ 
         generatedSingleImages: [], 
         singleImageOverallError: null, 
@@ -199,26 +201,34 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     setIsProcessing(true);
 
     try {
+      console.log('📝 Step 1: Generating sub-prompts');
       updateState({singleImageProgressMessage: `Bước 1: Đang phân tích nội dung và tạo danh sách prompt ảnh ${isContextualImageGeneratorTab ? "(Ngữ cảnh Thông minh)" : ""}...`});
       await delay(1000); 
+      console.log('🔍 About to call generateSubPrompts with:', { hookText: hookText.length, isContextual: isContextualImageGeneratorTab });
       let subPrompts = await generateSubPrompts(hookText, isContextualImageGeneratorTab);
+      console.log('✅ generateSubPrompts completed, got:', subPrompts.length, 'prompts');
       
       // Limit subPrompts to user's imageCount setting
       if (subPrompts.length > imageCount) {
+        console.log('✂️ Limiting subPrompts from', subPrompts.length, 'to', imageCount);
         subPrompts = subPrompts.slice(0, imageCount);
       }
 
+      console.log('🎯 Creating initial image items for', subPrompts.length, 'prompts with engine:', imageEngine);
       const initialImages: GeneratedImageItem[] = subPrompts.map(p => ({ promptUsed: p, imageUrl: null, error: null, engine: imageEngine }));
       updateState({ generatedSingleImages: initialImages, singleImageProgressMessage: `Đã tạo ${subPrompts.length} prompt con. Bắt đầu tạo ảnh...` });
 
       const currentGeneratedImages: GeneratedImageItem[] = [...initialImages];
 
+      console.log('🔄 Starting image generation loop for', subPrompts.length, 'images');
       for (let i = 0; i < subPrompts.length; i++) {
         const currentSubPrompt = subPrompts[i];
+        console.log(`🖼️ Generating image ${i + 1}/${subPrompts.length} with engine:`, imageEngine, 'prompt preview:', currentSubPrompt.substring(0,50));
         updateState({ singleImageProgressMessage: `Bước ${i + 2}/${subPrompts.length + 1}: Đang tạo ảnh ${i + 1}/${subPrompts.length} (Prompt: ${currentSubPrompt.substring(0,50)}...)` });
         if (i > 0 || imageEngine === 'google' || imageEngine === 'chatgpt' || imageEngine === 'deepseek') await delay(1500);
 
         try {
+          console.log('🎨 About to call image generation API for engine:', imageEngine);
           let imageUrlResult: string | null = null;
           let dalleRevisedPrompt: string | undefined = undefined;
 
@@ -235,8 +245,11 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
              const resultDallE = await generateDallEImage(currentSubPrompt, aspectRatio, effectiveChatGptKey);
              imageUrlResult = resultDallE;
           } else if (imageEngine === 'deepseek') {
+            console.log('🔑 Calling DeepSeek with keys:', { effectiveDeepSeekKey: effectiveDeepSeekKey ? 'present' : 'missing', deepseekGeneralApiKey: deepseekGeneralApiKey ? 'present' : 'missing' });
             imageUrlResult = await generateDeepSeekImage(currentSubPrompt, aspectRatio, effectiveDeepSeekKey, deepseekGeneralApiKey);
+            console.log('✅ DeepSeek image generation completed');
           }
+          console.log('💾 Updating image result for index', i);
           currentGeneratedImages[i] = { ...currentGeneratedImages[i], imageUrl: imageUrlResult, error: null, dalleRevisedPrompt: dalleRevisedPrompt };
         } catch (imgErr) {
           currentGeneratedImages[i] = { ...currentGeneratedImages[i], imageUrl: null, error: `Lỗi ảnh ${i+1}: ${(imgErr as Error).message}` };
