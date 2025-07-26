@@ -20,7 +20,7 @@ const keysRouter = require('./routes/keys');
 const adminKeysRouter = require('./routes/adminKeys');
 
 // --- Enhanced Subscription System ---
-const authEnhancedRouter = require('./routes/authEnhanced');
+// const authEnhancedRouter = require('./routes/authEnhanced'); // Temporarily disabled for deploy fix
 const SubscriptionHealthChecker = require('./services/subscriptionHealthChecker');
 const adminProxiesRouter = require('./routes/adminProxies');
 const paymentRouter = require('./routes/payment');
@@ -474,7 +474,7 @@ app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment ma
 app.use('/api/admin/anti-sharing', require('./routes/adminAntiSharing')); // Anti-sharing management
 app.use('/api/ai', aiProxyRouter);
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution
+// app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution - temporarily disabled
 app.use('/api/user', require('./routes/userStats')); // User statistics
 
 // --- Root and Server Start ---
