@@ -281,9 +281,9 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       updateState({ singleImageProgressMessage: `Hoàn thành tạo ảnh từ hook/truyện${isContextualImageGeneratorTab ? " (Ngữ cảnh Thông minh)" : ""}!`});
       
       // Log image generation usage
-      const imageCount = currentGeneratedImages.filter(img => img.imageUrl).length;
+      const successfulImageCount = currentGeneratedImages.filter(img => img.imageUrl).length;
       logApiCall('image-generation-suite', subPrompts.length);
-      logImageGenerated('image-generation-suite', imageCount);
+      logImageGenerated('image-generation-suite', successfulImageCount);
 
     } catch (e) {
       let errorMessage = `Đã xảy ra lỗi: ${(e as Error).message}`;
