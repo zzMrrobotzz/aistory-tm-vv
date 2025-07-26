@@ -18,6 +18,10 @@ const { createAuditLog } = require('./utils/auditLogger');
 // --- Import Routes ---
 const keysRouter = require('./routes/keys');
 const adminKeysRouter = require('./routes/adminKeys');
+
+// --- Enhanced Subscription System ---
+const authEnhancedRouter = require('./routes/authEnhanced');
+const SubscriptionHealthChecker = require('./services/subscriptionHealthChecker');
 const adminProxiesRouter = require('./routes/adminProxies');
 const paymentRouter = require('./routes/payment');
 const packagesRouter = require('./routes/packages');
@@ -60,7 +64,7 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'Cache-Control', 'Pragma', 'cache-control', 'expires']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'x-session-token', 'Cache-Control', 'Pragma', 'cache-control', 'expires']
 };
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
@@ -470,6 +474,7 @@ app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment ma
 app.use('/api/admin/anti-sharing', require('./routes/adminAntiSharing')); // Anti-sharing management
 app.use('/api/ai', aiProxyRouter);
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution
 app.use('/api/user', require('./routes/userStats')); // User statistics
 
 // --- Root and Server Start ---
@@ -485,6 +490,30 @@ app.get('/', (req, res) => {
 // Health check endpoint for Render
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'ai-story-backend' });
+});
+
+// Subscription health check endpoint (admin only)
+app.get('/api/admin/subscription-health', async (req, res) => {
+  try {
+    const healthChecker = new SubscriptionHealthChecker();
+    const report = await healthChecker.runHealthCheck();
+    res.json({
+      success: true,
+      report: report,
+      summary: {
+        totalIssues: report.summary.totalIssues,
+        highSeverity: report.summary.highSeverity,
+        healthScore: ((100 - report.summary.totalIssues * 10) / 100).toFixed(2)
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to run subscription health check',
+      details: error.message
+    });
+  }
 });
 
 const PORT = process.env.PORT || 3001; // Changed default to 3001 for consistency
