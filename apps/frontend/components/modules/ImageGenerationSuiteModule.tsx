@@ -22,6 +22,7 @@ import { generateDeepSeekImage, refineDeepSeekImage } from '../../services/deeps
 import { delay, dataUrlToBlob, isSubscribed } from '../../utils'; 
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logImageGenerated } from '../../services/usageService';
+import { ApiKeyStorage } from '../../utils/apiKeyStorage';
 
 interface ImageGenerationSuiteModuleProps {
   apiSettings: ApiSettings;
@@ -62,6 +63,12 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
 
   const geminiUserApiKey = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
   const deepseekGeneralApiKey = apiSettings.provider === 'deepseek' ? apiSettings.apiKey : undefined;
+  
+  // Get API keys from storage for image generation
+  const activeApiKeys = ApiKeyStorage.getActiveApiSettings();
+  const effectiveDeepSeekKey = deepSeekImageApiKey?.trim() || deepseekGeneralApiKey || activeApiKeys.deepseek;
+  const effectiveStabilityKey = stabilityApiKey?.trim() || activeApiKeys.stability;
+  const effectiveChatGptKey = chatGptApiKey?.trim() || activeApiKeys.openai;
   
   // Cleanup object URLs on unmount or when images change
   useEffect(() => {
@@ -162,16 +169,16 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       updateState({ singleImageOverallError: 'Vui lòng nhập đoạn Hook hoặc Nội dung truyện của bạn.' });
       return;
     }
-     if (imageEngine === 'stability' && !stabilityApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key của Stability AI.', singleImageOverallError: null });
+    if (imageEngine === 'stability' && !effectiveStabilityKey) {
+      updateState({ settingsError: 'Vui lòng cấu hình API Key cho Stability AI trong module Cài đặt → Quản Lý API Keys.', singleImageOverallError: null });
       return;
     }
-    if (imageEngine === 'chatgpt' && !chatGptApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key cho ChatGPT (DALL-E).', singleImageOverallError: null });
+    if (imageEngine === 'chatgpt' && !effectiveChatGptKey) {
+      updateState({ settingsError: 'Vui lòng cấu hình API Key cho OpenAI (DALL-E) trong module Cài đặt → Quản Lý API Keys.', singleImageOverallError: null });
       return;
     }
-     if (imageEngine === 'deepseek' && !deepSeekImageApiKey.trim() && !deepseekGeneralApiKey) {
-       updateState({ settingsError: 'Vui lòng nhập API Key cho DeepSeek Image hoặc cấu hình trong Cài đặt AI chung nếu dùng chung key.', singleImageOverallError: null });
+    if (imageEngine === 'deepseek' && !effectiveDeepSeekKey) {
+      updateState({ settingsError: 'Vui lòng cấu hình API Key cho DeepSeek trong module Cài đặt → Quản Lý API Keys.', singleImageOverallError: null });
       return;
     }
 
@@ -213,14 +220,14 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
           } else if (imageEngine === 'stability') {
             if (i === 0) await delay(1000); 
             const imageBlob = await generateStabilityImage(
-              stabilityApiKey, currentSubPrompt, stabilityStyle, aspectRatio, stabilityNegativePrompt
+              effectiveStabilityKey, currentSubPrompt, stabilityStyle, aspectRatio, stabilityNegativePrompt
             );
             imageUrlResult = URL.createObjectURL(imageBlob);
           } else if (imageEngine === 'chatgpt') {
-             const resultDallE = await generateDallEImage(currentSubPrompt, aspectRatio, chatGptApiKey);
+             const resultDallE = await generateDallEImage(currentSubPrompt, aspectRatio, effectiveChatGptKey);
              imageUrlResult = resultDallE;
           } else if (imageEngine === 'deepseek') {
-            imageUrlResult = await generateDeepSeekImage(currentSubPrompt, aspectRatio, deepSeekImageApiKey, deepseekGeneralApiKey);
+            imageUrlResult = await generateDeepSeekImage(currentSubPrompt, aspectRatio, effectiveDeepSeekKey, deepseekGeneralApiKey);
           }
           currentGeneratedImages[i] = { ...currentGeneratedImages[i], imageUrl: imageUrlResult, error: null, dalleRevisedPrompt: dalleRevisedPrompt };
         } catch (imgErr) {
@@ -300,16 +307,16 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       updateState({ batchOverallError: 'Vui lòng nhập ít nhất một prompt (tiếng Anh).', settingsError: null });
       return;
     }
-    if (imageEngine === 'stability' && !stabilityApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key của Stability AI.', batchOverallError: null });
+    if (imageEngine === 'stability' && !effectiveStabilityKey) {
+      updateState({ settingsError: 'Vui lòng cấu hình API Key cho Stability AI trong module Cài đặt → Quản Lý API Keys.', batchOverallError: null });
       return;
     }
-    if (imageEngine === 'chatgpt' && !chatGptApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key cho ChatGPT (DALL-E).', batchOverallError: null });
+    if (imageEngine === 'chatgpt' && !effectiveChatGptKey) {
+      updateState({ settingsError: 'Vui lòng cấu hình API Key cho OpenAI (DALL-E) trong module Cài đặt → Quản Lý API Keys.', batchOverallError: null });
       return;
     }
-    if (imageEngine === 'deepseek' && !deepSeekImageApiKey.trim() && !deepseekGeneralApiKey) {
-      updateState({ settingsError: 'Vui lòng nhập API Key cho DeepSeek Image hoặc cấu hình trong Cài đặt AI chung nếu dùng chung key.', batchOverallError: null });
+    if (imageEngine === 'deepseek' && !effectiveDeepSeekKey) {
+      updateState({ settingsError: 'Vui lòng cấu hình API Key cho DeepSeek trong module Cài đặt → Quản Lý API Keys.', batchOverallError: null });
       return;
     }
 
@@ -344,14 +351,14 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
           imageUrl = `data:image/png;base64,${base64Image}`;
         } else if (imageEngine === 'stability') {
           const imageBlob = await generateStabilityImage(
-            stabilityApiKey, finalImagePrompt, stabilityStyle, aspectRatio, stabilityNegativePrompt
+            effectiveStabilityKey, finalImagePrompt, stabilityStyle, aspectRatio, stabilityNegativePrompt
           );
           imageUrl = URL.createObjectURL(imageBlob);
         } else if (imageEngine === 'chatgpt') {
-           const resultDallE = await generateDallEImage(finalImagePrompt, aspectRatio, chatGptApiKey);
+           const resultDallE = await generateDallEImage(finalImagePrompt, aspectRatio, effectiveChatGptKey);
            imageUrl = resultDallE;
         } else if (imageEngine === 'deepseek') {
-          imageUrl = await generateDeepSeekImage(finalImagePrompt, aspectRatio, deepSeekImageApiKey, deepseekGeneralApiKey);
+          imageUrl = await generateDeepSeekImage(finalImagePrompt, aspectRatio, effectiveDeepSeekKey, deepseekGeneralApiKey);
         }
         newGeneratedImages[i] = { ...newGeneratedImages[i], imageUrl: imageUrl, error: null, dalleRevisedPrompt: dalleRevisedPrompt };
       } catch (e) {
@@ -452,7 +459,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
             originalMimeType,
             refinementPrompt,
             aspectRatio,
-            deepSeekImageApiKey,
+            effectiveDeepSeekKey,
             deepseekGeneralApiKey
         );
         newPromptForRefinedItem = refinementPrompt;
