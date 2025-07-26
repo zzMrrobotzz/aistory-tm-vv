@@ -463,6 +463,7 @@ const MainApp: React.FC = () => {
     selectedArtStyle: PREDEFINED_ART_STYLES[0].value,
     aspectRatio: ASPECT_RATIO_OPTIONS[0].value,
     imageEngine: IMAGE_GENERATION_ENGINE_OPTIONS[0].value as ImageGenerationEngine,
+    imageCount: 3, // Default to 3 images
     stabilityApiKey: '',
     chatGptApiKey: '',
     deepSeekImageApiKey: '',

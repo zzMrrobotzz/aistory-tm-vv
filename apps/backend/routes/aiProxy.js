@@ -603,4 +603,90 @@ async function logApiRequest(logData) {
   }
 }
 
+// POST /ai/generate-image - Generate images via AI providers
+router.post('/generate-image', aiRequestLimiter, async (req, res) => {
+  try {
+    const { prompt, provider = 'deepseek', size = '1024x1024', n = 1, model = 'deepseek-image', apiKey } = req.body;
+    
+    // Validate required fields
+    if (!prompt || !apiKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: prompt and apiKey'
+      });
+    }
+
+    console.log(`🖼️ Image generation request - Provider: ${provider}, Size: ${size}, Count: ${n}`);
+
+    let imageUrl;
+    try {
+      switch (provider.toLowerCase()) {
+        case 'deepseek':
+          imageUrl = await callDeepSeekImageAPI(prompt, size, n, apiKey);
+          break;
+        default:
+          return res.status(400).json({
+            success: false,
+            message: `Unsupported image provider: ${provider}`
+          });
+      }
+
+      console.log(`✅ Image generation successful`);
+
+      res.json({
+        success: true,
+        imageUrl: imageUrl,
+        provider: provider
+      });
+
+    } catch (apiError) {
+      console.error(`❌ ${provider} Image API error:`, apiError.message);
+      res.status(500).json({
+        success: false,
+        message: `Image generation failed: ${apiError.message}`
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Image generation endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during image generation'
+    });
+  }
+});
+
+// Helper function to call DeepSeek Image API
+async function callDeepSeekImageAPI(prompt, size, n, apiKey) {
+  const fetch = (await import('node-fetch')).default;
+  
+  const response = await fetch('https://api.deepseek.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      prompt: prompt,
+      size: size,
+      n: n,
+      model: "deepseek-image"
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  if (!data.data || !data.data[0] || !data.data[0].b64_json) {
+    throw new Error('Invalid response format from DeepSeek API');
+  }
+
+  // Return base64 image data
+  return `data:image/png;base64,${data.data[0].b64_json}`;
+}
+
 module.exports = router; 

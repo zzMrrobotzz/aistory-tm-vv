@@ -542,6 +542,7 @@ export interface ImageGenerationSuiteModuleState {
   selectedArtStyle: string; 
   aspectRatio: string;
   imageEngine: ImageGenerationEngine;
+  imageCount: number; // Number of images to generate
   
   // Engine-specific API Keys (managed within the module)
   stabilityApiKey: string;

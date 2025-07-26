@@ -43,7 +43,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
 }) => {
   const hasActiveSubscription = isSubscribed(currentUser);
   const {
-    activeTab, selectedArtStyle, aspectRatio, imageEngine,
+    activeTab, selectedArtStyle, aspectRatio, imageEngine, imageCount,
     stabilityApiKey, chatGptApiKey, deepSeekImageApiKey, 
     stabilityStyle, stabilityNegativePrompt,
     hookText, generatedSingleImages, singleImageOverallError, singleImageProgressMessage,
@@ -186,7 +186,12 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     try {
       updateState({singleImageProgressMessage: `Bước 1: Đang phân tích nội dung và tạo danh sách prompt ảnh ${isContextualImageGeneratorTab ? "(Ngữ cảnh Thông minh)" : ""}...`});
       await delay(1000); 
-      const subPrompts = await generateSubPrompts(hookText, isContextualImageGeneratorTab);
+      let subPrompts = await generateSubPrompts(hookText, isContextualImageGeneratorTab);
+      
+      // Limit subPrompts to user's imageCount setting
+      if (subPrompts.length > imageCount) {
+        subPrompts = subPrompts.slice(0, imageCount);
+      }
 
       const initialImages: GeneratedImageItem[] = subPrompts.map(p => ({ promptUsed: p, imageUrl: null, error: null, engine: imageEngine }));
       updateState({ generatedSingleImages: initialImages, singleImageProgressMessage: `Đã tạo ${subPrompts.length} prompt con. Bắt đầu tạo ảnh...` });
@@ -260,7 +265,13 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     setIsProcessing(true);
 
     try {
-      const subPrompts = await generateSubPrompts(hookTextForCtxPrompts, true); // true for contextual
+      let subPrompts = await generateSubPrompts(hookTextForCtxPrompts, true); // true for contextual
+      
+      // Limit subPrompts to user's imageCount setting
+      if (subPrompts.length > imageCount) {
+        subPrompts = subPrompts.slice(0, imageCount);
+      }
+      
       updateState({ 
           generatedCtxPrompts: subPrompts, 
           ctxPromptsLoadingMessage: `Hoàn thành! Đã tạo ${subPrompts.length} prompt.`,
@@ -588,6 +599,23 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
                     disabled={isProcessing || isRefining}
                 >
                     {ASPECT_RATIO_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+            </div>
+            <div>
+                <label htmlFor="igsImageCount" className="block text-sm font-medium text-gray-700 mb-1">Số lượng Ảnh tạo ra:</label>
+                <select 
+                    id="igsImageCount" 
+                    value={imageCount} 
+                    onChange={(e) => updateState({ imageCount: parseInt(e.target.value) })} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+                    disabled={isProcessing || isRefining}
+                >
+                    <option value={1}>1 ảnh</option>
+                    <option value={2}>2 ảnh</option>
+                    <option value={3}>3 ảnh</option>
+                    <option value={4}>4 ảnh</option>
+                    <option value={5}>5 ảnh</option>
+                    <option value={6}>6 ảnh</option>
                 </select>
             </div>
         </div>

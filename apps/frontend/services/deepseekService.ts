@@ -88,37 +88,41 @@ export const generateDeepSeekImage = async (
 ): Promise<string> => {
     const effectiveApiKey = getEffectiveDeepSeekApiKey(imageApiKey, generalApiKey);
     const size = mapAspectRatioToDeepSeekSize(aspectRatio);
-    const apiURL = "https://api.deepseek.com/v1/images/generations"; 
+    
+    // Use backend proxy to avoid CORS issues
+    const backendApiURL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com/api';
+    const apiURL = `${backendApiURL}/ai/generate-image`; 
     const modelName = "deepseek-image";
 
     try {
         const response = await fetch(apiURL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${effectiveApiKey}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: modelName,
                 prompt: prompt,
-                n: 1, 
-                size: size, 
-                response_format: "b64_json" 
+                provider: 'deepseek',
+                size: size,
+                n: 1,
+                model: modelName,
+                apiKey: effectiveApiKey
             }),
             signal: signal,
         });
 
         if (!response.ok) {
-           throw await handleDeepSeekError(response, signal, 'Image');
+           const errorData = await response.json().catch(() => ({}));
+           throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const responseData: DeepSeekImageResponse = await response.json();
+        const responseData = await response.json();
 
-        if (responseData.data && responseData.data.length > 0 && responseData.data[0].b64_json) {
-            return `data:image/png;base64,${responseData.data[0].b64_json}`;
+        if (responseData.success && responseData.imageUrl) {
+            return responseData.imageUrl;
         } else {
-            console.error("No image data received from DeepSeek API. Response:", responseData);
-            throw new Error("Không nhận được dữ liệu ảnh từ DeepSeek API.");
+            console.error("No image data received from backend proxy. Response:", responseData);
+            throw new Error(responseData.message || "Không nhận được dữ liệu ảnh từ backend proxy.");
         }
 
     } catch (error) {
