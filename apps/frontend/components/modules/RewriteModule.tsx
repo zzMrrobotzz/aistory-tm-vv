@@ -75,16 +75,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
                 },
             };
 
-            // Start processing if not already processing
-            setTimeout(() => {
-                setModuleState(currentState => {
-                    if (!currentState.queueSystem.isProcessing && currentState.queueSystem.isEnabled) {
-                        processQueue();
-                    }
-                    return currentState;
-                });
-            }, 100);
-
+            // DO NOT auto-start processing - wait for user to click "Bắt đầu"
             return newState;
         });
     };
@@ -201,8 +192,20 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
                 // Continue with next item after a short delay - only if not paused
                 setTimeout(() => {
                     setModuleState(prev => {
-                        if (!prev.queueSystem.isPaused && prev.queue.filter(item => item.status === 'waiting').length > 0) {
-                            processQueue();
+                        const hasWaitingItems = prev.queue.filter(item => item.status === 'waiting').length > 0;
+                        if (!prev.queueSystem.isPaused && hasWaitingItems) {
+                            // Continue processing next item
+                            setTimeout(() => processQueue(), 100);
+                        } else {
+                            // No more items - stop processing
+                            return {
+                                ...prev,
+                                queueSystem: {
+                                    ...prev.queueSystem,
+                                    isProcessing: false,
+                                    currentItem: null,
+                                }
+                            };
                         }
                         return prev;
                     });
