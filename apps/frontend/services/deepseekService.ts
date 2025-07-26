@@ -86,65 +86,8 @@ export const generateDeepSeekImage = async (
     generalApiKey?: string, // Key from ApiSettingsComponent (if DeepSeek is text provider)
     signal?: AbortSignal
 ): Promise<string> => {
-    const effectiveApiKey = getEffectiveDeepSeekApiKey(imageApiKey, generalApiKey);
-    const size = mapAspectRatioToDeepSeekSize(aspectRatio);
-    
-    // Use backend proxy to avoid CORS issues
-    const backendApiURL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com/api';
-    const apiURL = `${backendApiURL}/ai/generate-image`; 
-    const modelName = "deepseek-image";
-
-    try {
-        // Get session token for backend authentication
-        const sessionToken = localStorage.getItem('userToken');
-        
-        const response = await fetch(apiURL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${sessionToken}`,
-                'x-session-token': sessionToken || ''
-            },
-            body: JSON.stringify({
-                prompt: prompt,
-                provider: 'deepseek',
-                size: size,
-                n: 1,
-                model: modelName,
-                apiKey: effectiveApiKey
-            }),
-            signal: signal,
-        });
-
-        if (!response.ok) {
-           const errorData = await response.json().catch(() => ({}));
-           throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
-
-        if (responseData.success && responseData.imageUrl) {
-            return responseData.imageUrl;
-        } else {
-            console.error("No image data received from backend proxy. Response:", responseData);
-            throw new Error(responseData.message || "Không nhận được dữ liệu ảnh từ backend proxy.");
-        }
-
-    } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-            throw error;
-        }
-        console.error("Failed to generate image with DeepSeek:", error);
-         if (error instanceof Error && (error.message.startsWith("Lỗi từ DeepSeek") || error.message.startsWith("Lỗi xác thực DeepSeek"))) {
-            throw error; 
-        }
-        
-        let detailedErrorMessage = `Không thể tạo ảnh DeepSeek: ${(error as Error).message}`;
-        if ((error as Error).message.toLowerCase().includes('failed to fetch')) {
-             detailedErrorMessage = "Lỗi kết nối mạng khi gọi DeepSeek Image API. Vui lòng kiểm tra kết nối và thử lại. Nếu sự cố vẫn tiếp diễn, API endpoint của DeepSeek có thể đã thay đổi hoặc dịch vụ đang gặp sự cố.";
-        }
-        throw new Error(detailedErrorMessage);
-    }
+    // DeepSeek doesn't officially support image generation yet
+    throw new Error("DeepSeek chưa hỗ trợ tạo ảnh. Vui lòng sử dụng Gemini hoặc Stability AI thay thế. DeepSeek hiện tại chỉ hỗ trợ tạo văn bản và code.");
 };
 
 

@@ -237,7 +237,7 @@ router.post('/generate', aiRequestLimiter, validateActiveSession, checkAccountBl
 // POST /ai/generate-image - Proxy AI image generation
 router.post('/generate-image', aiRequestLimiter, validateActiveSession, checkAccountBlock, updateSessionActivity, async (req, res) => {
   try {
-    const { prompt, aspectRatio, provider } = req.body;
+    const { prompt, aspectRatio, provider, size, n, model, apiKey } = req.body;
     const userId = req.headers.authorization?.split(' ')[1]; // Lấy user key từ authorization header
 
     // Validate input
@@ -256,7 +256,7 @@ router.post('/generate-image', aiRequestLimiter, validateActiveSession, checkAcc
     }
 
     // Kiểm tra provider có hỗ trợ image generation không
-    const imageProviders = ['gemini', 'stability'];
+    const imageProviders = ['gemini', 'stability', 'deepseek'];
     if (!imageProviders.includes(provider.toLowerCase())) {
       return res.status(400).json({
         success: false,
@@ -294,18 +294,21 @@ router.post('/generate-image', aiRequestLimiter, validateActiveSession, checkAcc
       });
     }
 
-    // Lấy API key từ database (sử dụng key đầu tiên)
-    const apiKey = providerRecord.apiKeys[0];
+    // Lấy API key từ database (sử dụng key đầu tiên) hoặc từ request body
+    const effectiveApiKey = apiKey || providerRecord.apiKeys[0];
 
     // Gọi AI provider cho image generation
     let result;
     try {
       switch (provider.toLowerCase()) {
         case 'gemini':
-          result = await callGeminiImageAPI(prompt, aspectRatio, apiKey);
+          result = await callGeminiImageAPI(prompt, aspectRatio, effectiveApiKey);
           break;
         case 'stability':
-          result = await callStabilityImageAPI(prompt, aspectRatio, apiKey);
+          result = await callStabilityImageAPI(prompt, aspectRatio, effectiveApiKey);
+          break;
+        case 'deepseek':
+          result = await callDeepSeekImageAPI(prompt, size || aspectRatio, effectiveApiKey);
           break;
         default:
           return res.status(400).json({
@@ -319,7 +322,8 @@ router.post('/generate-image', aiRequestLimiter, validateActiveSession, checkAcc
 
       res.json({
         success: true,
-        imageData: result.imageData
+        imageData: result.imageData,
+        imageUrl: result.imageUrl || result.imageData
       });
 
     } catch (aiError) {
@@ -497,6 +501,12 @@ async function callStabilityImageAPI(prompt, aspectRatio, apiKey) {
   }
 }
 
+async function callDeepSeekImageAPI(prompt, size, apiKey) {
+  // DeepSeek doesn't have official image generation API yet
+  // This is a placeholder implementation that returns an error
+  throw new Error('DeepSeek image generation API is not yet available. Please use Gemini or Stability AI instead.');
+}
+
 // Helper function to validate user subscription before AI operations
 async function validateUserSubscription(userId) {
   try {
@@ -603,90 +613,5 @@ async function logApiRequest(logData) {
   }
 }
 
-// POST /ai/generate-image - Generate images via AI providers
-router.post('/generate-image', aiRequestLimiter, async (req, res) => {
-  try {
-    const { prompt, provider = 'deepseek', size = '1024x1024', n = 1, model = 'deepseek-image', apiKey } = req.body;
-    
-    // Validate required fields
-    if (!prompt || !apiKey) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: prompt and apiKey'
-      });
-    }
-
-    console.log(`🖼️ Image generation request - Provider: ${provider}, Size: ${size}, Count: ${n}`);
-
-    let imageUrl;
-    try {
-      switch (provider.toLowerCase()) {
-        case 'deepseek':
-          imageUrl = await callDeepSeekImageAPI(prompt, size, n, apiKey);
-          break;
-        default:
-          return res.status(400).json({
-            success: false,
-            message: `Unsupported image provider: ${provider}`
-          });
-      }
-
-      console.log(`✅ Image generation successful`);
-
-      res.json({
-        success: true,
-        imageUrl: imageUrl,
-        provider: provider
-      });
-
-    } catch (apiError) {
-      console.error(`❌ ${provider} Image API error:`, apiError.message);
-      res.status(500).json({
-        success: false,
-        message: `Image generation failed: ${apiError.message}`
-      });
-    }
-
-  } catch (error) {
-    console.error('❌ Image generation endpoint error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error during image generation'
-    });
-  }
-});
-
-// Helper function to call DeepSeek Image API
-async function callDeepSeekImageAPI(prompt, size, n, apiKey) {
-  const fetch = (await import('node-fetch')).default;
-  
-  const response = await fetch('https://api.deepseek.com/v1/images/generations', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      prompt: prompt,
-      size: size,
-      n: n,
-      model: "deepseek-image"
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  
-  if (!data.data || !data.data[0] || !data.data[0].b64_json) {
-    throw new Error('Invalid response format from DeepSeek API');
-  }
-
-  // Return base64 image data
-  return `data:image/png;base64,${data.data[0].b64_json}`;
-}
 
 module.exports = router; 
