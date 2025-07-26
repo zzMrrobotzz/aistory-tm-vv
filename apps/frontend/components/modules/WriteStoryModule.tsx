@@ -4,7 +4,7 @@ import {
     WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS, HOOK_STYLE_OPTIONS, 
     HOOK_LENGTH_OPTIONS, STORY_LENGTH_OPTIONS, 
     LESSON_LENGTH_OPTIONS, LESSON_WRITING_STYLE_OPTIONS,
-    HOOK_STRUCTURE_OPTIONS // Added
+    HOOK_STRUCTURE_OPTIONS, TRANSLATE_LANGUAGE_OPTIONS, TRANSLATE_STYLE_OPTIONS // Added
 } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
@@ -49,6 +49,10 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
   const [isSingleOutlineExpanded, setIsSingleOutlineExpanded] = useState(true);
   const [currentAbortController, setCurrentAbortController] = useState<AbortController | null>(null);
   const hasActiveSubscription = isSubscribed(currentUser);
+
+  // Translation settings
+  const [translateTargetLang, setTranslateTargetLang] = useState<string>('Vietnamese');
+  const [translateStyle, setTranslateStyle] = useState<string>('Default');
 
   const updateState = (updates: Partial<WriteStoryModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
@@ -420,9 +424,16 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     }
 
     updateStoryTranslationState({ isTranslating: true, error: null, translatedText: 'Đang dịch...' });
-    const prompt = `Translate the following text to Vietnamese. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${generatedStory.trim()}\n"""`;
-
+    
     try {
+        let styleInstruction = '';
+        if (translateStyle !== 'Default') {
+            const styleLabel = TRANSLATE_STYLE_OPTIONS.find(opt => opt.value === translateStyle)?.label || translateStyle;
+            styleInstruction = ` with a ${styleLabel.toLowerCase()} tone`;
+        }
+
+        const prompt = `Translate the following text to ${translateTargetLang}${styleInstruction}. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${generatedStory.trim()}\n"""`;
+        
         const result = await generateText(prompt, undefined, false, apiSettings);
         updateStoryTranslationState({ translatedText: result.text.trim() });
     } catch (e) {
@@ -766,23 +777,55 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
                         >
                             ✨ Biên Tập Lại (Nếu cần)
                         </button>
-                        {outputLanguage !== 'Vietnamese' && (
-                             <button
-                                onClick={handleTranslateStory}
-                                disabled={!hasActiveSubscription || storyTranslation.isTranslating || !generatedStory.trim()}
-                                className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 flex items-center"
-                            >
-                                <Languages size={16} className="mr-2"/>
-                                {storyTranslation.isTranslating ? 'Đang dịch...' : 'Dịch sang Tiếng Việt'}
-                            </button>
-                        )}
+                        <button
+                            onClick={handleTranslateStory}
+                            disabled={!hasActiveSubscription || storyTranslation.isTranslating || !generatedStory.trim()}
+                            className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 flex items-center"
+                        >
+                            <Languages size={16} className="mr-2"/>
+                            {storyTranslation.isTranslating ? 'Đang dịch...' : `Dịch sang ${translateTargetLang}`}
+                        </button>
                     </div>
+
+                    {/* Translation Settings */}
+                    <div className="mt-4 p-4 border rounded-lg bg-teal-50">
+                        <h4 className="text-md font-semibold text-teal-700 mb-3">⚙️ Cài đặt dịch thuật</h4>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ đích:</label>
+                                <select
+                                    value={translateTargetLang}
+                                    onChange={e => setTranslateTargetLang(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                    disabled={storyTranslation.isTranslating}
+                                >
+                                    {TRANSLATE_LANGUAGE_OPTIONS.map(opt => 
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    )}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Phong cách dịch:</label>
+                                <select
+                                    value={translateStyle}
+                                    onChange={e => setTranslateStyle(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                    disabled={storyTranslation.isTranslating}
+                                >
+                                    {TRANSLATE_STYLE_OPTIONS.map(opt => 
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    )}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                      {/* Translation Result Section */}
                     {storyTranslation.isTranslating && <LoadingSpinner message="Đang dịch truyện..." />}
                     {storyTranslation.error && <ErrorAlert message={storyTranslation.error} />}
                     {storyTranslation.translatedText && !storyTranslation.isTranslating && (
                         <div className="mt-4 p-4 border rounded-lg bg-teal-50">
-                            <h4 className="text-md font-semibold text-teal-700 mb-2">Bản dịch Tiếng Việt:</h4>
+                            <h4 className="text-md font-semibold text-teal-700 mb-2">Bản dịch {translateTargetLang}:</h4>
                             <textarea
                                 value={storyTranslation.translatedText}
                                 readOnly

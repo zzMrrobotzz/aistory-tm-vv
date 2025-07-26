@@ -156,6 +156,11 @@ export const generateImage = async (prompt: string, aspectRatio: string = "16:9"
      if (errorMessage.toLowerCase().includes("api key not valid") || errorMessage.toLowerCase().includes("api_key_invalid")) {
         throw new Error("Invalid Gemini API Key. Please check your configuration.");
     }
+    // Handle billing-related errors specifically
+    if (errorMessage.toLowerCase().includes("imagen api is only accessible to billed users") || 
+        errorMessage.toLowerCase().includes("billing")) {
+        throw new Error("Gemini Imagen API yêu cầu tài khoản có billing được kích hoạt. Vui lòng thiết lập billing cho Google Cloud project của bạn hoặc sử dụng engine khác như Stability AI.");
+    }
     throw new Error(`Gemini API image generation failed: ${errorMessage}`);
   }
 };

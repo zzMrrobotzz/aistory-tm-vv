@@ -1,9 +1,9 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
-import { StopCircle } from 'lucide-react';
+import { StopCircle, Languages } from 'lucide-react';
 import { ApiSettings, RewriteModuleState, UserProfile } from '../../types';
-import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS } from '../../constants';
+import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS, TRANSLATE_LANGUAGE_OPTIONS, TRANSLATE_STYLE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -37,6 +37,13 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
         originalText, rewrittenText, error, progress, loadingMessage,
         isEditing, editError, editLoadingMessage, hasBeenEdited, translation
     } = moduleState;
+
+    // Translation states
+    const [isTranslating, setIsTranslating] = useState(false);
+    const [translationError, setTranslationError] = useState<string | null>(null);
+    const [translatedText, setTranslatedText] = useState<string>('');
+    const [translateTargetLang, setTranslateTargetLang] = useState<string>('Vietnamese');
+    const [translateStyle, setTranslateStyle] = useState<string>('Default');
 
     const updateState = (updates: Partial<RewriteModuleState>) => {
         setModuleState(prev => ({ ...prev, ...updates }));
@@ -209,6 +216,36 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         alert("Đã sao chép!");
     };
 
+    const handleTranslateRewrittenText = async () => {
+        if (!rewrittenText.trim()) {
+            setTranslationError('Không có văn bản để dịch.');
+            return;
+        }
+
+        setIsTranslating(true);
+        setTranslationError(null);
+        setTranslatedText('Đang dịch...');
+
+        try {
+            let styleInstruction = '';
+            if (translateStyle !== 'Default') {
+                const styleLabel = TRANSLATE_STYLE_OPTIONS.find(opt => opt.value === translateStyle)?.label || translateStyle;
+                styleInstruction = ` with a ${styleLabel.toLowerCase()} tone`;
+            }
+
+            const prompt = `Translate the following text to ${translateTargetLang}${styleInstruction}. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${rewrittenText.trim()}\n"""`;
+
+            const result = await generateText(prompt, undefined, false, apiSettings);
+            setTranslatedText(result.text.trim());
+        } catch (e) {
+            console.error("Translation Error:", e);
+            setTranslationError(`Đã xảy ra lỗi khi dịch: ${(e as Error).message}`);
+            setTranslatedText('Dịch lỗi. Vui lòng thử lại.');
+        } finally {
+            setIsTranslating(false);
+        }
+    };
+
     const handleSelectHistory = (content: string) => {
         updateState({ rewrittenText: content });
     };
@@ -314,8 +351,74 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                             >
                                 Biên Tập & Tinh Chỉnh
                             </button>
+                            <button 
+                                onClick={handleTranslateRewrittenText} 
+                                disabled={!hasActiveSubscription || isTranslating}
+                                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                <Languages size={16} />
+                                {isTranslating ? 'Đang dịch...' : 'Dịch'}
+                            </button>
                          </div>
                      </div>
+                )}
+
+                {/* Translation Section */}
+                {rewrittenText && !anyLoading && (
+                    <div className="mt-6 p-4 border rounded-lg bg-blue-50">
+                        <h3 className="text-lg font-semibold mb-3">🌐 Dịch Thuật</h3>
+                        
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ đích:</label>
+                                <select
+                                    value={translateTargetLang}
+                                    onChange={e => setTranslateTargetLang(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                    disabled={isTranslating}
+                                >
+                                    {TRANSLATE_LANGUAGE_OPTIONS.map(opt => 
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    )}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Phong cách dịch:</label>
+                                <select
+                                    value={translateStyle}
+                                    onChange={e => setTranslateStyle(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                    disabled={isTranslating}
+                                >
+                                    {TRANSLATE_STYLE_OPTIONS.map(opt => 
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    )}
+                                </select>
+                            </div>
+                        </div>
+
+                        {translatedText && (
+                            <div>
+                                <h4 className="text-md font-semibold mb-2">Kết quả dịch:</h4>
+                                <textarea 
+                                    value={translatedText} 
+                                    readOnly 
+                                    rows={8} 
+                                    className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"
+                                />
+                                <div className="mt-2">
+                                    <button 
+                                        onClick={() => copyToClipboard(translatedText)} 
+                                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                                    >
+                                        Sao chép bản dịch
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {translationError && <ErrorAlert message={translationError} />}
+                    </div>
                 )}
 
                 {/* History Panel */}
