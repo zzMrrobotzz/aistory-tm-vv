@@ -21,7 +21,7 @@ const adminKeysRouter = require('./routes/adminKeys');
 
 // --- Enhanced Subscription System ---
 // const authEnhancedRouter = require('./routes/authEnhanced'); // Temporarily disabled for deploy fix
-const SubscriptionHealthChecker = require('./services/subscriptionHealthChecker');
+// const SubscriptionHealthChecker = require('./services/subscriptionHealthChecker'); // Temporarily disabled for deploy fix
 const adminProxiesRouter = require('./routes/adminProxies');
 const paymentRouter = require('./routes/payment');
 const packagesRouter = require('./routes/packages');
@@ -492,7 +492,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'ai-story-backend' });
 });
 
-// Subscription health check endpoint (admin only)
+// Subscription health check endpoint (admin only) - temporarily disabled for deploy fix
+/*
 app.get('/api/admin/subscription-health', async (req, res) => {
   try {
     const healthChecker = new SubscriptionHealthChecker();
@@ -515,6 +516,7 @@ app.get('/api/admin/subscription-health', async (req, res) => {
     });
   }
 });
+*/
 
 const PORT = process.env.PORT || 3001; // Changed default to 3001 for consistency
 
