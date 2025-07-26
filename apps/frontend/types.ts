@@ -231,6 +231,12 @@ export interface WriteStoryModuleState {
       isTranslating: boolean;
       error: string | null;
   };
+  
+  // --- Queue Systems ---
+  storyQueue: WriteStoryQueueItem[];
+  storyQueueSystem: QueueSystemState;
+  hookQueue: HookQueueItem[];
+  hookQueueSystem: QueueSystemState;
 
   // --- Batch Story Writing fields REMOVED ---
   // batchOutlineItems: BatchOutlineItem[]; 
@@ -262,12 +268,55 @@ export interface RewriteQueueItem {
     };
 }
 
-// Queue System State
+// WriteStory Queue Item
+export interface WriteStoryQueueItem {
+    id: string;
+    title: string;
+    storyOutline: string; // Input outline
+    status: 'waiting' | 'processing' | 'completed' | 'error';
+    progress: number; // 0-100
+    generatedStory: string | null;
+    error: string | null;
+    addedAt: Date;
+    startedAt: Date | null;
+    completedAt: Date | null;
+    estimatedTimeRemaining: number | null; // seconds
+    wordStats?: {
+        outlineWords: number;
+        storyWords: number;
+        expansionRatio: number; // how much story expanded from outline
+    };
+}
+
+// Hook Generator Queue Item  
+export interface HookQueueItem {
+    id: string;
+    title: string;
+    storyInput: string; // Input story for hook generation
+    status: 'waiting' | 'processing' | 'completed' | 'error';
+    progress: number; // 0-100
+    generatedHooks: string | null;
+    error: string | null;
+    addedAt: Date;
+    startedAt: Date | null;
+    completedAt: Date | null;
+    estimatedTimeRemaining: number | null; // seconds
+    hookSettings: {
+        hookLanguage: string;
+        hookStyle: string;
+        hookLength: string;
+        hookCount: number;
+        ctaChannel: string;
+        hookStructure: string;
+    };
+}
+
+// Generic Queue System State
 export interface QueueSystemState {
     isEnabled: boolean;
     isPaused: boolean;
     isProcessing: boolean;
-    currentItem: RewriteQueueItem | null;
+    currentItem: any | null; // Can be RewriteQueueItem, WriteStoryQueueItem, etc.
     completedCount: number;
     totalCount: number;
     averageProcessingTime: number; // seconds per item

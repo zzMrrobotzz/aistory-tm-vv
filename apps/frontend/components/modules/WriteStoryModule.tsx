@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApiSettings, WriteStoryModuleState, WriteStoryActiveTab, BatchOutlineItem, UserProfile } from '../../types';
+import { ApiSettings, WriteStoryModuleState, WriteStoryActiveTab, BatchOutlineItem, UserProfile, WriteStoryQueueItem, HookQueueItem } from '../../types';
 import { 
     WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS, HOOK_STYLE_OPTIONS, 
     HOOK_LENGTH_OPTIONS, STORY_LENGTH_OPTIONS, 
@@ -14,7 +14,7 @@ import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService';
 import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
-import { Languages, StopCircle } from 'lucide-react';
+import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logStoryGenerated } from '../../services/usageService';
 
@@ -43,12 +43,35 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     generatedLesson, lessonError, lessonLoadingMessage,
     // Integrated translation
     storyTranslation,
+    // Queue systems
+    storyQueue = [], storyQueueSystem = { isEnabled: false, isPaused: false, isProcessing: false, currentItem: null, completedCount: 0, totalCount: 0, averageProcessingTime: 60 },
+    hookQueue = [], hookQueueSystem = { isEnabled: false, isPaused: false, isProcessing: false, currentItem: null, completedCount: 0, totalCount: 0, averageProcessingTime: 60 },
     // Batch Story fields removed from destructuring
   } = moduleState;
 
   const [isSingleOutlineExpanded, setIsSingleOutlineExpanded] = useState(true);
   const [currentAbortController, setCurrentAbortController] = useState<AbortController | null>(null);
   const hasActiveSubscription = isSubscribed(currentUser);
+
+  // Generate unique ID for queue items
+  const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+  // Calculate word statistics for story generation
+  const calculateStoryStats = (outline: string, story: string) => {
+    const countWords = (text: string) => {
+      return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+    };
+
+    const outlineWords = countWords(outline);
+    const storyWords = countWords(story);
+    const expansionRatio = outlineWords > 0 ? Math.round(storyWords / outlineWords) : 0;
+
+    return {
+      outlineWords,
+      storyWords,
+      expansionRatio
+    };
+  };
 
   // Translation settings
   const [translateTargetLang, setTranslateTargetLang] = useState<string>('Vietnamese');
