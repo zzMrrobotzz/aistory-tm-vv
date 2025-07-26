@@ -77,6 +77,560 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
   const [translateTargetLang, setTranslateTargetLang] = useState<string>('Vietnamese');
   const [translateStyle, setTranslateStyle] = useState<string>('Default');
 
+  // Story Queue Management Functions
+  const addToStoryQueue = (outline: string, title?: string) => {
+    if (!outline.trim()) return;
+    
+    setModuleState(prev => {
+      const newItem: WriteStoryQueueItem = {
+        id: generateId(),
+        title: title || `Truyện ${prev.storyQueue.length + 1} - ${outline.substring(0, 30)}...`,
+        storyOutline: outline,
+        status: 'waiting',
+        progress: 0,
+        generatedStory: null,
+        error: null,
+        addedAt: new Date(),
+        startedAt: null,
+        completedAt: null,
+        estimatedTimeRemaining: null,
+      };
+
+      return {
+        ...prev,
+        storyQueue: [...prev.storyQueue, newItem],
+        storyQueueSystem: {
+          ...prev.storyQueueSystem,
+          totalCount: prev.storyQueue.length + 1,
+        },
+      };
+    });
+  };
+
+  const removeFromStoryQueue = (id: string) => {
+    setModuleState(prev => {
+      const updatedQueue = prev.storyQueue.filter(item => item.id !== id);
+      return {
+        ...prev,
+        storyQueue: updatedQueue,
+        storyQueueSystem: {
+          ...prev.storyQueueSystem,
+          totalCount: updatedQueue.length,
+        },
+      };
+    });
+  };
+
+  const clearStoryQueue = () => {
+    setModuleState(prev => ({
+      ...prev,
+      storyQueue: [],
+      storyQueueSystem: {
+        ...prev.storyQueueSystem,
+        totalCount: 0,
+        completedCount: 0,
+        currentItem: null,
+        isProcessing: false,
+      },
+    }));
+  };
+
+  const toggleStoryQueueMode = () => {
+    setModuleState(prev => ({
+      ...prev,
+      storyQueueSystem: {
+        ...prev.storyQueueSystem,
+        isEnabled: !prev.storyQueueSystem.isEnabled,
+      },
+    }));
+  };
+
+  const pauseResumeStoryQueue = () => {
+    setModuleState(prev => ({
+      ...prev,
+      storyQueueSystem: {
+        ...prev.storyQueueSystem,
+        isPaused: !prev.storyQueueSystem.isPaused,
+      },
+    }));
+  };
+
+  // Process story queue items one by one
+  const processStoryQueue = async () => {
+    setModuleState(prevState => {
+      const waitingItems = prevState.storyQueue.filter(item => item.status === 'waiting');
+      
+      // If no waiting items or paused, stop processing
+      if (waitingItems.length === 0 || prevState.storyQueueSystem.isPaused) {
+        return {
+          ...prevState,
+          storyQueueSystem: {
+            ...prevState.storyQueueSystem,
+            isProcessing: false,
+            currentItem: null,
+          },
+        };
+      }
+
+      // If already processing an item, don't start another
+      if (prevState.storyQueueSystem.isProcessing && prevState.storyQueueSystem.currentItem) {
+        return prevState;
+      }
+
+      const currentItem = waitingItems[0];
+      
+      // Start processing this item
+      setTimeout(async () => {
+        const startTime = Date.now();
+        
+        try {
+          // Process the story
+          await processStoryQueueItem(currentItem);
+          
+          const endTime = Date.now();
+          const processingTime = (endTime - startTime) / 1000;
+          
+          // Update completion stats and check for next item
+          setModuleState(prev => {
+            const updatedState = {
+              ...prev,
+              storyQueueSystem: {
+                ...prev.storyQueueSystem,
+                completedCount: prev.storyQueueSystem.completedCount + 1,
+                averageProcessingTime: (prev.storyQueueSystem.averageProcessingTime + processingTime) / 2,
+              },
+              storyQueue: prev.storyQueue.map(item =>
+                item.id === currentItem.id
+                  ? { ...item, status: 'completed' as const, completedAt: new Date(), progress: 100 }
+                  : item
+              ),
+            };
+
+            // Check if there are more waiting items
+            const hasWaitingItems = updatedState.storyQueue.filter(item => item.status === 'waiting').length > 0;
+            
+            if (!updatedState.storyQueueSystem.isPaused && hasWaitingItems) {
+              // Continue with next item after delay
+              setTimeout(() => {
+                setModuleState(nextState => ({
+                  ...nextState,
+                  storyQueueSystem: {
+                    ...nextState.storyQueueSystem,
+                    isProcessing: false,
+                    currentItem: null,
+                  }
+                }));
+                setTimeout(() => processStoryQueue(), 100);
+              }, 1000);
+            } else {
+              // No more items - stop processing
+              updatedState.storyQueueSystem.isProcessing = false;
+              updatedState.storyQueueSystem.currentItem = null;
+            }
+
+            return updatedState;
+          });
+
+        } catch (error) {
+          // Mark current item as error and continue with next
+          setModuleState(prev => {
+            const updatedState = {
+              ...prev,
+              storyQueue: prev.storyQueue.map(item =>
+                item.id === currentItem.id
+                  ? { ...item, status: 'error' as const, error: (error as Error).message }
+                  : item
+              ),
+            };
+
+            // Check if there are more waiting items even after error
+            const hasWaitingItems = updatedState.storyQueue.filter(item => item.status === 'waiting').length > 0;
+            
+            if (!updatedState.storyQueueSystem.isPaused && hasWaitingItems) {
+              // Continue with next item after delay
+              setTimeout(() => {
+                setModuleState(nextState => ({
+                  ...nextState,
+                  storyQueueSystem: {
+                    ...nextState.storyQueueSystem,
+                    isProcessing: false,
+                    currentItem: null,
+                  }
+                }));
+                setTimeout(() => processStoryQueue(), 100);
+              }, 1000);
+            } else {
+              // No more items - stop processing
+              updatedState.storyQueueSystem.isProcessing = false;
+              updatedState.storyQueueSystem.currentItem = null;
+            }
+
+            return updatedState;
+          });
+        }
+      }, 100);
+
+      // Update current item status immediately
+      return {
+        ...prevState,
+        storyQueueSystem: {
+          ...prevState.storyQueueSystem,
+          isProcessing: true,
+          currentItem: currentItem,
+        },
+        storyQueue: prevState.storyQueue.map(item =>
+          item.id === currentItem.id
+            ? { ...item, status: 'processing' as const, startedAt: new Date() }
+            : item
+        ),
+      };
+    });
+  };
+
+  // Process individual story queue item
+  const processStoryQueueItem = async (item: WriteStoryQueueItem) => {
+    const CHUNK_CHAR_COUNT = 4000;
+    const numChunks = Math.ceil(item.storyOutline.length / CHUNK_CHAR_COUNT);
+    let fullGeneratedStory = '';
+
+    for (let i = 0; i < numChunks; i++) {
+      // Update progress
+      const currentProgress = Math.round(((i + 1) / numChunks) * 100);
+      setModuleState(prev => ({
+        ...prev,
+        storyQueue: prev.storyQueue.map(qItem =>
+          qItem.id === item.id
+            ? { ...qItem, progress: currentProgress }
+            : qItem
+        ),
+      }));
+
+      const outlineChunk = item.storyOutline.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
+      
+      // Build story generation prompt
+      const prompt = `You are an expert storyteller. Generate a compelling story based on the provided outline.
+
+**Settings:**
+- Target Length: ${targetLength} words
+- Writing Style: ${writingStyle === 'custom' ? customWritingStyle : writingStyle}
+- Output Language: ${outputLanguage}
+- Reference Style: ${referenceViralStoryForStyle || 'N/A'}
+
+**Outline to Expand:**
+---
+${outlineChunk}
+---
+
+**Previous Story Context:**
+---
+${fullGeneratedStory || "This is the beginning of the story."}
+---
+
+**Instructions:**
+- Create engaging, coherent narrative that flows naturally from previous context
+- Maintain consistent characters, plot, and tone throughout
+- Use vivid descriptions and compelling dialogue
+- Ensure the story chunk connects smoothly with previous content
+- Write in ${outputLanguage} language
+
+Provide ONLY the story content for this section, no introductions or explanations.`;
+      
+      await delay(500);
+      const result = await generateText(prompt, undefined, false, apiSettings);
+      fullGeneratedStory += (fullGeneratedStory ? '\n\n' : '') + (result?.text || '').trim();
+    }
+
+    // Calculate word statistics
+    const finalStory = fullGeneratedStory.trim();
+    const wordStats = calculateStoryStats(item.storyOutline, finalStory);
+    
+    // Update final result with statistics
+    setModuleState(prev => ({
+      ...prev,
+      storyQueue: prev.storyQueue.map(qItem =>
+        qItem.id === item.id
+          ? { 
+              ...qItem, 
+              generatedStory: finalStory,
+              wordStats: wordStats
+            }
+          : qItem
+      ),
+    }));
+
+    // Log usage statistics
+    logApiCall('write-story', numChunks);
+    logStoryGenerated('write-story', 1);
+  };
+
+  // Hook Queue Management Functions
+  const addToHookQueue = (storyInput: string, title?: string) => {
+    if (!storyInput.trim()) return;
+    
+    setModuleState(prev => {
+      const newItem: HookQueueItem = {
+        id: generateId(),
+        title: title || `Hook ${prev.hookQueue.length + 1} - ${storyInput.substring(0, 30)}...`,
+        storyInput: storyInput,
+        status: 'waiting',
+        progress: 0,
+        generatedHooks: null,
+        error: null,
+        addedAt: new Date(),
+        startedAt: null,
+        completedAt: null,
+        estimatedTimeRemaining: null,
+        hookSettings: {
+          hookLanguage,
+          hookStyle,
+          hookLength,
+          hookCount,
+          ctaChannel,
+          hookStructure,
+        },
+      };
+
+      return {
+        ...prev,
+        hookQueue: [...prev.hookQueue, newItem],
+        hookQueueSystem: {
+          ...prev.hookQueueSystem,
+          totalCount: prev.hookQueue.length + 1,
+        },
+      };
+    });
+  };
+
+  const removeFromHookQueue = (id: string) => {
+    setModuleState(prev => {
+      const updatedQueue = prev.hookQueue.filter(item => item.id !== id);
+      return {
+        ...prev,
+        hookQueue: updatedQueue,
+        hookQueueSystem: {
+          ...prev.hookQueueSystem,
+          totalCount: updatedQueue.length,
+        },
+      };
+    });
+  };
+
+  const clearHookQueue = () => {
+    setModuleState(prev => ({
+      ...prev,
+      hookQueue: [],
+      hookQueueSystem: {
+        ...prev.hookQueueSystem,
+        totalCount: 0,
+        completedCount: 0,
+        currentItem: null,
+        isProcessing: false,
+      },
+    }));
+  };
+
+  const toggleHookQueueMode = () => {
+    setModuleState(prev => ({
+      ...prev,
+      hookQueueSystem: {
+        ...prev.hookQueueSystem,
+        isEnabled: !prev.hookQueueSystem.isEnabled,
+      },
+    }));
+  };
+
+  const pauseResumeHookQueue = () => {
+    setModuleState(prev => ({
+      ...prev,
+      hookQueueSystem: {
+        ...prev.hookQueueSystem,
+        isPaused: !prev.hookQueueSystem.isPaused,
+      },
+    }));
+  };
+
+  // Process hook queue items one by one
+  const processHookQueue = async () => {
+    setModuleState(prevState => {
+      const waitingItems = prevState.hookQueue.filter(item => item.status === 'waiting');
+      
+      if (waitingItems.length === 0 || prevState.hookQueueSystem.isPaused) {
+        return {
+          ...prevState,
+          hookQueueSystem: {
+            ...prevState.hookQueueSystem,
+            isProcessing: false,
+            currentItem: null,
+          },
+        };
+      }
+
+      if (prevState.hookQueueSystem.isProcessing && prevState.hookQueueSystem.currentItem) {
+        return prevState;
+      }
+
+      const currentItem = waitingItems[0];
+      
+      setTimeout(async () => {
+        const startTime = Date.now();
+        
+        try {
+          await processHookQueueItem(currentItem);
+          
+          const endTime = Date.now();
+          const processingTime = (endTime - startTime) / 1000;
+          
+          setModuleState(prev => {
+            const updatedState = {
+              ...prev,
+              hookQueueSystem: {
+                ...prev.hookQueueSystem,
+                completedCount: prev.hookQueueSystem.completedCount + 1,
+                averageProcessingTime: (prev.hookQueueSystem.averageProcessingTime + processingTime) / 2,
+              },
+              hookQueue: prev.hookQueue.map(item =>
+                item.id === currentItem.id
+                  ? { ...item, status: 'completed' as const, completedAt: new Date(), progress: 100 }
+                  : item
+              ),
+            };
+
+            const hasWaitingItems = updatedState.hookQueue.filter(item => item.status === 'waiting').length > 0;
+            
+            if (!updatedState.hookQueueSystem.isPaused && hasWaitingItems) {
+              setTimeout(() => {
+                setModuleState(nextState => ({
+                  ...nextState,
+                  hookQueueSystem: {
+                    ...nextState.hookQueueSystem,
+                    isProcessing: false,
+                    currentItem: null,
+                  }
+                }));
+                setTimeout(() => processHookQueue(), 100);
+              }, 1000);
+            } else {
+              updatedState.hookQueueSystem.isProcessing = false;
+              updatedState.hookQueueSystem.currentItem = null;
+            }
+
+            return updatedState;
+          });
+
+        } catch (error) {
+          setModuleState(prev => {
+            const updatedState = {
+              ...prev,
+              hookQueue: prev.hookQueue.map(item =>
+                item.id === currentItem.id
+                  ? { ...item, status: 'error' as const, error: (error as Error).message }
+                  : item
+              ),
+            };
+
+            const hasWaitingItems = updatedState.hookQueue.filter(item => item.status === 'waiting').length > 0;
+            
+            if (!updatedState.hookQueueSystem.isPaused && hasWaitingItems) {
+              setTimeout(() => {
+                setModuleState(nextState => ({
+                  ...nextState,
+                  hookQueueSystem: {
+                    ...nextState.hookQueueSystem,
+                    isProcessing: false,
+                    currentItem: null,
+                  }
+                }));
+                setTimeout(() => processHookQueue(), 100);
+              }, 1000);
+            } else {
+              updatedState.hookQueueSystem.isProcessing = false;
+              updatedState.hookQueueSystem.currentItem = null;
+            }
+
+            return updatedState;
+          });
+        }
+      }, 100);
+
+      return {
+        ...prevState,
+        hookQueueSystem: {
+          ...prevState.hookQueueSystem,
+          isProcessing: true,
+          currentItem: currentItem,
+        },
+        hookQueue: prevState.hookQueue.map(item =>
+          item.id === currentItem.id
+            ? { ...item, status: 'processing' as const, startedAt: new Date() }
+            : item
+        ),
+      };
+    });
+  };
+
+  // Process individual hook queue item
+  const processHookQueueItem = async (item: HookQueueItem) => {
+    const { hookSettings } = item;
+    let fullGeneratedHooks = '';
+
+    // Update progress to 50% while generating
+    setModuleState(prev => ({
+      ...prev,
+      hookQueue: prev.hookQueue.map(qItem =>
+        qItem.id === item.id
+          ? { ...qItem, progress: 50 }
+          : qItem
+      ),
+    }));
+
+    // Build hook generation prompt
+    const prompt = `You are a viral content expert. Generate ${hookSettings.hookCount} compelling hooks based on the provided story content.
+
+**Settings:**
+- Language: ${hookSettings.hookLanguage}
+- Style: ${hookSettings.hookStyle}
+- Length: ${hookSettings.hookLength}
+- CTA Channel: ${hookSettings.ctaChannel}
+- Structure: ${hookSettings.hookStructure}
+
+**Story Content:**
+---
+${item.storyInput}
+---
+
+**Instructions:**
+- Create ${hookSettings.hookCount} different hooks that capture attention immediately
+- Each hook should use the ${hookSettings.hookStyle} style
+- Target length: ${hookSettings.hookLength}
+- Include appropriate CTA for ${hookSettings.ctaChannel}
+- Follow ${hookSettings.hookStructure} structure
+- Write in ${hookSettings.hookLanguage} language
+- Number each hook (1., 2., 3., etc.)
+
+Provide ONLY the numbered hooks, no additional explanations.`;
+    
+    await delay(1000);
+    const result = await generateText(prompt, undefined, false, apiSettings);
+    fullGeneratedHooks = (result?.text || '').trim();
+
+    // Update progress to 100%
+    setModuleState(prev => ({
+      ...prev,
+      hookQueue: prev.hookQueue.map(qItem =>
+        qItem.id === item.id
+          ? { 
+              ...qItem, 
+              generatedHooks: fullGeneratedHooks,
+              progress: 100
+            }
+          : qItem
+      ),
+    }));
+
+    // Log usage statistics
+    logApiCall('write-story', 1);
+  };
+
   const updateState = (updates: Partial<WriteStoryModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
   };
