@@ -436,6 +436,9 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         
         const result = await generateText(prompt, undefined, false, apiSettings);
         updateStoryTranslationState({ translatedText: result.text.trim() });
+        
+        // Log translation usage
+        logApiCall('translate', 1);
     } catch (e) {
         console.error("Story Translation Error:", e);
         updateStoryTranslationState({ error: `Lỗi dịch thuật: ${(e as Error).message}`, translatedText: "Dịch lỗi. Vui lòng thử lại." });

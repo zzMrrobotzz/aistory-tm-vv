@@ -9,6 +9,7 @@ import InfoBox from '../InfoBox';
 import { Clipboard, ClipboardCheck, Languages, ArrowRightLeft } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
 import { isSubscribed } from '../../utils';
+import { logApiCall } from '../../services/usageService';
 
 interface TranslateModuleProps {
   apiSettings: ApiSettings;
@@ -70,6 +71,9 @@ const TranslateModule: React.FC<TranslateModuleProps> = ({
 
             const result = await generateText(prompt, undefined, false, apiSettings);
             updateState({ outputText: result.text.trim() });
+            
+            // Log translation usage
+            logApiCall('translate', 1);
         } catch (e) {
             console.error("Translation Error:", e);
             updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, outputText: 'Dịch lỗi. Vui lòng thử lại.' });

@@ -20,6 +20,7 @@ import { generateDallEImage, editDallEImage } from '../../services/openaiService
 import { generateDeepSeekImage, refineDeepSeekImage } from '../../services/deepseekService'; 
 import { delay, dataUrlToBlob, isSubscribed } from '../../utils'; 
 import UpgradePrompt from '../UpgradePrompt';
+import { logApiCall, logImageGenerated } from '../../services/usageService';
 
 interface ImageGenerationSuiteModuleProps {
   apiSettings: ApiSettings;
@@ -222,6 +223,11 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
         updateState({ generatedSingleImages: [...currentGeneratedImages] });
       }
       updateState({ singleImageProgressMessage: `Hoàn thành tạo ảnh từ hook/truyện${isContextualImageGeneratorTab ? " (Ngữ cảnh Thông minh)" : ""}!`});
+      
+      // Log image generation usage
+      const imageCount = currentGeneratedImages.filter(img => img.imageUrl).length;
+      logApiCall('image-generation-suite', subPrompts.length);
+      logImageGenerated('image-generation-suite', imageCount);
 
     } catch (e) {
       let errorMessage = `Đã xảy ra lỗi: ${(e as Error).message}`;
@@ -347,6 +353,12 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     }
 
     updateState({ batchProgressMessage: `Hoàn thành ${individualPrompts.length}/${individualPrompts.length} ảnh.` });
+    
+    // Log batch image generation usage
+    const successfulImages = newGeneratedImages.filter(img => img.imageUrl).length;
+    logApiCall('image-generation-suite', individualPrompts.length);
+    logImageGenerated('image-generation-suite', successfulImages);
+    
     setTimeout(() => updateState({ batchProgressMessage: null }), 3000);
     setIsProcessing(false);
   };

@@ -237,6 +237,9 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
 
             const result = await generateText(prompt, undefined, false, apiSettings);
             setTranslatedText(result.text.trim());
+            
+            // Log translation usage
+            logApiCall('translate', 1);
         } catch (e) {
             console.error("Translation Error:", e);
             setTranslationError(`Đã xảy ra lỗi khi dịch: ${(e as Error).message}`);
