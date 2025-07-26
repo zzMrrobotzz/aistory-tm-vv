@@ -131,12 +131,9 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
     // Process queue items one by one
     const processQueue = async () => {
         setModuleState(prevState => {
-            // Prevent multiple concurrent processQueue calls
-            if (prevState.queueSystem.isProcessing && !prevState.queueSystem.isPaused) {
-                return prevState; // Already processing, no change
-            }
-
             const waitingItems = prevState.queue.filter(item => item.status === 'waiting');
+            
+            // If no waiting items or paused, stop processing
             if (waitingItems.length === 0 || prevState.queueSystem.isPaused) {
                 return {
                     ...prevState,
@@ -146,6 +143,11 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
                         currentItem: null,
                     },
                 };
+            }
+
+            // If already processing an item, don't start another
+            if (prevState.queueSystem.isProcessing && prevState.queueSystem.currentItem) {
+                return prevState; // Already processing, no change
             }
 
             const currentItem = waitingItems[0];
@@ -161,55 +163,85 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
                     const endTime = Date.now();
                     const processingTime = (endTime - startTime) / 1000;
                     
-                    // Update completion stats
-                    setModuleState(prev => ({
-                        ...prev,
-                        queueSystem: {
-                            ...prev.queueSystem,
-                            completedCount: prev.queueSystem.completedCount + 1,
-                            averageProcessingTime: 
-                                (prev.queueSystem.averageProcessingTime + processingTime) / 2,
-                        },
-                        queue: prev.queue.map(item =>
-                            item.id === currentItem.id
-                                ? { ...item, status: 'completed', completedAt: new Date(), progress: 100 }
-                                : item
-                        ),
-                    }));
-
-                } catch (error) {
-                    // Mark current item as error
-                    setModuleState(prev => ({
-                        ...prev,
-                        queue: prev.queue.map(item =>
-                            item.id === currentItem.id
-                                ? { ...item, status: 'error', error: (error as Error).message }
-                                : item
-                        ),
-                    }));
-                }
-
-                // Continue with next item after a short delay - only if not paused
-                setTimeout(() => {
+                    // Update completion stats and check for next item
                     setModuleState(prev => {
-                        const hasWaitingItems = prev.queue.filter(item => item.status === 'waiting').length > 0;
-                        if (!prev.queueSystem.isPaused && hasWaitingItems) {
-                            // Continue processing next item
-                            setTimeout(() => processQueue(), 100);
+                        const updatedState = {
+                            ...prev,
+                            queueSystem: {
+                                ...prev.queueSystem,
+                                completedCount: prev.queueSystem.completedCount + 1,
+                                averageProcessingTime: 
+                                    (prev.queueSystem.averageProcessingTime + processingTime) / 2,
+                            },
+                            queue: prev.queue.map(item =>
+                                item.id === currentItem.id
+                                    ? { ...item, status: 'completed', completedAt: new Date(), progress: 100 }
+                                    : item
+                            ),
+                        };
+
+                        // Check if there are more waiting items
+                        const hasWaitingItems = updatedState.queue.filter(item => item.status === 'waiting').length > 0;
+                        
+                        if (!updatedState.queueSystem.isPaused && hasWaitingItems) {
+                            // Continue with next item after delay
+                            setTimeout(() => {
+                                setModuleState(nextState => ({
+                                    ...nextState,
+                                    queueSystem: {
+                                        ...nextState.queueSystem,
+                                        isProcessing: false, // Reset processing flag
+                                        currentItem: null,
+                                    }
+                                }));
+                                setTimeout(() => processQueue(), 100);
+                            }, 1000);
                         } else {
                             // No more items - stop processing
-                            return {
-                                ...prev,
-                                queueSystem: {
-                                    ...prev.queueSystem,
-                                    isProcessing: false,
-                                    currentItem: null,
-                                }
-                            };
+                            updatedState.queueSystem.isProcessing = false;
+                            updatedState.queueSystem.currentItem = null;
                         }
-                        return prev;
+
+                        return updatedState;
                     });
-                }, 1000);
+
+                } catch (error) {
+                    // Mark current item as error and continue with next
+                    setModuleState(prev => {
+                        const updatedState = {
+                            ...prev,
+                            queue: prev.queue.map(item =>
+                                item.id === currentItem.id
+                                    ? { ...item, status: 'error', error: (error as Error).message }
+                                    : item
+                            ),
+                        };
+
+                        // Check if there are more waiting items even after error
+                        const hasWaitingItems = updatedState.queue.filter(item => item.status === 'waiting').length > 0;
+                        
+                        if (!updatedState.queueSystem.isPaused && hasWaitingItems) {
+                            // Continue with next item after delay
+                            setTimeout(() => {
+                                setModuleState(nextState => ({
+                                    ...nextState,
+                                    queueSystem: {
+                                        ...nextState.queueSystem,
+                                        isProcessing: false, // Reset processing flag
+                                        currentItem: null,
+                                    }
+                                }));
+                                setTimeout(() => processQueue(), 100);
+                            }, 1000);
+                        } else {
+                            // No more items - stop processing
+                            updatedState.queueSystem.isProcessing = false;
+                            updatedState.queueSystem.currentItem = null;
+                        }
+
+                        return updatedState;
+                    });
+                }
             }, 100);
 
             // Update current item status immediately
