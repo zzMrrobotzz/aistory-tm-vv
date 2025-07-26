@@ -45,157 +45,185 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
     const [translateTargetLang, setTranslateTargetLang] = useState<string>('Vietnamese');
     const [translateStyle, setTranslateStyle] = useState<string>('Default');
 
-    const updateState = (updates: Partial<RewriteModuleState>) => {
-        setModuleState(prev => ({ ...prev, ...updates }));
-    };
 
     // Generate unique ID
     const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
     // Queue management functions
     const addToQueue = (text: string, title?: string) => {
-        const newItem: RewriteQueueItem = {
-            id: generateId(),
-            title: title || `Bài ${moduleState.queue.length + 1} - ${text.substring(0, 30)}...`,
-            originalText: text,
-            status: 'waiting',
-            progress: 0,
-            rewrittenText: null,
-            error: null,
-            addedAt: new Date(),
-            startedAt: null,
-            completedAt: null,
-            estimatedTimeRemaining: null,
-        };
+        setModuleState(prev => {
+            const newItem: RewriteQueueItem = {
+                id: generateId(),
+                title: title || `Bài ${prev.queue.length + 1} - ${text.substring(0, 30)}...`,
+                originalText: text,
+                status: 'waiting',
+                progress: 0,
+                rewrittenText: null,
+                error: null,
+                addedAt: new Date(),
+                startedAt: null,
+                completedAt: null,
+                estimatedTimeRemaining: null,
+            };
 
-        updateState({
-            queue: [...moduleState.queue, newItem],
-            queueSystem: {
-                ...moduleState.queueSystem,
-                totalCount: moduleState.queue.length + 1,
-            },
+            const newState = {
+                ...prev,
+                queue: [...prev.queue, newItem],
+                queueSystem: {
+                    ...prev.queueSystem,
+                    totalCount: prev.queue.length + 1,
+                },
+            };
+
+            // Start processing if not already processing
+            setTimeout(() => {
+                setModuleState(currentState => {
+                    if (!currentState.queueSystem.isProcessing && currentState.queueSystem.isEnabled) {
+                        processQueue();
+                    }
+                    return currentState;
+                });
+            }, 100);
+
+            return newState;
         });
-
-        // Start processing if not already processing
-        setTimeout(() => {
-            if (!moduleState.queueSystem.isProcessing && moduleState.queueSystem.isEnabled) {
-                processQueue();
-            }
-        }, 100);
     };
 
     const removeFromQueue = (id: string) => {
-        const updatedQueue = moduleState.queue.filter(item => item.id !== id);
-        updateState({
-            queue: updatedQueue,
-            queueSystem: {
-                ...moduleState.queueSystem,
-                totalCount: updatedQueue.length,
-            },
+        setModuleState(prev => {
+            const updatedQueue = prev.queue.filter(item => item.id !== id);
+            return {
+                ...prev,
+                queue: updatedQueue,
+                queueSystem: {
+                    ...prev.queueSystem,
+                    totalCount: updatedQueue.length,
+                },
+            };
         });
     };
 
     const clearQueue = () => {
-        updateState({
+        setModuleState(prev => ({
+            ...prev,
             queue: [],
             queueSystem: {
-                ...moduleState.queueSystem,
+                ...prev.queueSystem,
                 totalCount: 0,
                 completedCount: 0,
                 currentItem: null,
                 isProcessing: false,
             },
-        });
+        }));
     };
 
     const toggleQueueMode = () => {
-        updateState({
+        setModuleState(prev => ({
+            ...prev,
             queueSystem: {
-                ...moduleState.queueSystem,
-                isEnabled: !moduleState.queueSystem.isEnabled,
+                ...prev.queueSystem,
+                isEnabled: !prev.queueSystem.isEnabled,
             },
-        });
+        }));
     };
 
     const pauseResumeQueue = () => {
-        updateState({
+        setModuleState(prev => ({
+            ...prev,
             queueSystem: {
-                ...moduleState.queueSystem,
-                isPaused: !moduleState.queueSystem.isPaused,
+                ...prev.queueSystem,
+                isPaused: !prev.queueSystem.isPaused,
             },
-        });
+        }));
     };
 
     // Process queue items one by one
     const processQueue = async () => {
-        const waitingItems = moduleState.queue.filter(item => item.status === 'waiting');
-        if (waitingItems.length === 0 || moduleState.queueSystem.isPaused) {
-            updateState({
-                queueSystem: {
-                    ...moduleState.queueSystem,
-                    isProcessing: false,
-                    currentItem: null,
-                },
-            });
-            return;
-        }
-
-        const currentItem = waitingItems[0];
-        const startTime = Date.now();
-
-        // Update current item status
-        updateState({
-            queueSystem: {
-                ...moduleState.queueSystem,
-                isProcessing: true,
-                currentItem: currentItem,
-            },
-            queue: moduleState.queue.map(item =>
-                item.id === currentItem.id
-                    ? { ...item, status: 'processing', startedAt: new Date() }
-                    : item
-            ),
-        });
-
-        try {
-            // Use existing rewrite logic
-            await processQueueItem(currentItem);
-            
-            const endTime = Date.now();
-            const processingTime = (endTime - startTime) / 1000; // seconds
-            
-            // Update completion stats
-            updateState({
-                queueSystem: {
-                    ...moduleState.queueSystem,
-                    completedCount: moduleState.queueSystem.completedCount + 1,
-                    averageProcessingTime: 
-                        (moduleState.queueSystem.averageProcessingTime + processingTime) / 2,
-                },
-                queue: moduleState.queue.map(item =>
-                    item.id === currentItem.id
-                        ? { ...item, status: 'completed', completedAt: new Date(), progress: 100 }
-                        : item
-                ),
-            });
-
-        } catch (error) {
-            // Mark current item as error
-            updateState({
-                queue: moduleState.queue.map(item =>
-                    item.id === currentItem.id
-                        ? { ...item, status: 'error', error: (error as Error).message }
-                        : item
-                ),
-            });
-        }
-
-        // Continue with next item after a short delay
-        setTimeout(() => {
-            if (!moduleState.queueSystem.isPaused && moduleState.queueSystem.isEnabled) {
-                processQueue();
+        setModuleState(prevState => {
+            // Prevent multiple concurrent processQueue calls
+            if (prevState.queueSystem.isProcessing && !prevState.queueSystem.isPaused) {
+                return prevState; // Already processing, no change
             }
-        }, 1000);
+
+            const waitingItems = prevState.queue.filter(item => item.status === 'waiting');
+            if (waitingItems.length === 0 || prevState.queueSystem.isPaused) {
+                return {
+                    ...prevState,
+                    queueSystem: {
+                        ...prevState.queueSystem,
+                        isProcessing: false,
+                        currentItem: null,
+                    },
+                };
+            }
+
+            const currentItem = waitingItems[0];
+            
+            // Start processing this item
+            setTimeout(async () => {
+                const startTime = Date.now();
+                
+                try {
+                    // Process the item
+                    await processQueueItem(currentItem);
+                    
+                    const endTime = Date.now();
+                    const processingTime = (endTime - startTime) / 1000;
+                    
+                    // Update completion stats
+                    setModuleState(prev => ({
+                        ...prev,
+                        queueSystem: {
+                            ...prev.queueSystem,
+                            completedCount: prev.queueSystem.completedCount + 1,
+                            averageProcessingTime: 
+                                (prev.queueSystem.averageProcessingTime + processingTime) / 2,
+                        },
+                        queue: prev.queue.map(item =>
+                            item.id === currentItem.id
+                                ? { ...item, status: 'completed', completedAt: new Date(), progress: 100 }
+                                : item
+                        ),
+                    }));
+
+                } catch (error) {
+                    // Mark current item as error
+                    setModuleState(prev => ({
+                        ...prev,
+                        queue: prev.queue.map(item =>
+                            item.id === currentItem.id
+                                ? { ...item, status: 'error', error: (error as Error).message }
+                                : item
+                        ),
+                    }));
+                }
+
+                // Continue with next item after a short delay - only if not paused
+                setTimeout(() => {
+                    setModuleState(prev => {
+                        if (!prev.queueSystem.isPaused && prev.queue.filter(item => item.status === 'waiting').length > 0) {
+                            processQueue();
+                        }
+                        return prev;
+                    });
+                }, 1000);
+            }, 100);
+
+            // Update current item status immediately
+            return {
+                ...prevState,
+                queueSystem: {
+                    ...prevState.queueSystem,
+                    isProcessing: true,
+                    currentItem: currentItem,
+                },
+                queue: prevState.queue.map(item =>
+                    item.id === currentItem.id
+                        ? { ...item, status: 'processing', startedAt: new Date() }
+                        : item
+                ),
+            };
+        });
     };
 
     // Process individual queue item (extracted from handleSingleRewrite)
@@ -207,13 +235,14 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
         for (let i = 0; i < numChunks; i++) {
             // Update progress
             const currentProgress = Math.round(((i + 1) / numChunks) * 100);
-            updateState({
-                queue: moduleState.queue.map(qItem =>
+            setModuleState(prev => ({
+                ...prev,
+                queue: prev.queue.map(qItem =>
                     qItem.id === item.id
                         ? { ...qItem, progress: currentProgress }
                         : qItem
                 ),
-            });
+            }));
 
             const textChunk = item.originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
             
@@ -275,13 +304,14 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         }
 
         // Update final result
-        updateState({
-            queue: moduleState.queue.map(qItem =>
+        setModuleState(prev => ({
+            ...prev,
+            queue: prev.queue.map(qItem =>
                 qItem.id === item.id
                     ? { ...qItem, rewrittenText: fullRewrittenText.trim() }
                     : qItem
             ),
-        });
+        }));
 
         // Log usage statistics
         logApiCall('rewrite', numChunks);
@@ -290,19 +320,19 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
 
     useEffect(() => {
         if (targetLanguage !== sourceLanguage) {
-            updateState({ adaptContext: true }); 
+            setModuleState(prev => ({ ...prev, adaptContext: true })); 
         } else {
-            updateState({ adaptContext: false });
+            setModuleState(prev => ({ ...prev, adaptContext: false }));
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetLanguage, sourceLanguage]);
 
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
-            updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
+            setModuleState(prev => ({ ...prev, error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' }));
             return;
         }
-        updateState({ error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
+        setModuleState(prev => ({ ...prev, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false }));
         
         // Create new AbortController for this operation
         abortControllerRef.current = new AbortController();
@@ -315,10 +345,10 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             for (let i = 0; i < numChunks; i++) {
                 // Check if operation was aborted
                 if (abortControllerRef.current?.signal.aborted) {
-                    updateState({ loadingMessage: 'Đã dừng!', progress: 0 });
+                    setModuleState(prev => ({ ...prev, loadingMessage: 'Đã dừng!', progress: 0 }));
                     return;
                 }
-                updateState({ progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` });
+                setModuleState(prev => ({ ...prev, progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` }));
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
                 
                 let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
@@ -376,9 +406,9 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 await delay(500); // Simulate API call delay
                 const result = await generateText(prompt, undefined, false, apiSettings);
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + (result?.text || '').trim();
-                updateState({ rewrittenText: fullRewrittenText }); // Update UI progressively
+                setModuleState(prev => ({ ...prev, rewrittenText: fullRewrittenText })); // Update UI progressively
             }
-            updateState({ rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 });
+            setModuleState(prev => ({ ...prev, rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 }));
             
             // Save to history on successful completion
             if (fullRewrittenText.trim()) {
@@ -391,32 +421,32 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             logTextRewritten('rewrite', 1); // Log 1 text rewritten
             
             // Reset progress to 0 after completion to enable button
-            setTimeout(() => updateState({ progress: 0 }), 1500);
+            setTimeout(() => setModuleState(prev => ({ ...prev, progress: 0 })), 1500);
         } catch (e) {
             if (abortControllerRef.current?.signal.aborted) {
-                updateState({ loadingMessage: 'Đã dừng!', progress: 0 });
+                setModuleState(prev => ({ ...prev, loadingMessage: 'Đã dừng!', progress: 0 }));
             } else {
-                updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
+                setModuleState(prev => ({ ...prev, error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 }));
             }
         } finally {
             abortControllerRef.current = null;
-            setTimeout(() => updateState({ loadingMessage: null }), 3000);
+            setTimeout(() => setModuleState(prev => ({ ...prev, loadingMessage: null })), 3000);
         }
     };
 
     const handleStop = () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
-            updateState({ loadingMessage: 'Đang dừng...', progress: 0 });
+            setModuleState(prev => ({ ...prev, loadingMessage: 'Đang dừng...', progress: 0 }));
         }
     };
 
     const handlePostRewriteEdit = async () => {
          if (!rewrittenText.trim()) {
-            updateState({ editError: 'Không có văn bản để tinh chỉnh.' });
+            setModuleState(prev => ({ ...prev, editError: 'Không có văn bản để tinh chỉnh.' }));
             return;
         }
-        updateState({ isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false });
+        setModuleState(prev => ({ ...prev, isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false }));
         
         const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
 
@@ -438,14 +468,14 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         
         try {
             const result = await generateText(editPrompt, undefined, false, apiSettings);
-            updateState({ rewrittenText: result?.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true });
+            setModuleState(prev => ({ ...prev, rewrittenText: result?.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true }));
             
             // Log usage statistics for post-edit
             logApiCall('rewrite', 1); // Log 1 additional API call for editing
         } catch (e) {
-            updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
+            setModuleState(prev => ({ ...prev, editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' }));
         } finally {
-             setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
+             setTimeout(() => setModuleState(prev => ({ ...prev, editLoadingMessage: null })), 3000);
         }
     };
     
@@ -489,7 +519,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
     };
 
     const handleSelectHistory = (content: string) => {
-        updateState({ rewrittenText: content });
+        setModuleState(prev => ({ ...prev, rewrittenText: content }));
     };
     
     const anyLoading = loadingMessage !== null || isEditing;
@@ -625,7 +655,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                             <label htmlFor="rewriteSlider" className="text-sm font-medium text-gray-700">Mức độ thay đổi:</label>
                             <span className="bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full">{rewriteLevel}%</span>
                         </div>
-                        <input type="range" id="rewriteSlider" min="0" max="100" step="25" value={rewriteLevel} onChange={(e) => updateState({ rewriteLevel: parseInt(e.target.value)})} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={anyLoading}/>
+                        <input type="range" id="rewriteSlider" min="0" max="100" step="25" value={rewriteLevel} onChange={(e) => setModuleState(prev => ({ ...prev, rewriteLevel: parseInt(e.target.value)}))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={anyLoading}/>
                         <div className="mt-2 text-sm text-gray-600 bg-indigo-50 p-3 rounded-md border border-indigo-200">
                             <strong>Giải thích mức {rewriteLevel}%:</strong> {getCurrentLevelDescription()}
                         </div>
@@ -633,19 +663,19 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div>
                             <label htmlFor="quickSourceLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ gốc:</label>
-                            <select id="quickSourceLang" value={sourceLanguage} onChange={(e) => updateState({ sourceLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
+                            <select id="quickSourceLang" value={sourceLanguage} onChange={(e) => setModuleState(prev => ({ ...prev, sourceLanguage: e.target.value }))} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
                             {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
                         <div>
                             <label htmlFor="quickTargetLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ đầu ra:</label>
-                            <select id="quickTargetLang" value={targetLanguage} onChange={(e) => updateState({ targetLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
+                            <select id="quickTargetLang" value={targetLanguage} onChange={(e) => setModuleState(prev => ({ ...prev, targetLanguage: e.target.value }))} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
                             {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
                         <div>
                             <label htmlFor="quickRewriteStyle" className="block text-sm font-medium text-gray-700 mb-1">Phong cách viết lại:</label>
-                            <select id="quickRewriteStyle" value={rewriteStyle} onChange={(e) => updateState({ rewriteStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
+                            <select id="quickRewriteStyle" value={rewriteStyle} onChange={(e) => setModuleState(prev => ({ ...prev, rewriteStyle: e.target.value }))} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
                             {REWRITE_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
                         </div>
@@ -653,13 +683,13 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                      {rewriteStyle === 'custom' && (
                         <div>
                             <label htmlFor="quickCustomStyle" className="block text-sm font-medium text-gray-700 mb-1">Hướng dẫn tùy chỉnh:</label>
-                            <textarea id="quickCustomStyle" value={customRewriteStyle} onChange={(e) => updateState({ customRewriteStyle: e.target.value })} rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}/>
+                            <textarea id="quickCustomStyle" value={customRewriteStyle} onChange={(e) => setModuleState(prev => ({ ...prev, customRewriteStyle: e.target.value }))} rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}/>
                         </div>
                     )}
                 </div>
                  <div>
                     <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
-                    <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
+                    <textarea id="quickOriginalText" value={originalText} onChange={(e) => setModuleState(prev => ({ ...prev, originalText: e.target.value }))} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
                 </div>
                 <div className="flex gap-3">
                     {moduleState.queueSystem.isEnabled ? (
@@ -667,7 +697,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                             onClick={() => {
                                 if (originalText.trim()) {
                                     addToQueue(originalText.trim());
-                                    updateState({ originalText: '' }); // Clear input for next item
+                                    setModuleState(prev => ({ ...prev, originalText: '' })); // Clear input for next item
                                 }
                             }}
                             disabled={!hasActiveSubscription || !originalText.trim()}
