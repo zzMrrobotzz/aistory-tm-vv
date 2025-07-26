@@ -207,18 +207,40 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       console.log('🔍 About to call generateSubPrompts with:', { hookText: hookText.length, isContextual: isContextualImageGeneratorTab });
       let subPrompts = await generateSubPrompts(hookText, isContextualImageGeneratorTab);
       console.log('✅ generateSubPrompts completed, got:', subPrompts.length, 'prompts');
+      console.log('🔍 subPrompts data:', subPrompts);
       
       // Limit subPrompts to user's imageCount setting
+      console.log('🔢 Current imageCount setting:', imageCount);
       if (subPrompts.length > imageCount) {
         console.log('✂️ Limiting subPrompts from', subPrompts.length, 'to', imageCount);
-        subPrompts = subPrompts.slice(0, imageCount);
+        try {
+          subPrompts = subPrompts.slice(0, imageCount);
+          console.log('✅ Slice operation successful');
+        } catch (sliceError) {
+          console.error('❌ Error during slice operation:', sliceError);
+          throw sliceError;
+        }
       }
 
       console.log('🎯 Creating initial image items for', subPrompts.length, 'prompts with engine:', imageEngine);
-      const initialImages: GeneratedImageItem[] = subPrompts.map(p => ({ promptUsed: p, imageUrl: null, error: null, engine: imageEngine }));
-      updateState({ generatedSingleImages: initialImages, singleImageProgressMessage: `Đã tạo ${subPrompts.length} prompt con. Bắt đầu tạo ảnh...` });
+      let initialImages: GeneratedImageItem[];
+      let currentGeneratedImages: GeneratedImageItem[];
+      
+      try {
+        initialImages = subPrompts.map(p => ({ promptUsed: p, imageUrl: null, error: null, engine: imageEngine }));
+        console.log('✅ Initial images created successfully:', initialImages.length);
+        
+        console.log('🔄 Updating state with initial images');
+        updateState({ generatedSingleImages: initialImages, singleImageProgressMessage: `Đã tạo ${subPrompts.length} prompt con. Bắt đầu tạo ảnh...` });
+        console.log('✅ State update successful');
 
-      const currentGeneratedImages: GeneratedImageItem[] = [...initialImages];
+        console.log('📋 Creating copy of initial images');
+        currentGeneratedImages = [...initialImages];
+        console.log('✅ Copy created successfully');
+      } catch (mapError) {
+        console.error('❌ Error during initial images creation:', mapError);
+        throw mapError;
+      }
 
       console.log('🔄 Starting image generation loop for', subPrompts.length, 'images');
       for (let i = 0; i < subPrompts.length; i++) {
