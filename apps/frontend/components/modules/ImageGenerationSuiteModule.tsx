@@ -86,81 +86,89 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
   }, [generatedSingleImages, generatedBatchImages, activeRefinementItem]);
 
   const generateSubPrompts = async (currentHookText: string, isContextual: boolean): Promise<string[]> => {
-    const styleInfo = PREDEFINED_ART_STYLES.find(s => s.value === selectedArtStyle);
-    const styleKeywordForSubPromptEng = (styleInfo && styleInfo.value !== 'default') ? styleInfo.value.replace(/_/g, ' ') : null;
+    try {
+      console.log('generateSubPrompts started', { currentHookText: currentHookText?.length, isContextual });
+      const styleInfo = PREDEFINED_ART_STYLES.find(s => s.value === selectedArtStyle);
+      const styleKeywordForSubPromptEng = (styleInfo && styleInfo.value !== 'default') ? styleInfo.value.replace(/_/g, ' ') : null;
 
-    let contextualizationInstruction = "";
-    if (isContextual) {
-        contextualizationInstruction = `
-        **CONTEXTUALIZATION INSTRUCTION (CRITICAL):**
-        1. First, carefully identify the primary language of the "Story Hook / Content" provided below.
-        2. THEN, based on the identified language, apply the following contextualization to the ENGLISH image prompts you generate:
-            - **IF the primary language is Vietnamese (Tiếng Việt):** Generate English image prompts that incorporate elements reflecting Vietnamese culture, settings (e.g., Vietnamese landscapes, traditional houses, bustling city scenes like Hanoi or Saigon with specific landmarks if appropriate), characters (e.g., traditional attire like 'áo dài', 'nón lá' if contextually fitting, or modern Vietnamese fashion), objects, or social customs. The goal is to make the images feel authentic to a Vietnamese setting and narrative.
-            - **IF the primary language is Korean (한국어):** Generate English image prompts that incorporate elements reflecting Korean culture, settings (e.g., Korean cityscapes like Seoul with Namsan Tower, traditional hanok villages, serene temples), characters (e.g., modern K-fashion, K-drama inspired looks, or traditional 'hanbok' if appropriate for the story's period), objects (e.g., specific Korean foods, items from K-dramas), or social customs. The goal is to make the images feel authentic to a Korean setting and narrative.
-            - **IF the primary language is English or any other language not specified above:** Generate general English image prompts without specific cultural contextualization, unless the story content itself strongly implies a specific culture (e.g., a story explicitly set in ancient Rome). In such cases, use the story's implied cultural context.
-        This contextualization should be subtle and natural, fitting the story's narrative and tone. Do not force cultural elements if they feel out of place for the specific scene.`;
-    } else {
-        contextualizationInstruction = `
-        **CONTEXTUALIZATION INSTRUCTION:** Generate general English image prompts based on the content.`;
-    }
+      let contextualizationInstruction = "";
+      if (isContextual) {
+          contextualizationInstruction = `
+          **CONTEXTUALIZATION INSTRUCTION (CRITICAL):**
+          1. First, carefully identify the primary language of the "Story Hook / Content" provided below.
+          2. THEN, based on the identified language, apply the following contextualization to the ENGLISH image prompts you generate:
+              - **IF the primary language is Vietnamese (Tiếng Việt):** Generate English image prompts that incorporate elements reflecting Vietnamese culture, settings (e.g., Vietnamese landscapes, traditional houses, bustling city scenes like Hanoi or Saigon with specific landmarks if appropriate), characters (e.g., traditional attire like 'áo dài', 'nón lá' if contextually fitting, or modern Vietnamese fashion), objects, or social customs. The goal is to make the images feel authentic to a Vietnamese setting and narrative.
+              - **IF the primary language is Korean (한국어):** Generate English image prompts that incorporate elements reflecting Korean culture, settings (e.g., Korean cityscapes like Seoul with Namsan Tower, traditional hanok villages, serene temples), characters (e.g., modern K-fashion, K-drama inspired looks, or traditional 'hanbok' if appropriate for the story's period), objects (e.g., specific Korean foods, items from K-dramas), or social customs. The goal is to make the images feel authentic to a Korean setting and narrative.
+              - **IF the primary language is English or any other language not specified above:** Generate general English image prompts without specific cultural contextualization, unless the story content itself strongly implies a specific culture (e.g., a story explicitly set in ancient Rome). In such cases, use the story's implied cultural context.
+          This contextualization should be subtle and natural, fitting the story's narrative and tone. Do not force cultural elements if they feel out of place for the specific scene.`;
+      } else {
+          contextualizationInstruction = `
+          **CONTEXTUALIZATION INSTRUCTION:** Generate general English image prompts based on the content.`;
+      }
+      
+      let styleInstructionForLLM = "";
+      if (styleKeywordForSubPromptEng) {
+          styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** For each generated prompt, you MUST incorporate the art style: "${styleKeywordForSubPromptEng}". For example, if the style is "anime style", a prompt might be "A character looking at a sunset, in an anime style".`;
+      } else {
+          styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** The art style is "Mặc định (AI tự quyết)". DO NOT add any specific art style keywords to the prompts; let the image model decide based on the prompt's content.`;
+      }
+
+      const subPromptsGenerationPrompt = `
+      You are an AI expert at converting story hooks or full narratives into a sequence of visual image prompts.
+      Analyze the following "Story Hook / Content".
+      Your goal is to identify distinct visual scenes, moments, or key elements within this content.
+      For these identified elements, generate a dynamic number of detailed image prompts. The number of prompts should be based on the richness and visual potential of the input content.
+      Each generated image prompt MUST BE IN ENGLISH.
+      ${contextualizationInstruction}
+      ${styleInstructionForLLM}
+
+      Story Hook / Content:
+      ---
+      ${currentHookText}
+      ---
+
+      Return your entire response as a single JSON object with a single key "image_prompts".
+      The value for "image_prompts" should be an array of strings, where each string is a complete image prompt.
+      
+      Example (if style was "vintage photo" and input implied 2 scenes, and input language was Korean):
+      {
+        "image_prompts": [
+          "A young woman in a modernized hanbok walking through a neon-lit Seoul street at night, reflections in puddles, vintage photo style",
+          "A traditional Korean tea ceremony in a serene hanok courtyard, details of porcelain, vintage photo style"
+        ]
+      }
+      Example (if style was "watercolor painting" and input language was Vietnamese):
+      {
+        "image_prompts": [
+          "A young woman in an ao dai standing by a lotus pond at sunset, serene Vietnamese countryside, watercolor painting style",
+          "A bustling Hoan Kiem Lake scene with a red Huc bridge in the background, watercolor painting style"
+        ]
+      }
+      Example (if style was "photorealistic" and input language was English, non-specific context):
+      {
+        "image_prompts": [
+          "A detective examining clues in a dimly lit, cluttered office, rain streaking down the window, photorealistic style",
+          "A vast, alien desert landscape under a twin-sun sky, a lone rover in the distance, photorealistic style"
+        ]
+      }
+
+      Do not include any other text or explanation outside this JSON structure. Ensure the output is valid JSON.
+      The number of prompts in the array should reflect the visual storytelling potential of the input. Aim for a reasonable number, e.g., 2-7 prompts.
+      `;
+      const systemInstructionForSubPrompts = `You are an AI assistant that analyzes text (hooks or stories), identifies key visual scenes, and generates multiple detailed image prompts in English, suitable for AI image generation, formatted as a JSON array. You will apply contextualization and art style instructions as provided.`;
     
-    let styleInstructionForLLM = "";
-    if (styleKeywordForSubPromptEng) {
-        styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** For each generated prompt, you MUST incorporate the art style: "${styleKeywordForSubPromptEng}". For example, if the style is "anime style", a prompt might be "A character looking at a sunset, in an anime style".`;
-    } else {
-        styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** The art style is "Mặc định (AI tự quyết)". DO NOT add any specific art style keywords to the prompts; let the image model decide based on the prompt's content.`;
+      console.log('Calling generateTextWithJsonOutput with apiSettings:', apiSettings);
+      const subPromptsResult = await generateTextWithJsonOutput<GeminiSubPromptsResponse>(subPromptsGenerationPrompt, systemInstructionForSubPrompts, apiSettings);
+      
+      console.log('generateTextWithJsonOutput result:', subPromptsResult);
+      if (!subPromptsResult || !subPromptsResult.image_prompts || subPromptsResult.image_prompts.length === 0) {
+        throw new Error("Không thể tạo danh sách prompt con từ nội dung được cung cấp.");
+      }
+      return subPromptsResult.image_prompts;
+    } catch (error) {
+      console.error('Error in generateSubPrompts:', error);
+      throw error;
     }
-
-    const subPromptsGenerationPrompt = `
-    You are an AI expert at converting story hooks or full narratives into a sequence of visual image prompts.
-    Analyze the following "Story Hook / Content".
-    Your goal is to identify distinct visual scenes, moments, or key elements within this content.
-    For these identified elements, generate a dynamic number of detailed image prompts. The number of prompts should be based on the richness and visual potential of the input content.
-    Each generated image prompt MUST BE IN ENGLISH.
-    ${contextualizationInstruction}
-    ${styleInstructionForLLM}
-
-    Story Hook / Content:
-    ---
-    ${currentHookText}
-    ---
-
-    Return your entire response as a single JSON object with a single key "image_prompts".
-    The value for "image_prompts" should be an array of strings, where each string is a complete image prompt.
-    
-    Example (if style was "vintage photo" and input implied 2 scenes, and input language was Korean):
-    {
-      "image_prompts": [
-        "A young woman in a modernized hanbok walking through a neon-lit Seoul street at night, reflections in puddles, vintage photo style",
-        "A traditional Korean tea ceremony in a serene hanok courtyard, details of porcelain, vintage photo style"
-      ]
-    }
-    Example (if style was "watercolor painting" and input language was Vietnamese):
-    {
-      "image_prompts": [
-        "A young woman in an ao dai standing by a lotus pond at sunset, serene Vietnamese countryside, watercolor painting style",
-        "A bustling Hoan Kiem Lake scene with a red Huc bridge in the background, watercolor painting style"
-      ]
-    }
-    Example (if style was "photorealistic" and input language was English, non-specific context):
-    {
-      "image_prompts": [
-        "A detective examining clues in a dimly lit, cluttered office, rain streaking down the window, photorealistic style",
-        "A vast, alien desert landscape under a twin-sun sky, a lone rover in the distance, photorealistic style"
-      ]
-    }
-
-    Do not include any other text or explanation outside this JSON structure. Ensure the output is valid JSON.
-    The number of prompts in the array should reflect the visual storytelling potential of the input. Aim for a reasonable number, e.g., 2-7 prompts.
-    `;
-    const systemInstructionForSubPrompts = `You are an AI assistant that analyzes text (hooks or stories), identifies key visual scenes, and generates multiple detailed image prompts in English, suitable for AI image generation, formatted as a JSON array. You will apply contextualization and art style instructions as provided.`;
-    
-    const subPromptsResult = await generateTextWithJsonOutput<GeminiSubPromptsResponse>(subPromptsGenerationPrompt, systemInstructionForSubPrompts, apiSettings);
-    
-    if (!subPromptsResult || !subPromptsResult.image_prompts || subPromptsResult.image_prompts.length === 0) {
-      throw new Error("Không thể tạo danh sách prompt con từ nội dung được cung cấp.");
-    }
-    return subPromptsResult.image_prompts;
   };
 
 
