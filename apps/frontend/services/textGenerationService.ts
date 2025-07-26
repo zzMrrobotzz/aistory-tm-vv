@@ -76,7 +76,11 @@ export const generateTextWithJsonOutput = async <T,>(
   if (effectiveApiSettings?.provider === 'deepseek' && effectiveApiSettings.apiKey) {
     // Update last used timestamp
     ApiKeyStorage.updateLastUsed('deepseek');
-    return deepseekService.generateTextWithJsonOutput<T>(prompt, effectiveApiSettings.apiKey);
+    // DeepSeek doesn't support systemInstruction parameter, merge it with prompt if provided
+    const combinedPrompt = systemInstruction 
+      ? `${systemInstruction}\n\n${prompt}` 
+      : prompt;
+    return deepseekService.generateTextWithJsonOutput<T>(combinedPrompt, effectiveApiSettings.apiKey);
   }
 
   // Default to Gemini for all other cases
