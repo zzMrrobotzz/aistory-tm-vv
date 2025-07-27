@@ -356,7 +356,7 @@ const TtsModule: React.FC<TtsModuleProps> = ({
     }, [elevenLabsApiKeys]);
 
     return (
-        <ModuleContainer title="🎙️ Đọc Truyện AI (TTS)">
+        <ModuleContainer title="🎙️ Đọc Truyện AI (TTS)" badge="FREE">
             <InfoBox>
                 <p>Chuyển đổi văn bản thành giọng nói chất lượng cao. Hỗ trợ nhiều nhà cung cấp AI.</p>
                 <p className="mt-2 text-blue-800 bg-blue-100 p-2 rounded-md text-sm">

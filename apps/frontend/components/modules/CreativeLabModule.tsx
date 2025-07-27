@@ -391,7 +391,7 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
   const selectedPlotStructureDetails = PLOT_STRUCTURE_OPTIONS.find(opt => opt.value === plotStructure);
 
   return (
-    <ModuleContainer title="📝 Module: Xây Dựng Dàn Ý Thông Minh">
+    <ModuleContainer title="📝 Module: Xây Dựng Dàn Ý Thông Minh" badge="FREE">
       <InfoBox>
         <p><strong>💡 Hướng dẫn:</strong> Chọn tab để tạo dàn ý. "⚡️ Tạo Dàn Ý Nhanh" cho người mới hoặc cần ý tưởng gấp. "📝 Tạo Dàn Ý Lẻ (Chuyên Sâu)" cho phép tùy chỉnh sâu hơn. "📦 Tạo Dàn Ý Hàng Loạt" để xử lý nhiều ý tưởng cùng lúc.</p>
         <p className="mt-1"><strong>Mới:</strong> Thêm "Dàn Ý Viral Tham Khảo" trong cài đặt chung. AI sẽ học phong cách cấu trúc từ đó để áp dụng vào dàn ý mới của bạn (trong tab "Tạo Dàn Ý Lẻ (Chuyên Sâu)" và "Tạo Dàn Ý Hàng Loạt"). Bạn cũng có thể yêu cầu AI "Chỉ Phân Tích Dàn Ý Tham Khảo Này" để hiểu rõ cấu trúc của nó.</p>

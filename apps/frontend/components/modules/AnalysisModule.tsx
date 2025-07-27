@@ -208,7 +208,7 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
   const isProcessing = loadingMessage && loadingMessage.startsWith("Đang");
 
   return (
-    <ModuleContainer title="✨ Module: Phân Tích Truyện & ADN Viral">
+    <ModuleContainer title="✨ Module: Phân Tích Truyện & ADN Viral" badge="FREE">
       <InfoBox>
         <ul className="list-disc list-inside space-y-1">
             <li><strong>Phân tích tiêu chuẩn:</strong> Đánh giá các yếu tố văn học và nhận gợi ý cải thiện chung.</li>

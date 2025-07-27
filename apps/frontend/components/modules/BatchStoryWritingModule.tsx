@@ -375,7 +375,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
   const hasActiveSubscription = isSubscribed(currentUser);
 
   return (
-    <ModuleContainer title="📚 Viết Truyện Hàng Loạt">
+    <ModuleContainer title="📚 Viết Truyện Hàng Loạt" badge="PRO">
       {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <p><strong>💡 Hướng dẫn:</strong></p>

@@ -588,7 +588,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
 
 
   return (
-    <ModuleContainer title="🎨 Xưởng Tạo Ảnh AI">
+    <ModuleContainer title="🎨 Xưởng Tạo Ảnh AI" badge="FREE">
       <InfoBox>
         <p><strong>�� Hướng dẫn:</strong> Chọn chế độ tạo ảnh mong muốn từ các tab bên dưới.</p>
         <p className="mt-1">

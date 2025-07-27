@@ -440,7 +440,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
   };
 
   return (
-    <ModuleContainer title="🎬 YouTube SEO & Từ Khóa">
+    <ModuleContainer title="🎬 YouTube SEO & Từ Khóa" badge="FREE">
       <InfoBox>
         <strong>💡 Hướng dẫn:</strong> Tối ưu hóa video YouTube, nghiên cứu từ khóa liên quan, tạo dấu thời gian (chapter markers), và nhận gợi ý tiêu đề/thumbnail AI để tăng khả năng khám phá và giữ chân người xem.
       </InfoBox>

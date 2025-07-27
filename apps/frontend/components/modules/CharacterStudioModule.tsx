@@ -264,7 +264,7 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
 
 
   return (
-    <ModuleContainer title="👤 Xưởng Nhân Vật AI (Tạo Prompt Đồng nhất)">
+    <ModuleContainer title="👤 Xưởng Nhân Vật AI (Tạo Prompt Đồng nhất)" badge="FREE">
       <InfoBox>
         <p className="font-semibold text-lg mb-2">🎯 Mục tiêu: Tạo Prompt Ảnh Đồng nhất Nhân vật</p>
         <p className="mb-1">Module này giúp bạn tạo ra một prompt ảnh hoàn chỉnh, kết hợp mô tả nhân vật chi tiết với hành động cụ thể, nhằm giữ sự nhất quán cho nhân vật khi tạo ảnh AI.</p>

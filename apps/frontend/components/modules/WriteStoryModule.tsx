@@ -1280,7 +1280,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
 
 
   return (
-    <ModuleContainer title="✍️ Module: Viết Truyện, Hook & Bài Học">
+    <ModuleContainer title="✍️ Module: Viết Truyện, Hook & Bài Học" badge="PRO">
         {!hasActiveSubscription && <UpgradePrompt />}
         <InfoBox>
             <p><strong>📌 Quy trình Tạo Truyện Hoàn Chỉnh:</strong></p>

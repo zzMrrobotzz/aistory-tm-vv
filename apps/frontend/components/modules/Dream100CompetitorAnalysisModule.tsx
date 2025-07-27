@@ -147,7 +147,7 @@ If you cannot find enough distinct similar channels, return as many as you can u
   };
 
   return (
-    <ModuleContainer title="🎯 Dream 100 (Đối Thủ YouTube)">
+    <ModuleContainer title="🎯 Dream 100 (Đối Thủ YouTube)" badge="FREE">
       <InfoBox>
         <p><strong>💡 Hướng dẫn:</strong></p>
         <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">

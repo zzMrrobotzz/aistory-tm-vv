@@ -614,7 +614,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
     const getCurrentLevelDescription = () => userLevelDescriptions[Math.round(rewriteLevel / 25) * 25];
 
     return (
-        <ModuleContainer title="🔄 Viết Lại Nhanh">
+        <ModuleContainer title="🔄 Viết Lại Nhanh" badge="PRO">
              <div className="space-y-6 animate-fadeIn">
                 <InfoBox>
                     <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.

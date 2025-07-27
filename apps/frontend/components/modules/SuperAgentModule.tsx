@@ -119,7 +119,7 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
   
 
   return (
-    <ModuleContainer title="🚀 Siêu Trợ Lý AI: Từ Ý Tưởng Đến Sản Phẩm">
+    <ModuleContainer title="🚀 Siêu Trợ Lý AI: Từ Ý Tưởng Đến Sản Phẩm" badge="FREE">
       <InfoBox>
         <strong>💡 Hướng dẫn:</strong> Nhập ý tưởng, thiết lập các tùy chọn và để Siêu Trợ Lý tự động thực hiện toàn bộ quy trình. Dàn ý từ "Xây Dựng Truyện" sẽ được tự động điền vào đây.
       </InfoBox>

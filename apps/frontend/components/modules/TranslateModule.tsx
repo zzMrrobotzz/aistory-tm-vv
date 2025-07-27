@@ -80,7 +80,7 @@ const TranslateModule: React.FC<TranslateModuleProps> = ({
     };
 
     return (
-        <ModuleContainer title="🌐 Dịch Thuật AI">
+        <ModuleContainer title="🌐 Dịch Thuật AI" badge="FREE">
             <InfoBox>
                 Dịch thuật nhanh chóng và chính xác với sức mạnh từ AI. Chỉ cần nhập văn bản, chọn ngôn ngữ đích, phong cách dịch và để AI làm phần còn lại.
             </InfoBox>

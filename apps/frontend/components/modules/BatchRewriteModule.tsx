@@ -616,7 +616,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
   }
 
   return (
-    <ModuleContainer title="🔀 Viết Lại Hàng Loạt">
+    <ModuleContainer title="🔀 Viết Lại Hàng Loạt" badge="PRO">
       {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <p><strong>💡 Hướng dẫn:</strong></p>
