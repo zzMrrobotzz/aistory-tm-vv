@@ -246,36 +246,94 @@ router.post('/setup-webhook', async (req, res) => {
 router.post('/webhook/payos', async (req, res) => {
     try {
         const webhookData = req.body;
+        const requestId = req.headers['x-request-id'] || `REQ_${Date.now()}`;
         
-        console.log('PayOS webhook received:', webhookData);
+        console.log(`🔗 PayOS webhook received [${requestId}]:`, JSON.stringify(webhookData, null, 2));
 
-        // Verify webhook signature if needed
-        // const signature = req.headers['x-signature'];
+        // Validate webhook data structure
+        if (!webhookData || !webhookData.data) {
+            console.error(`❌ Invalid webhook data structure [${requestId}]:`, webhookData);
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Invalid webhook data structure',
+                requestId 
+            });
+        }
         
-        if (webhookData.code === '00' && webhookData.data.status === 'PAID') {
-            const orderCode = webhookData.data.orderCode;
+        const { code, data } = webhookData;
+        
+        if (code === '00' && data.status === 'PAID') {
+            const orderCode = data.orderCode;
+            console.log(`💰 Processing PAID payment [${requestId}] for order: ${orderCode}`);
             
             // Tìm payment tương ứng
             const payment = await Payment.findOne({ 'paymentData.orderCode': orderCode });
             
-            if (payment && payment.status === 'pending') {
-                // Tự động hoàn thành payment
-                await paymentService.completePayment(
-                    payment._id, 
-                    webhookData.data.transactions?.[0]?.reference || `PAYOS_WEBHOOK_${orderCode}`
-                );
-                
-                await createAuditLog('PAYMENT_WEBHOOK_COMPLETED', `PayOS webhook completed payment ${payment._id}`);
-                
-                console.log(`✅ PayOS webhook: Payment ${payment._id} completed automatically`);
+            if (!payment) {
+                console.warn(`⚠️ Payment not found [${requestId}] for orderCode: ${orderCode}`);
+                return res.json({ 
+                    success: true, 
+                    message: 'Payment not found but webhook acknowledged',
+                    requestId 
+                });
             }
+            
+            console.log(`📝 Found payment [${requestId}]:`, {
+                paymentId: payment._id,
+                status: payment.status,
+                userId: payment.userId,
+                amount: payment.price
+            });
+            
+            if (payment.status === 'pending') {
+                console.log(`🔄 Completing payment [${requestId}]: ${payment._id}`);
+                
+                // Tự động hoàn thành payment
+                const transactionRef = data.transactions?.[0]?.reference || `PAYOS_WEBHOOK_${orderCode}`;
+                await paymentService.completePayment(payment._id, transactionRef);
+                
+                await createAuditLog('PAYMENT_WEBHOOK_COMPLETED', `PayOS webhook completed payment ${payment._id} [${requestId}]`);
+                
+                console.log(`✅ PayOS webhook [${requestId}]: Payment ${payment._id} completed automatically`);
+                
+                return res.json({ 
+                    success: true, 
+                    message: 'Payment completed successfully',
+                    paymentId: payment._id,
+                    requestId 
+                });
+            } else {
+                console.log(`ℹ️ Payment already processed [${requestId}]: ${payment._id} (status: ${payment.status})`);
+                return res.json({ 
+                    success: true, 
+                    message: 'Payment already processed',
+                    requestId 
+                });
+            }
+        } else {
+            console.log(`ℹ️ Webhook not for PAID status [${requestId}]:`, { code, status: data.status });
+            return res.json({ 
+                success: true, 
+                message: 'Webhook acknowledged but not PAID status',
+                requestId 
+            });
         }
 
-        return res.json({ success: true });
-
     } catch (error) {
-        console.error('PayOS webhook error:', error);
-        return res.status(500).json({ success: false, error: 'Webhook processing failed' });
+        const requestId = req.headers['x-request-id'] || `REQ_${Date.now()}`;
+        console.error(`❌ PayOS webhook error [${requestId}]:`, error);
+        console.error(`❌ Error details [${requestId}]:`, {
+            message: error.message,
+            stack: error.stack,
+            body: req.body
+        });
+        
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Webhook processing failed',
+            details: error.message,
+            requestId 
+        });
     }
 });
 
@@ -516,5 +574,96 @@ router.post('/force-complete/:userKey', async (req, res) => {
         });
     }
 });
+
+// GET /api/payment/debug/:paymentId - Debug payment and webhook status
+router.get('/debug/:paymentId', async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        const Payment = require('../models/Payment');
+        const User = require('../models/User');
+        
+        console.log('🔍 Debugging payment:', paymentId);
+        
+        // Get payment details
+        const payment = await Payment.findById(paymentId).populate('userId');
+        
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                error: 'Payment not found'
+            });
+        }
+        
+        // Get user details
+        const user = await User.findById(payment.userId);
+        
+        // Check PayOS status if orderCode exists
+        let payosStatus = null;
+        if (payment.paymentData?.orderCode) {
+            try {
+                payosStatus = await paymentService.checkPayOSPaymentStatus(payment.paymentData.orderCode);
+            } catch (error) {
+                console.warn('Failed to check PayOS status:', error.message);
+                payosStatus = { error: error.message };
+            }
+        }
+        
+        return res.json({
+            success: true,
+            debug: {
+                payment: {
+                    id: payment._id,
+                    status: payment.status,
+                    price: payment.price,
+                    orderCode: payment.paymentData?.orderCode,
+                    createdAt: payment.createdAt,
+                    expiredAt: payment.expiredAt,
+                    completedAt: payment.completedAt,
+                    transactionId: payment.transactionId
+                },
+                user: user ? {
+                    id: user._id,
+                    email: user.email,
+                    subscriptionType: user.subscriptionType,
+                    subscriptionExpiresAt: user.subscriptionExpiresAt,
+                    isActive: user.isActive
+                } : null,
+                payosStatus: payosStatus,
+                recommendations: generateDebugRecommendations(payment, user, payosStatus)
+            }
+        });
+        
+    } catch (error) {
+        console.error('Debug payment error:', error);
+        
+        return res.status(500).json({
+            success: false,
+            error: error.message || 'Internal server error'
+        });
+    }
+});
+
+// Helper function to generate debug recommendations
+function generateDebugRecommendations(payment, user, payosStatus) {
+    const recommendations = [];
+    
+    if (payment.status === 'pending' && payosStatus?.payosStatus === 'PAID') {
+        recommendations.push('Payment is PAID on PayOS but still pending in database. Try force completing it.');
+    }
+    
+    if (payment.status === 'completed' && (!user.subscriptionType || user.subscriptionType === 'free')) {
+        recommendations.push('Payment is completed but user subscription was not updated. Check subscription logic.');
+    }
+    
+    if (payment.status === 'pending' && new Date() > new Date(payment.expiredAt)) {
+        recommendations.push('Payment has expired. User may need to create a new payment.');
+    }
+    
+    if (payosStatus?.error) {
+        recommendations.push(`PayOS check failed: ${payosStatus.error}. Webhook may not be working.`);
+    }
+    
+    return recommendations;
+}
 
 module.exports = router;

@@ -81,12 +81,37 @@ class PaymentService {
       const data = await response.json();
 
       if (!response.ok) {
+        console.error('Payment status check failed:', data);
         throw new Error(data.error || 'Không thể kiểm tra trạng thái thanh toán');
       }
 
       return data;
     } catch (error) {
       console.error('Payment status check error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Debug payment status with detailed info
+   */
+  async debugPaymentStatus(paymentId: string): Promise<any> {
+    try {
+      const response = await fetch(`${API_URL}/payment/debug/${paymentId}`, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Không thể debug thanh toán');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Payment debug error:', error);
       throw error;
     }
   }
@@ -159,11 +184,13 @@ class PaymentService {
 
           // Check payment status periodically
           const status = await this.checkPaymentStatus(paymentData.paymentId);
+          console.log('💳 Payment status check:', status);
           
           if (status.payment.status === 'completed') {
             clearInterval(checkInterval);
             paymentWindow.close();
             
+            console.log('✅ Payment completed successfully, calling success callback');
             if (onPaymentSuccess) {
               onPaymentSuccess();
             }
@@ -174,6 +201,15 @@ class PaymentService {
           if (status.isExpired) {
             clearInterval(checkInterval);
             paymentWindow.close();
+            
+            // Debug expired payment
+            try {
+              const debugInfo = await this.debugPaymentStatus(paymentData.paymentId);
+              console.warn('⚠️ Payment expired, debug info:', debugInfo);
+            } catch (debugError) {
+              console.warn('Failed to get debug info for expired payment:', debugError);
+            }
+            
             reject(new Error('Thanh toán đã hết hạn'));
             return;
           }
