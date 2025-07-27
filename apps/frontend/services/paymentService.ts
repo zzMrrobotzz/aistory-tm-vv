@@ -119,7 +119,7 @@ class PaymentService {
   /**
    * Open payment URL in new window and monitor payment completion
    */
-  async processPayment(paymentData: PaymentResponse): Promise<boolean> {
+  async processPayment(paymentData: PaymentResponse, onPaymentSuccess?: () => void): Promise<boolean> {
     return new Promise((resolve, reject) => {
       // Open payment window
       const paymentWindow = window.open(
@@ -140,10 +140,16 @@ class PaymentService {
           if (paymentWindow.closed) {
             clearInterval(checkInterval);
             
+            // Wait a bit for webhook to process
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
             // Check payment status
             const status = await this.checkPaymentStatus(paymentData.paymentId);
             
             if (status.payment.status === 'completed') {
+              if (onPaymentSuccess) {
+                onPaymentSuccess();
+              }
               resolve(true);
             } else {
               resolve(false);
@@ -157,6 +163,10 @@ class PaymentService {
           if (status.payment.status === 'completed') {
             clearInterval(checkInterval);
             paymentWindow.close();
+            
+            if (onPaymentSuccess) {
+              onPaymentSuccess();
+            }
             resolve(true);
             return;
           }

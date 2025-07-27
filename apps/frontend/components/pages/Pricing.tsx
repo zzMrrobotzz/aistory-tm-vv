@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Crown, Zap, AlertCircle } from 'lucide-react';
 import { paymentService } from '../../services/paymentService';
+import { refreshUserProfile } from '../../services/authService';
+import { paymentEventBus, PAYMENT_EVENTS } from '../../utils/paymentEventBus';
 import SubscriptionStatus from '../SubscriptionStatus';
 
 interface Package {
@@ -110,20 +112,47 @@ const Pricing: React.FC = () => {
         // Show payment modal with QR and transfer info
         paymentService.showPaymentModal(paymentData);
         
-        // Optional: Process payment in popup window
+        // Process payment in popup window with enhanced callback
         try {
-          const paymentCompleted = await paymentService.processPayment(paymentData);
+          const paymentCompleted = await paymentService.processPayment(paymentData, async () => {
+            // Callback when payment is successful
+            console.log('🎉 Payment completed, refreshing user profile...');
+            try {
+              await refreshUserProfile();
+              console.log('✅ User profile refreshed successfully');
+              
+              // Emit payment success event to update UI
+              paymentEventBus.emit(PAYMENT_EVENTS.PAYMENT_SUCCESS);
+            } catch (error) {
+              console.warn('⚠️ Failed to refresh profile:', error);
+            }
+          });
           
           if (paymentCompleted) {
-            alert(`✅ Thanh toán thành công cho gói ${packageData.name}!\n\nVui lòng tải lại trang để cập nhật trạng thái subscription.`);
-            window.location.reload();
+            // Give webhook time to process and profile refresh to complete
+            setTimeout(async () => {
+              alert(`✅ Thanh toán thành công cho gói ${packageData.name}!\n\nTrạng thái subscription đã được cập nhật.`);
+              
+              // Final refresh and UI update
+              try {
+                await refreshUserProfile();
+                paymentEventBus.emit(PAYMENT_EVENTS.PAYMENT_SUCCESS);
+                
+                // Navigate back to dashboard instead of reload
+                window.history.pushState({}, '', '/');
+                window.location.reload();
+              } catch (error) {
+                console.warn('Profile refresh failed, reloading page:', error);
+                window.location.reload();
+              }
+            }, 1000);
           } else {
             alert('❌ Thanh toán chưa hoàn tất. Vui lòng kiểm tra và thử lại.');
           }
         } catch (paymentError: any) {
           console.warn('Payment monitoring error:', paymentError.message);
           // Still show success message since payment modal is displayed
-          alert('Vui lòng hoàn thành thanh toán trong cửa sổ đã mở và tải lại trang để cập nhật trạng thái.');
+          alert('Vui lòng hoàn thành thanh toán trong cửa sổ đã mở. Giao diện sẽ cập nhật tự động sau khi thanh toán thành công.');
         }
       } else {
         throw new Error(paymentData.error || 'Không thể tạo thanh toán');

@@ -207,6 +207,26 @@ export const getUserProfile = async (): Promise<UserProfile> => {
   }
 };
 
+export const refreshUserProfile = async (): Promise<UserProfile> => {
+  console.log('🔄 Refreshing user profile...');
+  const token = getCurrentUserToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+  
+  setAuthToken(token);
+  
+  try {
+    // Force fresh request with cache busting
+    const response = await authApi.get(`/auth/me?t=${Date.now()}`);
+    console.log('✅ User profile refreshed successfully');
+    return response.data;
+  } catch (error) {
+    console.error('❌ Failed to refresh user profile:', error);
+    throw error;
+  }
+};
+
 // Make sure setAuthToken is called on initial load if token exists
 const token = getCurrentUserToken();
 const sessionToken = localStorage.getItem('sessionToken');

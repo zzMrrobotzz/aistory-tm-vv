@@ -50,11 +50,12 @@ import BatchRewriteModule from './components/modules/BatchRewriteModule'; // Add
 import Dream100CompetitorAnalysisModule from './components/modules/Dream100CompetitorAnalysisModule'; // Added
 import CharacterStudioModule from './components/modules/CharacterStudioModule'; // Added
 import SupportModule from './components/modules/SupportModule'; // Added
-import { getUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
+import { getUserProfile, refreshUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
 import Pricing from './components/pages/Pricing'; // Added for Pricing module
 import { logModuleAccess } from './services/usageService'; // Import usage tracking
+import { paymentEventBus, PAYMENT_EVENTS } from './utils/paymentEventBus';
 
 // NOTE: Renaming the component back to MainApp from App
 const MainApp: React.FC = () => {
@@ -899,30 +900,56 @@ const MainApp: React.FC = () => {
     loadApiKeysFromStorage();
   };
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const userProfile = await getUserProfile();
-        if (userProfile) {
-          setCurrentUser(userProfile);
-        } else {
-          // This case might happen if the token is valid but user is not found
-          logout();
-          navigate('/login');
-        }
-      } catch (error: any) {
-        console.error("Could not fetch user profile:", error);
-        // If API returns 401 Unauthorized or other auth errors, log out the user
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-          console.log("Authentication error, logging out.");
-          logout();
-          navigate('/login');
-        }
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const userProfile = await getUserProfile();
+      if (userProfile) {
+        setCurrentUser(userProfile);
+      } else {
+        // This case might happen if the token is valid but user is not found
+        logout();
+        navigate('/login');
       }
+    } catch (error: any) {
+      console.error("Could not fetch user profile:", error);
+      // If API returns 401 Unauthorized or other auth errors, log out the user
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        console.log("Authentication error, logging out.");
+        logout();
+        navigate('/login');
+      }
+    }
+  }, [navigate]);
+
+  const refreshUserAndProfile = useCallback(async () => {
+    try {
+      const userProfile = await refreshUserProfile();
+      if (userProfile) {
+        setCurrentUser(userProfile);
+        console.log('✅ User profile updated in MainApp');
+      }
+    } catch (error) {
+      console.error('❌ Failed to refresh user profile in MainApp:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
+
+  // Listen for payment success events
+  useEffect(() => {
+    const handlePaymentSuccess = () => {
+      console.log('💰 Payment success event received, refreshing user profile...');
+      refreshUserAndProfile();
     };
 
-    fetchUserProfile();
-  }, [navigate]);
+    paymentEventBus.on(PAYMENT_EVENTS.PAYMENT_SUCCESS, handlePaymentSuccess);
+
+    return () => {
+      paymentEventBus.off(PAYMENT_EVENTS.PAYMENT_SUCCESS, handlePaymentSuccess);
+    };
+  }, [refreshUserAndProfile]);
 
   // Track module usage when activeModule changes
   useEffect(() => {
