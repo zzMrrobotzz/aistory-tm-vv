@@ -10,8 +10,6 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
-import { isSubscribed } from '../../utils';
-import UpgradePrompt from '../UpgradePrompt';
 import { UserProfile } from '../../types';
 
 interface CharacterStudioModuleProps {
@@ -24,7 +22,6 @@ interface CharacterStudioModuleProps {
 const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({ 
     apiSettings, moduleState, setModuleState, currentUser 
 }) => {
-  const hasActiveSubscription = isSubscribed(currentUser);
   const {
     characterName,
     characterAge,
@@ -268,7 +265,6 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
 
   return (
     <ModuleContainer title="👤 Xưởng Nhân Vật AI (Tạo Prompt Đồng nhất)">
-      {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <p className="font-semibold text-lg mb-2">🎯 Mục tiêu: Tạo Prompt Ảnh Đồng nhất Nhân vật</p>
         <p className="mb-1">Module này giúp bạn tạo ra một prompt ảnh hoàn chỉnh, kết hợp mô tả nhân vật chi tiết với hành động cụ thể, nhằm giữ sự nhất quán cho nhân vật khi tạo ảnh AI.</p>
@@ -341,7 +337,7 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
             </div>
             <button
                 onClick={() => handleGenerateOrRefineBaseCharacterPrompt(false)}
-                disabled={!hasActiveSubscription || isLoadingBasePrompt || isLoadingRefinementForBasePrompt || isLoadingCompletePrompt}
+                disabled={isLoadingBasePrompt || isLoadingRefinementForBasePrompt || isLoadingCompletePrompt}
                 className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50"
             >
                 Tạo/Cập nhật Mô tả Nhân vật Cốt lõi
@@ -386,7 +382,7 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
                 />
                 <button
                     onClick={() => handleGenerateOrRefineBaseCharacterPrompt(true)}
-                    disabled={!hasActiveSubscription || isLoadingRefinementForBasePrompt || isLoadingCompletePrompt || isLoadingBasePrompt || !refinementInstructionForBasePrompt.trim()}
+                    disabled={isLoadingRefinementForBasePrompt || isLoadingCompletePrompt || isLoadingBasePrompt || !refinementInstructionForBasePrompt.trim()}
                     className="mt-2 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 text-sm"
                 >
                     Tinh Chỉnh Lại Mô tả Cốt lõi
@@ -421,7 +417,7 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
             </div>
             <button
                 onClick={handleGenerateCompleteImagePrompt}
-                disabled={!hasActiveSubscription || !generatedBaseCharacterPrompt.trim() || !characterAction.trim() || isLoadingCompletePrompt || isLoadingBasePrompt || isLoadingRefinementForBasePrompt}
+                disabled={!generatedBaseCharacterPrompt.trim() || !characterAction.trim() || isLoadingCompletePrompt || isLoadingBasePrompt || isLoadingRefinementForBasePrompt}
                 className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50"
             >
                 Tạo Prompt Ảnh Hoàn Chỉnh

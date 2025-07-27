@@ -13,8 +13,6 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
-import { isSubscribed } from '../../utils';
-import UpgradePrompt from '../UpgradePrompt';
 
 interface Dream100CompetitorAnalysisModuleProps {
   apiSettings: ApiSettings;
@@ -26,7 +24,6 @@ interface Dream100CompetitorAnalysisModuleProps {
 const Dream100CompetitorAnalysisModule: React.FC<Dream100CompetitorAnalysisModuleProps> = ({
     apiSettings, moduleState, setModuleState, currentUser
 }) => {
-  const hasActiveSubscription = isSubscribed(currentUser);
   const {
     inputChannelUrl, numberOfSuggestions, outputLanguage,
     analysisResults, isLoading, error, progressMessage, groundingSources,
@@ -151,7 +148,6 @@ If you cannot find enough distinct similar channels, return as many as you can u
 
   return (
     <ModuleContainer title="🎯 Dream 100 (Đối Thủ YouTube)">
-      {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <p><strong>💡 Hướng dẫn:</strong></p>
         <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">
@@ -269,7 +265,7 @@ If you cannot find enough distinct similar channels, return as many as you can u
 
         <button
           onClick={handleAnalyzeCompetitors}
-          disabled={!hasActiveSubscription || isLoading || !inputChannelUrl.trim()}
+          disabled={ isLoading || !inputChannelUrl.trim()}
           className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           Phân Tích Đối Thủ

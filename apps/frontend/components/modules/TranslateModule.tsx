@@ -7,8 +7,6 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { Clipboard, ClipboardCheck, Languages, ArrowRightLeft } from 'lucide-react';
-import UpgradePrompt from '../UpgradePrompt';
-import { isSubscribed } from '../../utils';
 import { logApiCall } from '../../services/usageService';
 
 interface TranslateModuleProps {
@@ -21,7 +19,6 @@ interface TranslateModuleProps {
 const TranslateModule: React.FC<TranslateModuleProps> = ({ 
     apiSettings, moduleState, setModuleState, currentUser 
 }) => {
-    const hasActiveSubscription = isSubscribed(currentUser);
     const {
         inputText, outputText, targetLanguage, translationStyle,
         customStyle, isLoading, error
@@ -84,7 +81,6 @@ const TranslateModule: React.FC<TranslateModuleProps> = ({
 
     return (
         <ModuleContainer title="🌐 Dịch Thuật AI">
-            {!hasActiveSubscription && <UpgradePrompt />}
             <InfoBox>
                 Dịch thuật nhanh chóng và chính xác với sức mạnh từ AI. Chỉ cần nhập văn bản, chọn ngôn ngữ đích, phong cách dịch và để AI làm phần còn lại.
             </InfoBox>
@@ -178,7 +174,7 @@ const TranslateModule: React.FC<TranslateModuleProps> = ({
                     <button
                         id="translateButton"
                         onClick={handleTranslation}
-                        disabled={!hasActiveSubscription || isLoading || !inputText.trim()}
+                        disabled={ isLoading || !inputText.trim()}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg flex items-center justify-center transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isLoading ? (

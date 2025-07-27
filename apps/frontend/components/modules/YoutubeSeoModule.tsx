@@ -13,8 +13,6 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
-import { isSubscribed } from '../../utils';
-import UpgradePrompt from '../UpgradePrompt';
 import { UserProfile } from '../../types';
 
 interface YoutubeSeoModuleProps {
@@ -25,7 +23,6 @@ interface YoutubeSeoModuleProps {
 }
 
 const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState, currentUser }) => {
-  const hasActiveSubscription = isSubscribed(currentUser);
   const {
     activeSeoTab, videoTitle, youtubeOutline, language, timelineCount, videoDuration,
     videoKeywords, youtubeDescription, youtubeTags, keywordTopic, suggestedKeywordsOutput,
@@ -328,7 +325,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
               <label htmlFor="videoKeywords" className="block text-sm font-medium text-gray-700 mb-1">Từ khóa Chính (cách nhau bởi dấu phẩy, không bắt buộc):</label>
               <input type="text" id="videoKeywords" value={videoKeywords} onChange={(e) => updateState({ videoKeywords: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="truyện audio, truyện ngắn, cậu bé rồng, phiêu lưu" disabled={!!loadingMessage}/>
             </div>
-            <button onClick={handleGenerateDescription} disabled={!hasActiveSubscription || !!loadingMessage} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50">
+            <button onClick={handleGenerateDescription} disabled={ !!loadingMessage} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50">
               Tạo Mô tả & Timeline (Cấu trúc mới)
             </button>
           </div>
@@ -346,7 +343,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
                   {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
               </div>
-            <button onClick={handleSuggestKeywords} disabled={!hasActiveSubscription || !!loadingMessage} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50">
+            <button onClick={handleSuggestKeywords} disabled={ !!loadingMessage} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50">
               Tìm Từ khóa Liên quan
             </button>
           </div>
@@ -374,7 +371,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
                 <input type="number" id="desiredChapterCount" value={desiredChapterCount} onChange={(e) => updateState({ desiredChapterCount: parseInt(e.target.value)})} min="2" max="50" className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" disabled={!!loadingMessage}/>
               </div>
             </div>
-            <button onClick={handleGenerateChapters} disabled={!hasActiveSubscription || !!loadingMessage} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50">
+            <button onClick={handleGenerateChapters} disabled={ !!loadingMessage} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50">
               Tạo Chapter Markers
             </button>
           </div>
@@ -389,7 +386,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
                         <textarea id="titleForAnalysis" value={titleForAnalysis} onChange={(e) => updateState({ titleForAnalysis: e.target.value })} rows={2} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập tiêu đề bạn muốn AI phân tích..." disabled={loadingTitleOptimizer}></textarea>
                     </div>
                     {/* Consider adding videoKeywords input here if you want it specific for title analysis */}
-                    <button onClick={handleAnalyzeAndScoreTitle} disabled={!hasActiveSubscription || loadingTitleOptimizer} className="mt-3 w-full bg-purple-600 text-white font-semibold py-2.5 px-4 rounded-lg shadow hover:bg-purple-700 disabled:opacity-50">
+                    <button onClick={handleAnalyzeAndScoreTitle} disabled={ loadingTitleOptimizer} className="mt-3 w-full bg-purple-600 text-white font-semibold py-2.5 px-4 rounded-lg shadow hover:bg-purple-700 disabled:opacity-50">
                         Phân Tích & Chấm Điểm Tiêu Đề
                     </button>
                     {loadingTitleOptimizer && <LoadingSpinner message="Đang phân tích tiêu đề..." />}
@@ -444,7 +441,6 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
 
   return (
     <ModuleContainer title="🎬 YouTube SEO & Từ Khóa">
-      {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <strong>💡 Hướng dẫn:</strong> Tối ưu hóa video YouTube, nghiên cứu từ khóa liên quan, tạo dấu thời gian (chapter markers), và nhận gợi ý tiêu đề/thumbnail AI để tăng khả năng khám phá và giữ chân người xem.
       </InfoBox>

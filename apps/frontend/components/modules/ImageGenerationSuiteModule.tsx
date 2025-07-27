@@ -19,8 +19,7 @@ import { generateTextWithJsonOutput } from '../../services/textGenerationService
 import { generateStabilityImage, refineStabilityImage } from '../../services/stabilityAiService';
 import { generateDallEImage, editDallEImage } from '../../services/openaiService'; 
 import { generateDeepSeekImage, refineDeepSeekImage } from '../../services/deepseekService'; 
-import { delay, dataUrlToBlob, isSubscribed } from '../../utils'; 
-import UpgradePrompt from '../UpgradePrompt';
+import { delay, dataUrlToBlob } from '../../utils';
 import { logApiCall, logImageGenerated } from '../../services/usageService';
 import { ApiKeyStorage } from '../../utils/apiKeyStorage';
 
@@ -42,7 +41,6 @@ const parseDataUrl = (dataUrl: string): { base64: string; mimeType: string } | n
 const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
   apiSettings, moduleState, setModuleState, currentUser
 }) => {
-  const hasActiveSubscription = isSubscribed(currentUser);
   const {
     activeTab, selectedArtStyle, aspectRatio, imageEngine, imageCount,
     stabilityApiKey, chatGptApiKey, deepSeekImageApiKey, 
@@ -591,7 +589,6 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
 
   return (
     <ModuleContainer title="🎨 Xưởng Tạo Ảnh AI">
-      {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <p><strong>�� Hướng dẫn:</strong> Chọn chế độ tạo ảnh mong muốn từ các tab bên dưới.</p>
         <p className="mt-1">
@@ -739,7 +736,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
             </div>
             <button 
                 onClick={() => executeImageGenerationFromHook(false)} 
-                disabled={!hasActiveSubscription || isProcessing || isRefining || !hookText.trim()} 
+                disabled={isProcessing || isRefining || !hookText.trim()} 
                 className="w-full bg-gradient-to-r from-blue-600 to-sky-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
                 🚀 Bắt đầu Tạo Ảnh Từ Hook/Truyện
@@ -805,7 +802,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
             </div>
             <button 
                 onClick={() => executeImageGenerationFromHook(true)} 
-                disabled={!hasActiveSubscription || isProcessing || isRefining || !hookText.trim()} 
+                disabled={isProcessing || isRefining || !hookText.trim()} 
                 className="w-full bg-gradient-to-r from-teal-600 to-emerald-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
                 🚀 Bắt đầu Tạo Ảnh (Ngữ Cảnh Thông minh)
@@ -873,7 +870,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
             </div>
              <button 
                 onClick={handleGenerateIntelligentContextPromptsOnly} 
-                disabled={!hasActiveSubscription || isProcessing || isRefining || !hookTextForCtxPrompts.trim()} 
+                disabled={isProcessing || isRefining || !hookTextForCtxPrompts.trim()} 
                 className="w-full bg-gradient-to-r from-green-600 to-lime-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
                 🚀 Tạo Danh Sách Prompt (Ngữ Cảnh Thông minh)
@@ -924,7 +921,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
             </div>
             <button 
                 onClick={handleGenerateBatchImages} 
-                disabled={!hasActiveSubscription || isProcessing || isRefining || !promptsInput.trim()} 
+                disabled={isProcessing || isRefining || !promptsInput.trim()} 
                 className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
                 🚀 Bắt đầu Tạo Ảnh Hàng Loạt
@@ -1018,7 +1015,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
                         </button>
                         <button
                             onClick={handleRefineImage}
-                            disabled={!hasActiveSubscription || isRefining || !refinementPrompt.trim()}
+                            disabled={isRefining || !refinementPrompt.trim()}
                             className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50"
                         >
                             Bắt đầu Tinh Chỉnh

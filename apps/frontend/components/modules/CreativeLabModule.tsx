@@ -14,8 +14,7 @@ import LoadingSpinner from '../LoadingSpinner'; // Re-add
 import ErrorAlert from '../ErrorAlert';     // Re-add
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/textGenerationService'; // Use the generic text generation service
-import { delay, isSubscribed } from '../../utils';
-import UpgradePrompt from '../UpgradePrompt';
+import { delay } from '../../utils';
 
 
 interface CreativeLabModuleProps {
@@ -37,7 +36,6 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
   setOutlineForSuperAgent,
   currentUser
 }) => {
-  const hasActiveSubscription = isSubscribed(currentUser);
 
   const {
     // Common settings
@@ -503,7 +501,7 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
             </fieldset>
             <button 
                 onClick={handleGenerateQuickOutline} 
-                disabled={!hasActiveSubscription || quickOutlineLoading} 
+                disabled={quickOutlineLoading} 
                 className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               🚀 Tạo Dàn Ý Nhanh
@@ -515,8 +513,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
                 <h3 className="text-lg font-semibold mb-2 text-gray-700">Dàn Ý Nhanh Đã Tạo:</h3>
                 <textarea value={quickOutlineResult} readOnly rows={15} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white whitespace-pre-wrap leading-relaxed"></textarea>
                 <div className="mt-4 space-x-3">
-                  <button onClick={() => sendOutlineToModule(quickOutlineResult, ActiveModule.WriteStory)} disabled={!hasActiveSubscription} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">Gửi đến Module Viết Truyện</button>
-                  <button onClick={() => sendOutlineToModule(quickOutlineResult, ActiveModule.SuperAgent)} disabled={!hasActiveSubscription} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50">Gửi đến Siêu Trợ Lý AI</button>
+                  <button onClick={() => sendOutlineToModule(quickOutlineResult, ActiveModule.WriteStory)} disabled={false} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">Gửi đến Module Viết Truyện</button>
+                  <button onClick={() => sendOutlineToModule(quickOutlineResult, ActiveModule.SuperAgent)} disabled={false} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50">Gửi đến Siêu Trợ Lý AI</button>
                   <button id="copyQuickOutlineBtn" onClick={() => copyToClipboard(quickOutlineResult, "copyQuickOutlineBtn")} className="mt-2 px-3 py-1 bg-teal-500 text-white text-xs rounded-lg hover:bg-teal-600">
                     📋 Sao chép Dàn Ý Nhanh
                   </button>
@@ -534,7 +532,7 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
                     <h4 className="text-md font-semibold text-yellow-800 mb-2">Phân Tích Dàn Ý Tham Khảo</h4>
                     <button
                         onClick={handleAnalyzeReferenceOutline}
-                        disabled={!hasActiveSubscription || !moduleState.referenceViralOutline || moduleState.isAnalyzingReferenceOutline}
+                        disabled={!moduleState.referenceViralOutline || moduleState.isAnalyzingReferenceOutline}
                         className="w-full mb-3 bg-yellow-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md hover:bg-yellow-600 transition-opacity disabled:opacity-50"
                     >
                        🔬 Chỉ Phân Tích Dàn Ý Tham Khảo Này
@@ -566,7 +564,7 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
             </fieldset>
             <button 
                 onClick={handleGenerateSingleOutlineInDepth} 
-                disabled={!hasActiveSubscription || singleOutlineLoading || moduleState.isAnalyzingReferenceOutline} 
+                disabled={singleOutlineLoading || moduleState.isAnalyzingReferenceOutline} 
                 className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               💡 Tạo Dàn Ý Lẻ (Chuyên Sâu) Mới
@@ -578,8 +576,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
                 <h3 className="text-lg font-semibold mb-2 text-gray-700">Dàn Ý Chuyên Sâu Mới Đã Tạo:</h3>
                 <textarea value={finalOutline} readOnly rows={15} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white whitespace-pre-wrap leading-relaxed"></textarea>
                 <div className="mt-4 space-x-3">
-                  <button onClick={() => sendOutlineToModule(finalOutline, ActiveModule.WriteStory)} disabled={!hasActiveSubscription} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">Gửi đến Module Viết Truyện</button>
-                  <button onClick={() => sendOutlineToModule(finalOutline, ActiveModule.SuperAgent)} disabled={!hasActiveSubscription} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50">Gửi đến Siêu Trợ Lý AI</button>
+                  <button onClick={() => sendOutlineToModule(finalOutline, ActiveModule.WriteStory)} disabled={false} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">Gửi đến Module Viết Truyện</button>
+                  <button onClick={() => sendOutlineToModule(finalOutline, ActiveModule.SuperAgent)} disabled={false} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50">Gửi đến Siêu Trợ Lý AI</button>
                    <button id="copySingleOutlineBtn" onClick={() => copyToClipboard(finalOutline, "copySingleOutlineBtn")} className="mt-2 px-3 py-1 bg-teal-500 text-white text-xs rounded-lg hover:bg-teal-600">
                     📋 Sao chép Dàn Ý Chuyên Sâu
                   </button>
@@ -624,7 +622,7 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
             </div>
             <button 
                 onClick={handleGenerateBatchOutlines} 
-                disabled={!hasActiveSubscription || batchOutlineLoading || batchCoreIdeas.every(idea => !idea.trim())} 
+                disabled={batchOutlineLoading || batchCoreIdeas.every(idea => !idea.trim())} 
                 className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               💡 Bắt đầu Tạo Dàn Ý Hàng Loạt

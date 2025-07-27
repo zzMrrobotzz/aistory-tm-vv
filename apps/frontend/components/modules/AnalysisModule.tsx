@@ -6,8 +6,6 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/textGenerationService'; // Corrected import path
-import { isSubscribed } from '../../utils';
-import UpgradePrompt from '../UpgradePrompt';
 
 
 interface AnalysisModuleProps {
@@ -18,7 +16,6 @@ interface AnalysisModuleProps {
 }
 
 const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleState, setModuleState, currentUser }) => {
-  const hasActiveSubscription = isSubscribed(currentUser);
   const {
     sourceText, analysisFactors, suggestions, improvedStory, viralOutlineAnalysisResult,
     loadingMessage, errorAnalysis, errorImprovement, errorViralOutline
@@ -212,7 +209,6 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
 
   return (
     <ModuleContainer title="✨ Module: Phân Tích Truyện & ADN Viral">
-      {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <ul className="list-disc list-inside space-y-1">
             <li><strong>Phân tích tiêu chuẩn:</strong> Đánh giá các yếu tố văn học và nhận gợi ý cải thiện chung.</li>
@@ -230,21 +226,21 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
             <button 
                 onClick={handleAnalyze} 
-                disabled={!hasActiveSubscription || !!loadingMessage} 
+                disabled={!!loadingMessage} 
                 className="w-full bg-gradient-to-r from-indigo-600 to-purple-500 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50 text-sm"
             >
                 🔬 Phân tích Tiêu chuẩn
             </button>
             <button 
                 onClick={handleAnalyzeViralOutline} 
-                disabled={!hasActiveSubscription || !!loadingMessage} 
+                disabled={!!loadingMessage} 
                 className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50 text-sm"
             >
                 🧬 Phân tích Dàn Ý Viral
             </button>
             <button 
                 onClick={handleGetGeminiSuggestions} 
-                disabled={!hasActiveSubscription || !!loadingMessage} 
+                disabled={!!loadingMessage} 
                 className="w-full md:col-span-2 lg:col-span-1 bg-gradient-to-r from-blue-500 to-teal-500 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50 text-sm"
             >
                 ✨ Đề xuất Cải tiến (Gemini)
@@ -287,7 +283,7 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
                 <h3 className="text-lg font-semibold mb-2 text-gray-700">Gợi ý Cải thiện (từ Phân tích Tiêu Chuẩn hoặc Gemini):</h3>
                 <div className={`p-3 border ${improvedStory ? 'border-yellow-200 text-yellow-800' : 'border-indigo-200 text-indigo-800'} rounded-md text-sm whitespace-pre-wrap leading-relaxed`}>{suggestions}</div>
                 {!improvedStory && (
-                  <button onClick={handleImproveStory} disabled={!hasActiveSubscription || !!loadingMessage} className="mt-4 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 disabled:opacity-50">
+                  <button onClick={handleImproveStory} disabled={!!loadingMessage} className="mt-4 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 disabled:opacity-50">
                       🚀 Bắt đầu Cải thiện dựa trên gợi ý này
                   </button>
                 )}

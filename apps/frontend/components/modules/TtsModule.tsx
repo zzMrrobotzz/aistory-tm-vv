@@ -9,9 +9,8 @@ import { fetchGoogleCloudVoices, generateGoogleCloudSpeech } from '@/services/go
 import { fetchAmazonPollyVoices, generateAmazonPollySpeech } from '@/services/amazonPollyService';
 import { generateOpenAiSpeech } from '../../services/openaiService';
 import { fetchElevenLabsUser, fetchElevenLabsVoices, generateElevenLabsSpeech } from '../../services/elevenLabsService';
-import { delay, isSubscribed } from '../../utils';
+import { delay } from '../../utils';
 import { FileDown, Square, Trash2, Settings, RefreshCw, CheckCircle, Download, Copy, Loader2, ClipboardCheck, AlertTriangle, Key, Save, CheckCircle2, XCircle } from 'lucide-react';
-import UpgradePrompt from '../UpgradePrompt';
 
 
 interface TtsModuleProps {
@@ -28,7 +27,6 @@ function isElevenLabsVoice(voice: any): voice is ElevenLabsVoice { return voice 
 const TtsModule: React.FC<TtsModuleProps> = ({ 
   moduleState, setModuleState, currentUser
 }) => {
-  const hasActiveSubscription = isSubscribed(currentUser);
   const {
     selectedProvider, googleCloudApiKey, amazonAccessKeyId, amazonSecretAccessKey, amazonRegion,
     chatGptApiKey, elevenLabsApiKeys, modelId, subtitleLines, voices, selectedVoiceId,
@@ -359,7 +357,6 @@ const TtsModule: React.FC<TtsModuleProps> = ({
 
     return (
         <ModuleContainer title="🎙️ Đọc Truyện AI (TTS)">
-            {!hasActiveSubscription && <UpgradePrompt />}
             <InfoBox>
                 <p>Chuyển đổi văn bản thành giọng nói chất lượng cao. Hỗ trợ nhiều nhà cung cấp AI.</p>
                 <p className="mt-2 text-blue-800 bg-blue-100 p-2 rounded-md text-sm">
@@ -410,7 +407,7 @@ const TtsModule: React.FC<TtsModuleProps> = ({
                                     return <option key={voiceId} value={voiceId}>{label}</option>
                                 })}
                             </select>
-                             <button onClick={() => handleFetchVoices()} disabled={!hasActiveSubscription || isFetchingVoices || isProcessing} className="px-3 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 disabled:bg-gray-400">
+                             <button onClick={() => handleFetchVoices()} disabled={isFetchingVoices || isProcessing} className="px-3 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 disabled:bg-gray-400">
                                 {isFetchingVoices ? <Loader2 className="animate-spin" size={16}/> : <RefreshCw size={16}/>}
                             </button>
                         </div>
@@ -451,8 +448,8 @@ const TtsModule: React.FC<TtsModuleProps> = ({
                          <h3 className="font-semibold text-gray-700 mb-2">3. Nhập và Phân Đoạn Văn Bản</h3>
                         <textarea value={mainText} onChange={e => updateState({ mainText: e.target.value })} rows={8} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Dán hoặc nhập văn bản của bạn vào đây..." disabled={isProcessing}/>
                          <div className="mt-4 flex flex-col sm:flex-row gap-4">
-                            <button onClick={handleSplitText} disabled={!hasActiveSubscription || isProcessing || !mainText.trim()} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400">Phân đoạn Văn bản</button>
-                             <button onClick={handleProcessAll} disabled={!hasActiveSubscription || isProcessing || subtitleLines.filter(l=>l.status !== 'done').length === 0} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400">Bắt đầu Tạo Audio</button>
+                            <button onClick={handleSplitText} disabled={isProcessing || !mainText.trim()} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400">Phân đoạn Văn bản</button>
+                             <button onClick={handleProcessAll} disabled={isProcessing || subtitleLines.filter(l=>l.status !== 'done').length === 0} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400">Bắt đầu Tạo Audio</button>
                              {isProcessing && (<button onClick={handleCancelProcessing} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"><Square size={16}/></button>)}
                          </div>
                     </div>
@@ -501,8 +498,8 @@ const TtsModule: React.FC<TtsModuleProps> = ({
                          </div>
                          {subtitleLines.some(l => l.status === 'done') && (
                              <div className="mt-4 flex flex-col sm:flex-row gap-4">
-                                <button onClick={handleMergeAndDownload} className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50" disabled={!hasActiveSubscription}>Hợp nhất & Tải tất cả</button>
-                                <button onClick={handleDownloadSrt} className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 disabled:opacity-50" disabled={!hasActiveSubscription}>Tải file .SRT</button>
+                                <button onClick={handleMergeAndDownload} className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50" disabled={false}>Hợp nhất & Tải tất cả</button>
+                                <button onClick={handleDownloadSrt} className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 disabled:opacity-50" disabled={false}>Tải file .SRT</button>
                                 <button onClick={handleReset} className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200"><Trash2 size={16} className="inline-block mr-1"/>Xóa & Làm lại</button>
                              </div>
                          )}

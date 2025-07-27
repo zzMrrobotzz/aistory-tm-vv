@@ -8,8 +8,6 @@ import InfoBox from '../InfoBox';
 import { generateImage } from '../../services/geminiService';
 import { generateText } from '@/services/textGenerationService';
 import { delay } from '../../utils'; // Added delay import
-import UpgradePrompt from '../UpgradePrompt';
-import { isSubscribed } from '../../utils';
 
 interface SuperAgentModuleProps {
   apiSettings: ApiSettings;
@@ -119,11 +117,9 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
     }
   };
   
-  const hasActiveSubscription = isSubscribed(currentUser);
 
   return (
     <ModuleContainer title="🚀 Siêu Trợ Lý AI: Từ Ý Tưởng Đến Sản Phẩm">
-      {!hasActiveSubscription && <UpgradePrompt />}
       <InfoBox>
         <strong>💡 Hướng dẫn:</strong> Nhập ý tưởng, thiết lập các tùy chọn và để Siêu Trợ Lý tự động thực hiện toàn bộ quy trình. Dàn ý từ "Xây Dựng Truyện" sẽ được tự động điền vào đây.
       </InfoBox>
@@ -180,7 +176,7 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={!hasActiveSubscription || !sourceText}
+            disabled={ !sourceText}
             className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity"
           >
             🚀 Bắt Đầu Quy Trình
