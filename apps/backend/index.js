@@ -20,8 +20,8 @@ const keysRouter = require('./routes/keys');
 const adminKeysRouter = require('./routes/adminKeys');
 
 // --- Enhanced Subscription System ---
-// const authEnhancedRouter = require('./routes/authEnhanced'); // Temporarily disabled for deploy fix
-// const SubscriptionHealthChecker = require('./services/subscriptionHealthChecker'); // Temporarily disabled for deploy fix
+const authEnhancedRouter = require('./routes/authEnhanced');
+const SubscriptionHealthChecker = require('./services/subscriptionHealthChecker');
 const adminProxiesRouter = require('./routes/adminProxies');
 const paymentRouter = require('./routes/payment');
 const packagesRouter = require('./routes/packages');
@@ -474,7 +474,7 @@ app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment ma
 app.use('/api/admin/anti-sharing', require('./routes/adminAntiSharing')); // Anti-sharing management
 app.use('/api/ai', aiProxyRouter);
 app.use('/api/auth', require('./routes/auth'));
-// app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution - temporarily disabled
+app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution
 app.use('/api/user', require('./routes/userStats')); // User statistics
 
 // --- Root and Server Start ---
@@ -492,8 +492,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'ai-story-backend' });
 });
 
-// Subscription health check endpoint (admin only) - temporarily disabled for deploy fix
-/*
+// Subscription health check endpoint (admin only)
 app.get('/api/admin/subscription-health', async (req, res) => {
   try {
     const healthChecker = new SubscriptionHealthChecker();
@@ -516,7 +515,6 @@ app.get('/api/admin/subscription-health', async (req, res) => {
     });
   }
 });
-*/
 
 const PORT = process.env.PORT || 3001; // Changed default to 3001 for consistency
 
