@@ -319,12 +319,12 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
             let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
             
             const levelDescriptions: {[key: number]: string} = {
-                0: 'only fix spelling and grammar. Keep the original story 100%.',
-                25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning and plot.',
-                50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but MUST keep the main character names and core plot points.',
-                75: 'creatively reimagine the story. You can change character names and some settings. The plot may have new developments, but it MUST retain the spirit of the original script.',
-                100: 'completely rewrite into a new script. Only retain the "soul" (core idea, main theme) of the original story.'
-            };
+                    0: 'only fix spelling and grammar. Keep the original story 100%.',
+                    25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning, plot, character names, locations, and logical flow of events.',
+                    50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but you MUST keep the main characters, locations, and core plot points perfectly consistent. The logic of the situations must be preserved.',
+                    75: 'creatively reimagine the story with new descriptions and developments. However, you MUST maintain the original main characters, the core plot, and the logical consistency of events. Do not change character names or the fundamental sequence of events unless specified in the replacement rules.',
+                    100: 'completely rewrite into a new script, keeping only the "soul" (core idea, main theme) of the original story. While you have maximum creative freedom, the final story must be internally consistent with its own logic, characters, and events from beginning to end.'
+                };
             const descriptionKey = Math.round(rewriteLevel / 25) * 25;
             const levelDescription = levelDescriptions[descriptionKey];
 
@@ -405,41 +405,82 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetLanguage, sourceLanguage]);
 
+    // New helper function to create a replacement map for entities
+    const createReplacementMap = async (text: string, targetLang: string): Promise<Record<string, string>> => {
+        setModuleState(prev => ({ ...prev, loadingMessage: 'Bước 1/4: Phân tích và tạo bản đồ thay thế...' }));
+        const targetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === targetLang)?.label || targetLang;
+
+        const prompt = `Analyze the following text to identify all primary entities (main characters, significant locations). Your task is to create a JSON map of these entities to new, culturally appropriate names for a ${targetLangLabel}-speaking audience.\n\n**Rules:**\n1.  Identify 3-5 of the most important entities.\n2.  The new names must be consistent and sound natural in ${targetLangLabel}.\n3.  Return ONLY a valid JSON object mapping the original name to the new name. Example: {"Anna": "Jessica", "Paris": "the City of Lights"}.\n\n**Text to Analyze:**\n---\n${text}\n---\n`;
+        try {
+            const result = await generateText(prompt, undefined, false, apiSettings);
+            // Basic JSON parsing, can be made more robust
+            const jsonResponse = JSON.parse(result.text.trim());
+            console.log("Generated Replacement Map:", jsonResponse);
+            return jsonResponse;
+        } catch (error) {
+            console.error("Could not create replacement map, proceeding without it.", error);
+            setModuleState(prev => ({ ...prev, loadingMessage: 'Không thể tạo bản đồ thay thế, sẽ tiếp tục viết lại bình thường...' }));
+            await delay(1500); // Give user time to see the message
+            return {}; // Return empty map on error
+        }
+    };
+
     const handleSingleRewrite = async () => {
-         if (!originalText.trim()) {
+        if (!originalText.trim()) {
             setModuleState(prev => ({ ...prev, error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' }));
             return;
         }
         setModuleState(prev => ({ ...prev, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false }));
         
-        // Create new AbortController for this operation
         abortControllerRef.current = new AbortController();
         
-        const CHUNK_CHAR_COUNT = 4000;
-        // Use minimum chunks for better progress visualization
-        const numChunks = Math.max(3, Math.ceil(originalText.length / CHUNK_CHAR_COUNT));
+        let replacementMap: Record<string, string> = {};
         let fullRewrittenText = '';
 
         try {
+            // STEP 1: Create Replacement Map (if applicable)
+            if (rewriteLevel >= 75) {
+                replacementMap = await createReplacementMap(originalText, targetLanguage);
+            }
+
+            // STEP 2 & 3: Rewrite text chunk by chunk with enhanced prompts
+            const CHUNK_CHAR_COUNT = 4000;
+            const numChunks = Math.max(3, Math.ceil(originalText.length / CHUNK_CHAR_COUNT));
+
             for (let i = 0; i < numChunks; i++) {
-                // Check if operation was aborted
                 if (abortControllerRef.current?.signal.aborted) {
                     setModuleState(prev => ({ ...prev, loadingMessage: 'Đã dừng!', progress: 0 }));
                     return;
                 }
-                // Update progress with more granular steps (leave 10% for completion)
-                const currentProgress = Math.round(((i + 1) / numChunks) * 90);
-                setModuleState(prev => ({ ...prev, progress: currentProgress, loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` }));
+                
+                const currentProgress = Math.round(((i + 1) / numChunks) * 100);
+                setModuleState(prev => ({ ...prev, progress: currentProgress, loadingMessage: `Bước 2/4: Đang viết lại phần ${i + 1}/${numChunks}...` }));
+                
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
                 
+                // --- Language-Specific Prompt Enhancement ---
+                let languageEnhancement = '';
+                if (targetLanguage === 'English') {
+                    languageEnhancement = `As a master storyteller, your writing must be fluid, engaging, and idiomatic for a native English-speaking audience. Pay close attention to natural sentence flow, sophisticated vocabulary, and compelling narrative structures. The final output must be of publishable quality.`;
+                } else if (targetLanguage === 'Vietnamese') {
+                    languageEnhancement = `Với vai trò là một nhà văn tài ba, văn bản viết lại phải mượt mà, giàu cảm xúc và tự nhiên theo văn phong kể chuyện của người Việt. Câu chữ phải chau chuốt, mạch lạc, có sức lôi cuốn.`;
+                }
+
+                // --- Replacement Rules ---
+                let replacementRules = '';
+                if (Object.keys(replacementMap).length > 0) {
+                    const rules = Object.entries(replacementMap).map(([key, value]) => `'${key}' is ALWAYS '${value}'`).join('. ');
+                    replacementRules = `\n- **CRITICAL REPLACEMENT RULES:** You MUST strictly adhere to this map: ${rules}. NO EXCEPTIONS.`;
+                }
+
                 let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
                 
                 const levelDescriptions: {[key: number]: string} = {
                     0: 'only fix spelling and grammar. Keep the original story 100%.',
-                    25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning and plot.',
-                    50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but MUST keep the main character names and core plot points.',
-                    75: 'creatively reimagine the story. You can change character names and some settings. The plot may have new developments, but it MUST retain the spirit of the original script.',
-                    100: 'completely rewrite into a new script. Only retain the "soul" (core idea, main theme) of the original story.'
+                    25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning, plot, character names, locations, and logical flow of events.',
+                    50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but you MUST keep the main characters, locations, and core plot points perfectly consistent. The logic of the situations must be preserved.',
+                    75: 'creatively reimagine the story with new descriptions and developments. However, you MUST maintain the original main characters, the core plot, and the logical consistency of events. Do not change character names or the fundamental sequence of events unless specified in the replacement rules.',
+                    100: 'completely rewrite into a new script, keeping only the "soul" (core idea, main theme) of the original story. While you have maximum creative freedom, the final story must be internally consistent with its own logic, characters, and events from beginning to end.'
                 };
                 const descriptionKey = Math.round(rewriteLevel / 25) * 25;
                 const levelDescription = levelDescriptions[descriptionKey];
@@ -452,56 +493,35 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                     localizationRequest = `\n- **Cultural Localization Required:** Deeply adapt the cultural context, social norms, proper names, and other details to make the story feel natural and appropriate for a ${selectedTargetLangLabel}-speaking audience.`;
                 }
 
-                let rewriteStyleInstructionPromptSegment = '';
+                let rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${effectiveStyle}.`;
                 if (rewriteStyle === 'custom') {
                     rewriteStyleInstructionPromptSegment = `Apply the following custom rewrite instructions: "${customRewriteStyle}"`;
-                } else {
-                    rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${effectiveStyle}.`;
                 }
 
-                const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
-
-**Instructions:**
-- **Source Language:** ${selectedSourceLangLabel}
-- **Target Language:** ${selectedTargetLangLabel}
-- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.
-- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}
-- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
-- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.
-${localizationRequest}
-
-**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**
----
-${fullRewrittenText || "This is the first chunk."}
----
-
-**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**
----
-${textChunk}
----
-
-**Your Task:**
-Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
-`;
+                const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.\n\n**Core Instructions:**\n- **Source Language:** ${selectedSourceLangLabel}\n- **Target Language:** ${selectedTargetLangLabel}\n- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.\n- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}\n- **Style Enhancement:** ${languageEnhancement}\n- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.\n- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.\n${localizationRequest}${replacementRules}\n\n**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**\n---\n${fullRewrittenText || "This is the first chunk."}\n---\n\n**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**\n---\n${textChunk}\n---\n\n**Your Task:**\nProvide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.\n`;
                 
-                await delay(500); // Simulate API call delay
+                await delay(500);
                 const result = await generateText(prompt, undefined, false, apiSettings);
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + (result?.text || '').trim();
-                setModuleState(prev => ({ ...prev, rewrittenText: fullRewrittenText })); // Update UI progressively
+                setModuleState(prev => ({ ...prev, rewrittenText: fullRewrittenText }));
             }
-            setModuleState(prev => ({ ...prev, rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 }));
+
+            setModuleState(prev => ({ ...prev, loadingMessage: 'Bước 3/4: Đã viết lại xong, chuẩn bị biên tập cuối cùng...', progress: 100 }));
+            await delay(1000);
+
+            // STEP 4: Automatic Post-Rewrite Edit
+            const finalText = await handlePostRewriteEdit(fullRewrittenText.trim());
+
+            setModuleState(prev => ({ ...prev, rewrittenText: finalText, loadingMessage: 'Hoàn thành!', progress: 100 }));
             
-            // Save to history on successful completion
-            if (fullRewrittenText.trim()) {
+            if (finalText) {
                 const title = `Viết lại - ${new Date().toLocaleString('vi-VN')}`;
-                HistoryStorage.saveToHistory(MODULE_KEYS.REWRITE, title, fullRewrittenText.trim());
+                HistoryStorage.saveToHistory(MODULE_KEYS.REWRITE, title, finalText);
             }
             
-            // Log usage statistics
-            logApiCall('rewrite', numChunks); // Log API calls used
-            logTextRewritten('rewrite', 1); // Log 1 text rewritten
+            logApiCall('rewrite', numChunks);
+            logTextRewritten('rewrite', 1);
             
-            // Reset progress to 0 after completion to enable button
             setTimeout(() => setModuleState(prev => ({ ...prev, progress: 0 })), 1500);
         } catch (e) {
             if (abortControllerRef.current?.signal.aborted) {
@@ -522,18 +542,19 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         }
     };
 
-    const handlePostRewriteEdit = async () => {
-         if (!rewrittenText.trim()) {
+    // This function is now called automatically after a successful rewrite.
+    const handlePostRewriteEdit = async (textToEdit: string) => {
+        if (!textToEdit.trim()) {
             setModuleState(prev => ({ ...prev, editError: 'Không có văn bản để tinh chỉnh.' }));
-            return;
+            return textToEdit; // Return original text if empty
         }
-        setModuleState(prev => ({ ...prev, isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false }));
+        setModuleState(prev => ({ ...prev, isEditing: true, editError: null, editLoadingMessage: 'Đang thực hiện biên tập cuối cùng...' }));
         
         const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
 
 **Text to Edit:**
 ---
-${rewrittenText}
+${textToEdit}
 ---
 
 **Editing Instructions:**
@@ -549,12 +570,15 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         
         try {
             const result = await generateText(editPrompt, undefined, false, apiSettings);
-            setModuleState(prev => ({ ...prev, rewrittenText: result?.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true }));
+            const editedText = result?.text || '';
+            setModuleState(prev => ({ ...prev, rewrittenText: editedText, isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true }));
             
             // Log usage statistics for post-edit
             logApiCall('rewrite', 1); // Log 1 additional API call for editing
+            return editedText;
         } catch (e) {
             setModuleState(prev => ({ ...prev, editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' }));
+            return textToEdit; // Return original text on error
         } finally {
              setTimeout(() => setModuleState(prev => ({ ...prev, editLoadingMessage: null })), 3000);
         }
@@ -703,7 +727,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     Xóa hết
                                 </button>
-                            </div>
+                            }
 
                             {/* Current Processing Status */}
                             {moduleState.queueSystem.currentItem && (
@@ -852,11 +876,11 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                                 Sao chép
                             </button>
                             <button 
-                                onClick={handlePostRewriteEdit} 
+                                onClick={() => handlePostRewriteEdit(rewrittenText)} 
                                 disabled={!hasActiveSubscription || anyLoading}
                                 className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50"
                             >
-                                Biên Tập & Tinh Chỉnh
+                                Biên Tập Lại (Thủ công)
                             </button>
                             <button 
                                 onClick={handleTranslateRewrittenText} 
@@ -925,7 +949,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                                                 {item.originalText}
                                             </div>
                                         </details>
-                                    </div>
+                                    }
 
                                     {/* Show result for completed items */}
                                     {item.status === 'completed' && item.rewrittenText && (
