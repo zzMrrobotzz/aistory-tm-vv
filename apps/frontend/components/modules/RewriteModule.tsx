@@ -727,7 +727,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     Xóa hết
                                 </button>
-                            }
+                            </div>
 
                             {/* Current Processing Status */}
                             {moduleState.queueSystem.currentItem && (
@@ -949,7 +949,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                                                 {item.originalText}
                                             </div>
                                         </details>
-                                    }
+                                    </div>
 
                                     {/* Show result for completed items */}
                                     {item.status === 'completed' && item.rewrittenText && (
