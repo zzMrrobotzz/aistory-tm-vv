@@ -410,11 +410,40 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         setModuleState(prev => ({ ...prev, loadingMessage: 'Bước 1/4: Phân tích và tạo bản đồ thay thế...' }));
         const targetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === targetLang)?.label || targetLang;
 
-        const prompt = `Analyze the following text to identify all primary entities (main characters, significant locations). Your task is to create a JSON map of these entities to new, culturally appropriate names for a ${targetLangLabel}-speaking audience.\n\n**Rules:**\n1.  Identify 3-5 of the most important entities.\n2.  The new names must be consistent and sound natural in ${targetLangLabel}.\n3.  Return ONLY a valid JSON object mapping the original name to the new name. Example: {"Anna": "Jessica", "Paris": "the City of Lights"}.\n\n**Text to Analyze:**\n---\n${text}\n---\n`;
+        const prompt = `Analyze the following text to identify all primary entities (main characters, significant locations). Your task is to create a JSON map of these entities to new, culturally appropriate names for a ${targetLangLabel}-speaking audience.
+
+**Rules:**
+1. Identify 3-5 of the most important entities only
+2. The new names must be consistent and sound natural in ${targetLangLabel}
+3. Return ONLY a valid JSON object with no additional text, explanations, or markdown formatting
+4. Example format: {"Anna": "Jessica", "Paris": "the City of Lights"}
+
+**CRITICAL: Your response must be ONLY the JSON object, nothing else.**
+
+**Text to Analyze:**
+---
+${text}
+---
+
+JSON Response:`;
         try {
             const result = await generateText(prompt, undefined, false, apiSettings);
-            // Basic JSON parsing, can be made more robust
-            const jsonResponse = JSON.parse(result.text.trim());
+            
+            // Extract JSON from markdown format or plain text
+            let jsonText = result.text.trim();
+            
+            // Remove markdown code blocks if present
+            const jsonMatch = jsonText.match(/```(?:json)?\s*(\{.*?\})\s*```/s) || 
+                             jsonText.match(/(\{.*?\})/s);
+            
+            if (jsonMatch) {
+                jsonText = jsonMatch[1];
+            }
+            
+            // Clean up common formatting issues
+            jsonText = jsonText.replace(/^\s*```json\s*/, '').replace(/\s*```\s*$/, '');
+            
+            const jsonResponse = JSON.parse(jsonText);
             console.log("Generated Replacement Map:", jsonResponse);
             return jsonResponse;
         } catch (error) {
