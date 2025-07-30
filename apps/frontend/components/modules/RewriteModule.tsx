@@ -284,11 +284,7 @@ Chỉ trả về JSON.`;
                                 averageProcessingTime: 
                                     (prev.queueSystem.averageProcessingTime + processingTime) / 2,
                             },
-                            queue: prev.queue.map(item =>
-                                item.id === currentItem.id
-                                    ? { ...item, status: 'completed' as const, completedAt: new Date(), progress: 100 }
-                                    : item
-                            ),
+                            // Don't update queue here - it's already updated in processQueueItem
                         };
 
                         // Check if there are more waiting items
@@ -495,7 +491,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             }
         }
         
-        // Update final result with statistics
+        // Update final result with statistics and COMPLETE status
         setModuleState(prev => ({
             ...prev,
             queue: prev.queue.map(qItem =>
@@ -504,7 +500,10 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                         ...qItem, 
                         rewrittenText: finalRewrittenText,
                         wordStats: wordStats,
-                        storyQualityStats: storyQualityStats
+                        storyQualityStats: storyQualityStats,
+                        progress: 100, // IMPORTANT: Set to 100% when complete
+                        status: 'completed' as const, // IMPORTANT: Mark as completed
+                        completedAt: new Date() // IMPORTANT: Set completion timestamp
                     }
                     : qItem
             ),
@@ -655,8 +654,16 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                     setModuleState(prev => ({ ...prev, storyQualityAnalysis: qualityStats }));
                 } catch (error) {
                     console.error('Story quality analysis failed for single rewrite:', error);
+                    // Continue without analysis but show completion
                 }
             }
+            
+            // IMPORTANT: Reset loading state after analysis completes (regardless of success/failure)
+            setModuleState(prev => ({ 
+                ...prev, 
+                loadingMessage: null, // Clear loading message immediately
+                progress: 0 // Reset progress
+            }));
             
             // Save to history AFTER analysis is complete
             if (fullRewrittenText.trim()) {
@@ -681,7 +688,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             logApiCall('rewrite', numChunks);
             logTextRewritten('rewrite', 1);
             
-            setTimeout(() => setModuleState(prev => ({ ...prev, progress: 0 })), 1500);
+            // Progress already reset above, no need for additional timeout
         } catch (e) {
             if (abortControllerRef.current?.signal.aborted) {
                 setModuleState(prev => ({ ...prev, error: `Viết lại đã bị hủy.`, loadingMessage: 'Đã hủy.', progress: 0 }));
@@ -690,7 +697,14 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             }
         } finally {
             abortControllerRef.current = null;
-            setTimeout(() => setModuleState(prev => (prev.loadingMessage?.includes("Hoàn thành") || prev.loadingMessage?.includes("Lỗi") || prev.loadingMessage?.includes("hủy")) ? {...prev, loadingMessage: null} : prev), 3000);
+            // Clear any lingering loading messages after a short delay
+            setTimeout(() => {
+                setModuleState(prev => ({
+                    ...prev, 
+                    loadingMessage: null,
+                    progress: 0
+                }));
+            }, 2000);
         }
     };
 
