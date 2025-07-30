@@ -5,6 +5,26 @@ export interface HistoryItem {
   content: string;
   createdAt: string;
   module: string;
+  metadata?: {
+    storyQualityStats?: {
+      consistencyScore: number;
+      completenessScore: number;
+      overallQualityScore: number;
+      analysis: {
+        characterConsistency: string;
+        plotCoherence: string;
+        timelineConsistency: string;
+        settingConsistency: string;
+        overallAssessment: string;
+      };
+    };
+    wordStats?: {
+      originalWords: number;
+      rewrittenWords: number;
+      wordsChanged: number;
+      changePercentage: number;
+    };
+  };
 }
 
 const HISTORY_KEY_PREFIX = 'ai_story_history_';
@@ -12,7 +32,7 @@ const MAX_HISTORY_ITEMS = 5;
 
 export const HistoryStorage = {
   // Save a new item to history for specific module
-  saveToHistory: (moduleKey: string, title: string, content: string): void => {
+  saveToHistory: (moduleKey: string, title: string, content: string, metadata?: any): void => {
     const historyKey = `${HISTORY_KEY_PREFIX}${moduleKey}`;
     const existingHistory = HistoryStorage.getHistory(moduleKey);
     
@@ -21,7 +41,8 @@ export const HistoryStorage = {
       title: title || 'Không có tiêu đề',
       content,
       createdAt: new Date().toISOString(),
-      module: moduleKey
+      module: moduleKey,
+      ...(metadata && { metadata })
     };
     
     // Add to beginning of array and limit to MAX_HISTORY_ITEMS

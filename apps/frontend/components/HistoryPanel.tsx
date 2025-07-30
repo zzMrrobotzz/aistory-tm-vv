@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, Trash2, Clock, Copy, Eye, Download, MoreVertical } from 'lucide-react';
+import { History, Trash2, Clock, Copy, Eye, Download } from 'lucide-react';
 import { HistoryStorage, HistoryItem } from '../utils/historyStorage';
 import { downloadUtils } from '../utils/downloadUtils';
 import ArticleDetailModal from './ArticleDetailModal';
@@ -164,6 +164,50 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ moduleKey, onSelectHistory 
                     <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                       {truncateContent(item.content)}
                     </p>
+                    
+                    {/* Display quality stats if available */}
+                    {item.metadata?.storyQualityStats && (
+                      <div className="mb-2 p-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded border border-purple-100">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-purple-700">🎯 Chất lượng:</span>
+                          <span className="font-bold text-indigo-700">{item.metadata.storyQualityStats.overallQualityScore}%</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 mt-1 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Nhất quán:</span>
+                            <span className="font-semibold text-purple-600">{item.metadata.storyQualityStats.consistencyScore}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Hoàn thiện:</span>
+                            <span className="font-semibold text-pink-600">{item.metadata.storyQualityStats.completenessScore}%</span>
+                          </div>
+                        </div>
+                        {/* Mini progress bar for overall quality */}
+                        <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                          <div 
+                            className="bg-indigo-600 h-1 rounded-full transition-all duration-300" 
+                            style={{ width: `${item.metadata.storyQualityStats.overallQualityScore}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Display word stats if available */}
+                    {item.metadata?.wordStats && (
+                      <div className="mb-2 p-2 bg-blue-50 rounded border border-blue-100">
+                        <div className="grid grid-cols-2 gap-1 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Từ gốc:</span>
+                            <span className="font-semibold">{item.metadata.wordStats.originalWords.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">% thay đổi:</span>
+                            <span className="font-semibold text-orange-600">{item.metadata.wordStats.changePercentage}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center text-xs text-gray-500">
                       <Clock className="w-3 h-3 mr-1" />
                       {formatDate(item.createdAt)}
@@ -171,6 +215,13 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ moduleKey, onSelectHistory 
                   </div>
                   
                   <div className="flex items-center space-x-1 ml-2">
+                    <button
+                      onClick={() => onSelectHistory(item.content)}
+                      className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded"
+                      title="Chọn làm nội dung"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
                     <button
                       onClick={() => handleViewArticle(item)}
                       className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded"

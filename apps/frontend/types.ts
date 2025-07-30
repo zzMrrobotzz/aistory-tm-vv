@@ -266,6 +266,18 @@ export interface RewriteQueueItem {
         wordsChanged: number;
         changePercentage: number;
     };
+    storyQualityStats?: {
+        consistencyScore: number; // 0-100%
+        completenessScore: number; // 0-100%
+        overallQualityScore: number; // 0-100%
+        analysis: {
+            characterConsistency: string;
+            plotCoherence: string;
+            timelineConsistency: string;
+            settingConsistency: string;
+            overallAssessment: string;
+        };
+    };
 }
 
 // WriteStory Queue Item
@@ -338,6 +350,18 @@ export interface RewriteModuleState {
     editError: string | null;
     editLoadingMessage: string | null;
     hasBeenEdited: boolean;
+    storyQualityAnalysis?: {
+        consistencyScore: number;
+        completenessScore: number;
+        overallQualityScore: number;
+        analysis: {
+            characterConsistency: string;
+            plotCoherence: string;
+            timelineConsistency: string;
+            settingConsistency: string;
+            overallAssessment: string;
+        };
+    };
     translation: {
         translatedText: string | null;
         isTranslating: boolean;
