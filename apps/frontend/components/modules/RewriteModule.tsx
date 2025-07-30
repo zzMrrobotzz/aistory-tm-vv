@@ -116,6 +116,8 @@ ${rewrittenText}
 - **completenessScore**: Độ hoàn thiện của cốt truyện, có đầu-giữa-cuối rõ ràng (0-100%)  
 - **overallQualityScore**: Chất lượng tổng thể = (consistencyScore + completenessScore)/2
 
+**LƯU Ý**: Hãy đánh giá nghiêm túc và chính xác. Điểm số phải phản ánh thực tế chất lượng văn bản.
+
 Chỉ trả về JSON, không thêm bất kỳ text nào khác.`;
 
             const result = await generateText(analysisPrompt, undefined, false, apiSettings);
@@ -635,23 +637,26 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             setModuleState(prev => ({ ...prev, rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 }));
             
             // Analyze story quality for single rewrite (only for substantial content)
+            let qualityStats = null;
             if (fullRewrittenText.trim().length > 500) {
                 setModuleState(prev => ({ ...prev, loadingMessage: 'Đang phân tích chất lượng câu chuyện...' }));
                 try {
-                    const qualityStats = await analyzeStoryQuality(originalText, fullRewrittenText.trim());
+                    qualityStats = await analyzeStoryQuality(originalText, fullRewrittenText.trim());
                     setModuleState(prev => ({ ...prev, storyQualityAnalysis: qualityStats }));
                 } catch (error) {
                     console.error('Story quality analysis failed for single rewrite:', error);
                 }
             }
             
+            // Save to history AFTER analysis is complete
             if (fullRewrittenText.trim()) {
                 const title = `Viết lại - ${new Date().toLocaleString('vi-VN')}`;
                 const wordStats = calculateWordStats(originalText, fullRewrittenText.trim());
                 const metadata = {
                     wordStats,
-                    ...(moduleState.storyQualityAnalysis && { storyQualityStats: moduleState.storyQualityAnalysis })
+                    ...(qualityStats && { storyQualityStats: qualityStats })
                 };
+                console.log('📊 Saving to history with metadata:', { wordStats, qualityStats });
                 HistoryStorage.saveToHistory(MODULE_KEYS.REWRITE, title, fullRewrittenText.trim(), metadata);
             }
             

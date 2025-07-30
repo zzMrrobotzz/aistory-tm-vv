@@ -151,7 +151,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ moduleKey, onSelectHistory 
           </div>
 
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {historyItems.map((item) => (
+            {historyItems.map((item) => {
+              console.log('📋 HistoryPanel - Item metadata:', item.metadata);
+              return (
               <div
                 key={item.id}
                 className="border rounded-lg p-3 hover:bg-gray-50 transition-colors"
@@ -287,7 +289,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ moduleKey, onSelectHistory 
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       )}
