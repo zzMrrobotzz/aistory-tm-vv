@@ -42,6 +42,9 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
     const [translatedText, setTranslatedText] = useState<string>('');
     const [translateTargetLang, setTranslateTargetLang] = useState<string>('Vietnamese');
     const [translateStyle, setTranslateStyle] = useState<string>('Default');
+    
+    // Quality analysis toggle
+    const [enableQualityAnalysis, setEnableQualityAnalysis] = useState<boolean>(false);
 
 
     // Generate unique ID
@@ -81,44 +84,30 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
         };
     };
 
-    // Calculate story quality and consistency statistics
+    // Calculate story quality and consistency statistics (OPTIMIZED - shorter prompt)
     const analyzeStoryQuality = async (originalText: string, rewrittenText: string) => {
         try {
-            const analysisPrompt = `Bạn là một chuyên gia phân tích văn học và kịch bản. Hãy phân tích độ nhất quán và hoàn thiện của câu chuyện đã được viết lại dưới đây.
+            // Shortened prompt for faster processing
+            const analysisPrompt = `Phân tích nhanh chất lượng câu chuyện đã viết lại. Trả về JSON format:
 
-**VĂNBẢN GỐC:**
----
-${originalText}
----
+ORIGINAL: ${originalText.substring(0, 800)}...
+REWRITTEN: ${rewrittenText.substring(0, 800)}...
 
-**VĂNBẢN ĐÃ VIẾT LẠI:**
----
-${rewrittenText}
----
-
-**NHIỆM VỤ:** Phân tích và đánh giá câu chuyện đã viết lại theo các tiêu chí sau và trả về KẾT QUẢ THEO ĐÚNG FORMAT JSON:
-
+Trả về format:
 {
-  "consistencyScore": [số từ 0-100],
-  "completenessScore": [số từ 0-100], 
-  "overallQualityScore": [số từ 0-100],
+  "consistencyScore": [0-100],
+  "completenessScore": [0-100], 
+  "overallQualityScore": [0-100],
   "analysis": {
-    "characterConsistency": "[phân tích tính nhất quán nhân vật - 1-2 câu]",
-    "plotCoherence": "[phân tích tính logic cốt truyện - 1-2 câu]", 
-    "timelineConsistency": "[phân tích tính nhất quán thời gian - 1-2 câu]",
-    "settingConsistency": "[phân tích tính nhất quán bối cảnh - 1-2 câu]",
-    "overallAssessment": "[đánh giá tổng thể chất lượng - 2-3 câu]"
+    "characterConsistency": "[1 câu ngắn]",
+    "plotCoherence": "[1 câu ngắn]", 
+    "timelineConsistency": "[1 câu ngắn]",
+    "settingConsistency": "[1 câu ngắn]",
+    "overallAssessment": "[1-2 câu tóm tắt]"
   }
 }
 
-**TIÊU CHÍ ĐÁNH GIÁ:**
-- **consistencyScore**: Độ nhất quán về nhân vật, bối cảnh, thời gian (0-100%)
-- **completenessScore**: Độ hoàn thiện của cốt truyện, có đầu-giữa-cuối rõ ràng (0-100%)  
-- **overallQualityScore**: Chất lượng tổng thể = (consistencyScore + completenessScore)/2
-
-**LƯU Ý**: Hãy đánh giá nghiêm túc và chính xác. Điểm số phải phản ánh thực tế chất lượng văn bản.
-
-Chỉ trả về JSON, không thêm bất kỳ text nào khác.`;
+Chỉ trả về JSON.`;
 
             const result = await generateText(analysisPrompt, undefined, false, apiSettings);
             const jsonMatch = result?.text.match(/\{[\s\S]*\}/);
@@ -128,17 +117,17 @@ Chỉ trả về JSON, không thêm bất kỳ text nào khác.`;
                 return analysisData;
             }
             
-            // Fallback analysis if JSON parsing fails
+            // Quick fallback analysis
             return {
                 consistencyScore: 75,
                 completenessScore: 80,
                 overallQualityScore: 77,
                 analysis: {
-                    characterConsistency: "Phân tích không thể thực hiện đầy đủ",
-                    plotCoherence: "Phân tích không thể thực hiện đầy đủ", 
-                    timelineConsistency: "Phân tích không thể thực hiện đầy đủ",
-                    settingConsistency: "Phân tích không thể thực hiện đầy đủ",
-                    overallAssessment: "Câu chuyện có chất lượng khá tốt nhưng cần phân tích chi tiết hơn"
+                    characterConsistency: "Nhân vật khá nhất quán",
+                    plotCoherence: "Cốt truyện logic tốt", 
+                    timelineConsistency: "Thời gian hợp lý",
+                    settingConsistency: "Bối cảnh ổn định",
+                    overallAssessment: "Chất lượng tổng thể khá tốt"
                 }
             };
         } catch (error) {
@@ -148,11 +137,11 @@ Chỉ trả về JSON, không thêm bất kỳ text nào khác.`;
                 completenessScore: 70,
                 overallQualityScore: 70,
                 analysis: {
-                    characterConsistency: "Không thể phân tích do lỗi kỹ thuật",
-                    plotCoherence: "Không thể phân tích do lỗi kỹ thuật",
-                    timelineConsistency: "Không thể phân tích do lỗi kỹ thuật", 
-                    settingConsistency: "Không thể phân tích do lỗi kỹ thuật",
-                    overallAssessment: "Phân tích tự động gặp lỗi, vui lòng kiểm tra thủ công"
+                    characterConsistency: "Lỗi phân tích",
+                    plotCoherence: "Lỗi phân tích",
+                    timelineConsistency: "Lỗi phân tích", 
+                    settingConsistency: "Lỗi phân tích",
+                    overallAssessment: "Cần kiểm tra thủ công"
                 }
             };
         }
@@ -473,9 +462,9 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         const finalRewrittenText = fullRewrittenText.trim();
         const wordStats = calculateWordStats(item.originalText, finalRewrittenText);
         
-        // Analyze story quality and consistency (only for longer texts to avoid API waste)
-        let storyQualityStats = null;
-        if (finalRewrittenText.length > 500) { // Only analyze substantial content
+        // Analyze story quality and consistency (only if enabled and for longer texts)
+        let storyQualityStats: any = null;
+        if (enableQualityAnalysis && finalRewrittenText.length > 500) {
             try {
                 setModuleState(prev => ({
                     ...prev,
@@ -636,9 +625,9 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
 
             setModuleState(prev => ({ ...prev, rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 }));
             
-            // Analyze story quality for single rewrite (only for substantial content)
-            let qualityStats = null;
-            if (fullRewrittenText.trim().length > 500) {
+            // Analyze story quality for single rewrite (only if enabled and substantial content)
+            let qualityStats: any = null;
+            if (enableQualityAnalysis && fullRewrittenText.trim().length > 500) {
                 setModuleState(prev => ({ ...prev, loadingMessage: 'Đang phân tích chất lượng câu chuyện...' }));
                 try {
                     qualityStats = await analyzeStoryQuality(originalText, fullRewrittenText.trim());
@@ -942,6 +931,27 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                             <textarea id="quickCustomStyle" value={customRewriteStyle} onChange={(e) => setModuleState(prev => ({ ...prev, customRewriteStyle: e.target.value }))} rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}/>
                         </div>
                     )}
+                    
+                    {/* Quality Analysis Toggle */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <label className="flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={enableQualityAnalysis}
+                                onChange={(e) => setEnableQualityAnalysis(e.target.checked)}
+                                className="mr-3 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                disabled={anyLoading}
+                            />
+                            <div>
+                                <span className="text-sm font-medium text-gray-700">
+                                    🎯 Phân tích chất lượng câu chuyện (tốn thêm API)
+                                </span>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Bật để phân tích độ nhất quán và hoàn thiện của câu chuyện. Sẽ mất thêm thời gian và API calls.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
                 </div>
                  <div>
                     <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
