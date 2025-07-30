@@ -24,6 +24,14 @@ export interface HistoryItem {
       wordsChanged: number;
       changePercentage: number;
     };
+    rewriteSettings?: {
+      rewriteLevel: number;
+      sourceLanguage: string;
+      targetLanguage: string;
+      rewriteStyle: string;
+      customRewriteStyle?: string;
+      adaptContext: boolean;
+    };
   };
 }
 

@@ -167,11 +167,36 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ moduleKey, onSelectHistory 
                       {truncateContent(item.content)}
                     </p>
                     
+                    {/* Display rewrite settings if available */}
+                    {item.metadata?.rewriteSettings && (
+                      <div className="mb-2 p-2 bg-gradient-to-r from-indigo-50 to-blue-50 rounded border border-indigo-100">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-medium text-indigo-700">⚙️ Cài đặt viết lại:</span>
+                          <span className="font-bold text-indigo-800">{item.metadata.rewriteSettings.rewriteLevel}%</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Ngôn ngữ:</span>
+                            <span className="font-semibold text-blue-600">{item.metadata.rewriteSettings.sourceLanguage} → {item.metadata.rewriteSettings.targetLanguage}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Phong cách:</span>
+                            <span className="font-semibold text-purple-600 truncate max-w-20" title={item.metadata.rewriteSettings.customRewriteStyle || item.metadata.rewriteSettings.rewriteStyle}>
+                              {item.metadata.rewriteSettings.customRewriteStyle || item.metadata.rewriteSettings.rewriteStyle}
+                            </span>
+                          </div>
+                          {item.metadata.rewriteSettings.adaptContext && (
+                            <div className="text-xs text-green-600 font-medium">✓ Thích ứng văn hóa</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* Display quality stats if available */}
                     {item.metadata?.storyQualityStats && (
                       <div className="mb-2 p-2 bg-gradient-to-r from-purple-50 to-pink-50 rounded border border-purple-100">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-medium text-purple-700">🎯 Chất lượng:</span>
+                          <span className="font-medium text-purple-700">🎯 Chất lượng (toàn bộ):</span>
                           <span className="font-bold text-indigo-700">{item.metadata.storyQualityStats.overallQualityScore}%</span>
                         </div>
                         <div className="grid grid-cols-2 gap-1 mt-1 text-xs">
