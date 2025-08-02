@@ -25,19 +25,29 @@ const retryApiCall = async (
     try {
       return await apiFunction();
     } catch (error: any) {
+      console.log('Retry logic - Error details:', { 
+        message: error?.message, 
+        status: error?.status, 
+        code: error?.code,
+        attempt: i + 1 
+      });
+      
       const isServerError = error?.message?.includes('500') || 
                            error?.message?.includes('Internal Server Error') ||
-                           error?.message?.includes('ServerError');
+                           error?.message?.includes('ServerError') ||
+                           error?.status === 500 ||
+                           error?.code === 500;
       
       if (isServerError && i < maxRetries - 1) {
         // Exponential backoff: 2s, 4s, 8s for normal mode
         // Longer delays for queue mode: 3s, 6s, 12s
         const baseDelay = isQueueMode ? 3000 : 2000;
         const backoffDelay = baseDelay * Math.pow(2, i);
-        console.warn(`API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms...`);
+        console.warn(`🔄 RETRY: API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms... [Queue mode: ${isQueueMode}]`);
         await delay(backoffDelay);
         continue;
       }
+      console.error(`❌ FINAL FAILURE: All ${maxRetries} retry attempts failed. Error:`, error);
       throw error;
     }
   }
