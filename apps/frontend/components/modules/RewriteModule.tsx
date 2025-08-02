@@ -15,6 +15,34 @@ import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
 
+// Retry logic with exponential backoff for API calls
+const retryApiCall = async <T>(
+  apiFunction: () => Promise<T>,
+  maxRetries: number = 3,
+  isQueueMode: boolean = false
+): Promise<T> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await apiFunction();
+    } catch (error: any) {
+      const isServerError = error?.message?.includes('500') || 
+                           error?.message?.includes('Internal Server Error') ||
+                           error?.message?.includes('ServerError');
+      
+      if (isServerError && i < maxRetries - 1) {
+        // Exponential backoff: 2s, 4s, 8s for normal mode
+        // Longer delays for queue mode: 3s, 6s, 12s
+        const baseDelay = isQueueMode ? 3000 : 2000;
+        const backoffDelay = baseDelay * Math.pow(2, i);
+        console.warn(`API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms...`);
+        await delay(backoffDelay);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('All retry attempts failed');
+};
 
 interface RewriteModuleProps {
   apiSettings: ApiSettings;
@@ -291,7 +319,7 @@ Chỉ trả về JSON.`;
                         const hasWaitingItems = updatedState.queue.filter(item => item.status === 'waiting').length > 0;
                         
                         if (!updatedState.queueSystem.isPaused && hasWaitingItems) {
-                            // Continue with next item after delay
+                            // Continue with next item after longer delay to prevent rate limiting
                             setTimeout(() => {
                                 setModuleState(nextState => ({
                                     ...nextState,
@@ -301,8 +329,8 @@ Chỉ trả về JSON.`;
                                         currentItem: null,
                                     }
                                 }));
-                                setTimeout(() => processQueue(), 100);
-                            }, 1000);
+                                setTimeout(() => processQueue(), 500);
+                            }, 3000); // Increased from 1000ms to 3000ms
                         } else {
                             // No more items - stop processing
                             updatedState.queueSystem.isProcessing = false;
@@ -319,7 +347,13 @@ Chỉ trả về JSON.`;
                             ...prev,
                             queue: prev.queue.map(item =>
                                 item.id === currentItem.id
-                                    ? { ...item, status: 'error' as const, error: (error as Error).message }
+                                    ? { 
+                                        ...item, 
+                                        status: 'error' as const, 
+                                        error: (error as Error).message.includes('500') || (error as Error).message.includes('ServerError')
+                                            ? 'Lỗi server tạm thời. API đã thử lại nhưng vẫn thất bại. Vui lòng thử lại sau.'
+                                            : (error as Error).message
+                                    }
                                     : item
                             ),
                         };
@@ -328,7 +362,7 @@ Chỉ trả về JSON.`;
                         const hasWaitingItems = updatedState.queue.filter(item => item.status === 'waiting').length > 0;
                         
                         if (!updatedState.queueSystem.isPaused && hasWaitingItems) {
-                            // Continue with next item after delay
+                            // Continue with next item after longer delay to prevent rate limiting
                             setTimeout(() => {
                                 setModuleState(nextState => ({
                                     ...nextState,
@@ -338,8 +372,8 @@ Chỉ trả về JSON.`;
                                         currentItem: null,
                                     }
                                 }));
-                                setTimeout(() => processQueue(), 100);
-                            }, 1000);
+                                setTimeout(() => processQueue(), 500);
+                            }, 3000); // Increased from 1000ms to 3000ms
                         } else {
                             // No more items - stop processing
                             updatedState.queueSystem.isProcessing = false;
@@ -451,8 +485,13 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
             
-            await delay(500);
-            const result = await generateText(prompt, undefined, false, apiSettings);
+            // Longer delay for queue mode to prevent rate limiting
+            await delay(1500);
+            const result = await retryApiCall(
+                () => generateText(prompt, undefined, false, apiSettings),
+                3,
+                true // isQueueMode = true
+            );
             let currentChunkText = result?.text || '';
 
             // Extract character map from first chunk if level >= 75
@@ -628,7 +667,11 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
 `;
                 
                 await delay(500);
-                const result = await generateText(prompt, undefined, false, apiSettings);
+                const result = await retryApiCall(
+                    () => generateText(prompt, undefined, false, apiSettings),
+                    3,
+                    false // isQueueMode = false
+                );
                 let currentChunkText = result?.text || '';
 
                 if (i === 0 && rewriteLevel >= 75) {
@@ -747,7 +790,11 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
 `;
         
         try {
-            const result = await generateText(editPrompt, undefined, false, apiSettings);
+            const result = await retryApiCall(
+                () => generateText(editPrompt, undefined, false, apiSettings),
+                3,
+                false
+            );
             const editedText = result?.text || '';
             setModuleState(prev => ({ ...prev, rewrittenText: editedText, isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true }));
             
@@ -787,7 +834,11 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
 
             const prompt = `Translate the following text to ${translateTargetLang}${styleInstruction}. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${rewrittenText.trim()}\n"""`;
 
-            const result = await generateText(prompt, undefined, false, apiSettings);
+            const result = await retryApiCall(
+                () => generateText(prompt, undefined, false, apiSettings),
+                3,
+                false
+            );
             setTranslatedText(result.text.trim());
             
             // Log translation usage
