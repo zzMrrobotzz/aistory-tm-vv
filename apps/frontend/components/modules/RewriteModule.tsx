@@ -16,11 +16,11 @@ import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
 
 // Retry logic with exponential backoff for API calls
-const retryApiCall = async <T>(
-  apiFunction: () => Promise<T>,
+const retryApiCall = async (
+  apiFunction: () => Promise<any>,
   maxRetries: number = 3,
   isQueueMode: boolean = false
-): Promise<T> => {
+): Promise<any> => {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await apiFunction();
