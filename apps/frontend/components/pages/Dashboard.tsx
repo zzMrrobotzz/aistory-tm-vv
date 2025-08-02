@@ -34,13 +34,23 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setActiveModule }) =
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   useEffect(() => {
-    fetchUsageStats();
-  }, []);
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime;
+    const CACHE_DURATION = 30 * 1000; // 30 seconds cache
+
+    if (timeSinceLastFetch > CACHE_DURATION || !usageStats) {
+      fetchUsageStats();
+    } else {
+      setLoading(false);
+    }
+  }, [lastFetchTime]);
 
   const fetchUsageStats = async () => {
     try {
+      setLoading(true);
       const token = getCurrentUserToken();
       if (!token) {
         setError('Vui lòng đăng nhập để xem thống kê');
@@ -63,6 +73,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setActiveModule }) =
       
       if (result.success && result.data) {
         setUsageStats(result.data);
+        setLastFetchTime(Date.now()); // Update cache timestamp
+        setError(null); // Clear any previous errors
       } else {
         throw new Error('Invalid response format');
       }
@@ -84,6 +96,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setActiveModule }) =
         videosCreated: 0
       };
       setUsageStats(basicStats);
+      setLastFetchTime(Date.now()); // Cache even fallback data
     } finally {
       setLoading(false);
     }
