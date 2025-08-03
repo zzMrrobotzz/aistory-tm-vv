@@ -1,5 +1,3 @@
-
-
 import { ActiveModule } from './types';
 
 export const APP_TITLE = "AI Story Creator Studio";
@@ -46,19 +44,13 @@ export const NAVIGATION_GROUPS = [
     ]
   },
   {
-    title: "Siêu Trợ Lý",
-    icon: "🚀",
+    title: "Hỗ Trợ & Hướng Dẫn",
+    icon: "🆘",
     subItems: [
        { id: ActiveModule.SuperAgent, label: "Siêu Trợ Lý AI", icon: "🚀" },
-       { id: ActiveModule.Tutorials, label: "Hướng Dẫn Sử Dụng", icon: "📚" },
        { id: ActiveModule.Support, label: "Hỗ Trợ & Liên Hệ", icon: "📞" },
-    ]
-  },
-  {
-    title: "Gói Cước & Giá",
-    icon: "💸",
-    subItems: [
-      { id: ActiveModule.Pricing, label: "Gói Cước & Giá", icon: "💸" },
+       { id: ActiveModule.Tutorials, label: "Hướng Dẫn Sử Dụng", icon: "📚" },
+       { id: ActiveModule.Pricing, label: "Gói Cước & Giá", icon: "💸" },
     ]
   },
   {
@@ -69,7 +61,6 @@ export const NAVIGATION_GROUPS = [
     ]
   }
 ];
-
 
 export const DEFAULT_API_PROVIDER = "gemini";
 
