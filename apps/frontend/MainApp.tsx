@@ -52,6 +52,7 @@ import Dream100CompetitorAnalysisModule from './components/modules/Dream100Compe
 import CharacterStudioModule from './components/modules/CharacterStudioModule'; // Added
 import SupportModule from './components/modules/SupportModule'; // Added
 import TutorialComponent from './components/TutorialComponent'; // Added for tutorials
+import SupportChatbot from './components/SupportChatbot'; // Added for chatbot
 import { getUserProfile, refreshUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
@@ -1157,6 +1158,9 @@ const MainApp: React.FC = () => {
           {renderActiveModule()}
         </main>
       </div>
+      
+      {/* Support Chatbot */}
+      <SupportChatbot />
     </div>
   );
 };
