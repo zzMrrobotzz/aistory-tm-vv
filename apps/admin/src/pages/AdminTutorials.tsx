@@ -299,7 +299,7 @@ const AdminTutorials: React.FC = () => {
           </div>
           <div className="mt-2">
             {record.tags.map((tag, index) => (
-              <Tag key={index} size="small" className="mb-1">
+              <Tag key={index} className="mb-1" style={{ fontSize: '12px', padding: '2px 6px' }}>
                 {tag}
               </Tag>
             ))}
