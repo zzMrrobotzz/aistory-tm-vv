@@ -247,69 +247,59 @@ router.get('/stats/summary', /* isAdmin, */ async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/users/test
+// @desc    Test endpoint for debugging
+// @access  Admin only  
+router.get('/test', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: 'Test endpoint working',
+      userSessionModel: !!UserSession,
+      timestamp: new Date()
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      stack: err.stack
+    });
+  }
+});
+
 // @route   GET /api/admin/users/online
 // @desc    Get currently online users
 // @access  Admin only
 router.get('/online', /* isAdmin, */ async (req, res) => {
   try {
-    // Consider users online if their last activity was within 5 minutes
-    const onlineThreshold = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
+    // Simple version first - just check if UserSession works
+    console.log('Testing UserSession model:', !!UserSession);
     
-    // Get all active sessions within the threshold
-    const onlineSessions = await UserSession.find({
-      isActive: true,
-      lastActivity: { $gte: onlineThreshold }
-    })
-    .populate('userId', 'username email subscriptionType')
-    .sort({ lastActivity: -1 });
-
-    // Group by user to avoid duplicates (user may have multiple sessions)
-    const onlineUsersMap = new Map();
+    const sessionCount = await UserSession.countDocuments({});
+    console.log('Total sessions in DB:', sessionCount);
     
-    onlineSessions.forEach(session => {
-      if (session.userId && !onlineUsersMap.has(session.userId._id.toString())) {
-        onlineUsersMap.set(session.userId._id.toString(), {
-          userId: session.userId._id,
-          username: session.userId.username,
-          email: session.userId.email,
-          subscriptionType: session.userId.subscriptionType,
-          sessionInfo: {
-            lastActivity: session.lastActivity,
-            loginAt: session.loginAt,
-            ipAddress: session.ipAddress,
-            userAgent: session.userAgent,
-            deviceInfo: null, // Simplified for now
-            totalSessions: 1
-          }
-        });
-      } else if (session.userId && onlineUsersMap.has(session.userId._id.toString())) {
-        // Count multiple sessions for same user
-        onlineUsersMap.get(session.userId._id.toString()).sessionInfo.totalSessions++;
-      }
-    });
-
-    const onlineUsers = Array.from(onlineUsersMap.values());
-    
-    // Calculate additional statistics
-    const stats = {
-      totalOnline: onlineUsers.length,
-      totalSessions: onlineSessions.length,
-      bySubscription: {
-        free: onlineUsers.filter(u => u.subscriptionType === 'free').length,
-        monthly: onlineUsers.filter(u => u.subscriptionType === 'monthly').length,
-        lifetime: onlineUsers.filter(u => u.subscriptionType === 'lifetime').length
+    // Return mock data for now to test frontend
+    const mockData = {
+      success: true,
+      onlineUsers: [], // Empty for now
+      stats: {
+        totalOnline: 0,
+        totalSessions: 0,
+        bySubscription: {
+          free: 0,
+          monthly: 0,
+          lifetime: 0
+        },
+        averageSessionTime: 0
       },
-      averageSessionTime: onlineSessions.reduce((acc, session) => {
-        return acc + (Date.now() - new Date(session.loginAt).getTime());
-      }, 0) / onlineSessions.length || 0
+      lastUpdated: new Date(),
+      debug: {
+        userSessionModelExists: !!UserSession,
+        totalSessionsInDB: sessionCount
+      }
     };
 
-    res.json({
-      success: true,
-      onlineUsers,
-      stats,
-      lastUpdated: new Date()
-    });
+    res.json(mockData);
 
   } catch (err) {
     console.error('Error fetching online users:', err);
@@ -317,7 +307,7 @@ router.get('/online', /* isAdmin, */ async (req, res) => {
       success: false, 
       message: 'Server error', 
       error: err.message,
-      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      stack: err.stack
     });
   }
 });
