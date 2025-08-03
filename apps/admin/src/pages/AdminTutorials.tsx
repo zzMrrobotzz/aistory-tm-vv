@@ -266,16 +266,23 @@ const AdminTutorials: React.FC = () => {
       key: 'video',
       width: 120,
       render: (record: Tutorial) => (
-        <div className="text-center">
+        <div style={{ textAlign: 'center' }}>
           <img
             src={record.thumbnail}
             alt={record.title}
-            style={{ width: 80, height: 45, objectFit: 'cover', borderRadius: 4 }}
+            style={{ 
+              width: 80, 
+              height: 45, 
+              objectFit: 'cover', 
+              borderRadius: 4,
+              display: 'block',
+              margin: '0 auto'
+            }}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/placeholder-video.jpg';
+              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/80x45?text=Video';
             }}
           />
-          <div className="mt-1">
+          <div style={{ marginTop: 4 }}>
             <a
               href={record.youtubeUrl}
               target="_blank"
@@ -293,13 +300,30 @@ const AdminTutorials: React.FC = () => {
       key: 'info',
       render: (record: Tutorial) => (
         <div>
-          <div className="font-medium text-sm">{record.title}</div>
-          <div className="text-xs text-gray-500 mt-1" style={{ maxWidth: 200 }}>
-            {record.description.substring(0, 100)}...
+          <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>
+            {record.title}
           </div>
-          <div className="mt-2">
+          <div style={{ 
+            fontSize: '12px', 
+            color: '#6b7280', 
+            marginTop: '4px',
+            maxWidth: 200,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {record.description.length > 100 ? record.description.substring(0, 100) + '...' : record.description}
+          </div>
+          <div style={{ marginTop: '8px' }}>
             {record.tags.map((tag, index) => (
-              <Tag key={index} className="mb-1" style={{ fontSize: '12px', padding: '2px 6px' }}>
+              <Tag 
+                key={index} 
+                style={{ 
+                  fontSize: '11px', 
+                  padding: '1px 6px',
+                  marginBottom: '2px',
+                  marginRight: '4px'
+                }}
+              >
                 {tag}
               </Tag>
             ))}
@@ -337,8 +361,8 @@ const AdminTutorials: React.FC = () => {
       width: 100,
       sorter: (a: Tutorial, b: Tutorial) => a.viewCount - b.viewCount,
       render: (count: number) => (
-        <div className="text-center">
-          <EyeOutlined className="mr-1" />
+        <div style={{ textAlign: 'center' }}>
+          <EyeOutlined style={{ marginRight: '4px' }} />
           {count.toLocaleString()}
         </div>
       ),
@@ -363,7 +387,7 @@ const AdminTutorials: React.FC = () => {
       key: 'createdAt',
       width: 120,
       render: (date: string) => (
-        <div className="text-xs">
+        <div style={{ fontSize: '12px' }}>
           {formatDistanceToNow(new Date(date), { addSuffix: true, locale: vi })}
         </div>
       ),
@@ -411,15 +435,24 @@ const AdminTutorials: React.FC = () => {
   ];
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Quản Lý Hướng Dẫn</h1>
-        <p className="text-gray-600">Quản lý video hướng dẫn sử dụng cho người dùng</p>
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ 
+          fontSize: '24px', 
+          fontWeight: 'bold', 
+          color: '#1f2937', 
+          marginBottom: '8px' 
+        }}>
+          Quản Lý Hướng Dẫn
+        </h1>
+        <p style={{ color: '#6b7280' }}>
+          Quản lý video hướng dẫn sử dụng cho người dùng
+        </p>
       </div>
 
       {/* Statistics */}
       {stats && (
-        <Row gutter={16} className="mb-6">
+        <Row gutter={16} style={{ marginBottom: '24px' }}>
           <Col span={6}>
             <Card>
               <Statistic
@@ -460,7 +493,7 @@ const AdminTutorials: React.FC = () => {
       )}
 
       {/* Filters */}
-      <Card className="mb-4">
+      <Card style={{ marginBottom: '16px' }}>
         <Row gutter={16} align="middle">
           <Col flex="auto">
             <Search
