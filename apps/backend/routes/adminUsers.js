@@ -148,7 +148,7 @@ router.get('/online/stats', /* isAdmin, */ async (req, res) => {
 });
 
 // @route   GET /api/admin/users
-// @desc    Get all users for admin panel
+// @desc    Get all users for admin panel with session info
 // @access  Admin only (temporarily bypassed for demo)
 router.get('/', /* isAdmin, */ async (req, res) => {
   try {
@@ -180,11 +180,45 @@ router.get('/', /* isAdmin, */ async (req, res) => {
       .skip((page - 1) * limit)
       .exec();
     
+    // Get session info for each user
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    
+    const usersWithSessionInfo = await Promise.all(users.map(async (user) => {
+      // Get latest session for this user
+      const latestSession = await UserSession.findOne({ 
+        userId: user._id,
+        isActive: true 
+      }).sort({ lastActivity: -1 });
+      
+      // Determine online status (active within 5 minutes)
+      const isOnline = latestSession && 
+        latestSession.lastActivity >= fiveMinutesAgo;
+      
+      // Calculate session duration if online
+      let sessionDuration = 0;
+      if (latestSession && isOnline) {
+        sessionDuration = Math.round((now.getTime() - new Date(latestSession.loginAt).getTime()) / 60000); // minutes
+      }
+      
+      return {
+        ...user.toObject(),
+        sessionInfo: {
+          isOnline,
+          lastActivity: latestSession?.lastActivity || null,
+          loginAt: latestSession?.loginAt || null,
+          sessionDuration, // in minutes
+          ipAddress: latestSession?.ipAddress || null,
+          userAgent: latestSession?.userAgent || null
+        }
+      };
+    }));
+    
     const total = await User.countDocuments(query);
     
     res.json({
       success: true,
-      users,
+      users: usersWithSessionInfo,
       pagination: {
         current: page,
         pages: Math.ceil(total / limit),

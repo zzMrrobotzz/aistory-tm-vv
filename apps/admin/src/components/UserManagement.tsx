@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Input, Select, Tag, Space, Modal, message, InputNumber, Tooltip } from 'antd';
-import { SearchOutlined, UserOutlined, EditOutlined, StopOutlined, CheckOutlined, CrownOutlined } from '@ant-design/icons';
+import { SearchOutlined, UserOutlined, EditOutlined, StopOutlined, CheckOutlined, CrownOutlined, GlobalOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { fetchUsers, fetchUserStats, updateUserCredits, updateUserStatus, updateUserSubscription } from '../services/keyService';
 
 const { Option } = Select;
@@ -16,6 +16,14 @@ interface User {
   subscriptionExpiresAt?: string;
   createdAt: string;
   lastLoginAt?: string;
+  sessionInfo?: {
+    isOnline: boolean;
+    lastActivity: string | null;
+    loginAt: string | null;
+    sessionDuration: number; // in minutes
+    ipAddress: string | null;
+    userAgent: string | null;
+  };
 }
 
 interface UserStats {
@@ -86,6 +94,13 @@ const UserManagement: React.FC = () => {
     loadUsers();
     loadUserStats();
     loadPackages();
+    
+    // Auto-refresh mỗi 30 giây để cập nhật trạng thái online
+    const interval = setInterval(() => {
+      loadUsers(pagination.current, searchText, statusFilter);
+    }, 30000);
+    
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -309,6 +324,37 @@ const UserManagement: React.FC = () => {
             {record.subscriptionExpiresAt && subStatus !== 'free' && (
               <div style={{ fontSize: '12px', color: '#666' }}>
                 Hết hạn: {new Date(record.subscriptionExpiresAt).toLocaleDateString('vi-VN')}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Online Status',
+      key: 'onlineStatus',
+      render: (_, record: User) => {
+        const sessionInfo = record.sessionInfo;
+        if (!sessionInfo) {
+          return <Tag color="default">Không có data</Tag>;
+        }
+        
+        return (
+          <div>
+            <Tag 
+              color={sessionInfo.isOnline ? 'green' : 'default'}
+              icon={<GlobalOutlined />}
+            >
+              {sessionInfo.isOnline ? 'Online' : 'Offline'}
+            </Tag>
+            {sessionInfo.isOnline && sessionInfo.sessionDuration > 0 && (
+              <div style={{ fontSize: '12px', color: '#666', marginTop: 2 }}>
+                <ClockCircleOutlined /> {sessionInfo.sessionDuration} phút
+              </div>
+            )}
+            {sessionInfo.lastActivity && (
+              <div style={{ fontSize: '12px', color: '#999', marginTop: 2 }}>
+                Hoạt động: {new Date(sessionInfo.lastActivity).toLocaleString('vi-VN')}
               </div>
             )}
           </div>
