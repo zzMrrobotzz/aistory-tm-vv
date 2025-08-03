@@ -51,6 +51,7 @@ import BatchRewriteModule from './components/modules/BatchRewriteModule'; // Add
 import Dream100CompetitorAnalysisModule from './components/modules/Dream100CompetitorAnalysisModule'; // Added
 import CharacterStudioModule from './components/modules/CharacterStudioModule'; // Added
 import SupportModule from './components/modules/SupportModule'; // Added
+import TutorialComponent from './components/TutorialComponent'; // Added for tutorials
 import { getUserProfile, refreshUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
@@ -1126,6 +1127,8 @@ const MainApp: React.FC = () => {
         return <SupportModule 
                   currentUser={currentUser} // Pass user profile
                 />;
+      case ActiveModule.Tutorials:
+        return <TutorialComponent />;
       case ActiveModule.Settings:
         return <Settings onApiKeysChange={handleApiKeysChange} />;
       case ActiveModule.Pricing:

@@ -519,11 +519,13 @@ app.use('/api/settings', settingsRouter);
 // Mount new routes
 app.use('/api/admin/stats', adminStatsRouter);
 app.use('/api/admin/users', require('./routes/adminUsers'));
+app.use('/api/admin/tutorials', require('./routes/adminTutorials')); // Tutorial management
 app.use('/api/admin', require('./routes/adminPackages')); // Package management
 app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment management
 app.use('/api/admin/anti-sharing', require('./routes/adminAntiSharing')); // Anti-sharing management
 // Apply universal activity tracking to protected routes
 app.use('/api/ai', auth, updateUserActivity, aiProxyRouter);
+app.use('/api/tutorials', require('./routes/tutorials')); // Public tutorials for end users
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution  
 app.use('/api/user', auth, updateUserActivity, require('./routes/userStats')); // User statistics

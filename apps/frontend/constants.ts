@@ -50,6 +50,7 @@ export const NAVIGATION_GROUPS = [
     icon: "🚀",
     subItems: [
        { id: ActiveModule.SuperAgent, label: "Siêu Trợ Lý AI", icon: "🚀" },
+       { id: ActiveModule.Tutorials, label: "Hướng Dẫn Sử Dụng", icon: "📚" },
        { id: ActiveModule.Support, label: "Hỗ Trợ & Liên Hệ", icon: "📞" },
     ]
   },

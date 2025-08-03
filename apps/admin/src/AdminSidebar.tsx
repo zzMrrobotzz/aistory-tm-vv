@@ -1,6 +1,6 @@
 import React from 'react';
 import { AdminActiveModule } from './types';
-import { LayoutDashboard, KeyRound, CreditCard, ShieldAlert, Cloud, Settings, LogOut, Cpu, Database, Wifi, Banknote, Gift, Users, UserCheck } from 'lucide-react';
+import { LayoutDashboard, KeyRound, CreditCard, ShieldAlert, Cloud, Settings, LogOut, Cpu, Database, Wifi, Banknote, Gift, Users, UserCheck, PlayCircle } from 'lucide-react';
 
 interface AdminSidebarProps {
   activeModule: AdminActiveModule;
@@ -12,6 +12,7 @@ const NAVIGATION_ITEMS = [
   { id: 'dashboard', label: 'Tổng Quan', icon: LayoutDashboard },
   { id: 'userManagement', label: 'Quản Lý Người Dùng', icon: Users },
   { id: 'onlineUsers', label: 'Người Dùng Online', icon: UserCheck },
+  { id: 'tutorials', label: 'Hướng Dẫn', icon: PlayCircle },
   { id: 'keyManagement', label: 'Quản Lý Key', icon: KeyRound },
   { id: 'apiProviders', label: 'Quản Lý API Providers', icon: Cpu },
   { id: 'apiKeyPool', label: 'Quản lý Kho Key', icon: Database },

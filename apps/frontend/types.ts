@@ -23,6 +23,7 @@ export enum ActiveModule {
   CharacterStudio = "character-studio", // Added for Character Locking Prompts
   Support = "support", // Added
   Settings = "settings", // Added for API key management
+  Tutorials = "tutorials", // Added for tutorial videos
   Pricing = "pricing",
 }
 
