@@ -312,8 +312,13 @@ router.get('/online', /* isAdmin, */ async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error fetching online users:', err.message);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error fetching online users:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
@@ -372,8 +377,13 @@ router.get('/online/stats', /* isAdmin, */ async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error fetching online stats:', err.message);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error fetching online stats:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
