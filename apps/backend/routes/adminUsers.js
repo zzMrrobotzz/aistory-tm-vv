@@ -173,18 +173,17 @@ router.get('/', /* isAdmin, */ async (req, res) => {
       }
     }
     
-    const users = await User.find(query)
+    // Get ALL users first (without pagination) to properly filter by online status
+    const allUsers = await User.find(query)
       .select('-password')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
       .exec();
     
-    // Get session info for each user
+    // Get session info for ALL users
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
     
-    const usersWithSessionInfo = await Promise.all(users.map(async (user) => {
+    const usersWithSessionInfo = await Promise.all(allUsers.map(async (user) => {
       // Get latest session for this user
       const latestSession = await UserSession.findOne({ 
         userId: user._id,
@@ -192,7 +191,7 @@ router.get('/', /* isAdmin, */ async (req, res) => {
       }).sort({ lastActivity: -1 });
       
       // Debug log for first few users
-      if (users.indexOf(user) < 3) {
+      if (allUsers.indexOf(user) < 3) {
         console.log(`🔍 Debug user ${user.username} (${user._id}):`, {
           sessionFound: !!latestSession,
           sessionUserId: latestSession?.userId,
@@ -235,13 +234,15 @@ router.get('/', /* isAdmin, */ async (req, res) => {
     }
     
     // Update pagination to reflect filtered results
-    const total = await User.countDocuments(query);
+    const totalUsers = await User.countDocuments(query);
     const filteredTotal = filteredUsers.length;
     
     // Apply pagination to filtered results
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + parseInt(limit);
     const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+    
+    console.log(`📊 Filter results: totalUsers=${totalUsers}, filteredTotal=${filteredTotal}, page=${page}, limit=${limit}`);
     
     res.json({
       success: true,
@@ -250,7 +251,7 @@ router.get('/', /* isAdmin, */ async (req, res) => {
         current: parseInt(page),
         pages: Math.ceil(filteredTotal / limit),
         total: filteredTotal,
-        totalUsers: total // Total before online filter
+        totalUsers: totalUsers // Total before online filter
       }
     });
   } catch (err) {
