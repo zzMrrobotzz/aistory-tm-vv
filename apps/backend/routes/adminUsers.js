@@ -32,17 +32,35 @@ router.get('/online', /* isAdmin, */ async (req, res) => {
     // Lấy các session còn hoạt động trong 5 phút gần nhất
     const FIVE_MINUTES = 5 * 60 * 1000;
     const now = new Date();
+    
+    console.log(`🔍 Fetching online users at ${now.toISOString()}`);
+    console.log(`🕐 Looking for sessions active since ${new Date(now.getTime() - FIVE_MINUTES).toISOString()}`);
+    
+    // First get all active sessions within the time window
     const activeSessions = await UserSession.find({
       isActive: true,
       lastActivity: { $gte: new Date(now.getTime() - FIVE_MINUTES) }
-    }).populate('userId');
+    }).populate('userId').lean();
+
+    console.log(`📊 Found ${activeSessions.length} active sessions`);
+
+    // Filter out sessions where user population failed and log any issues
+    const validSessions = activeSessions.filter(session => {
+      if (!session.userId) {
+        console.warn(`⚠️ Session ${session._id} has invalid userId reference`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`✅ ${validSessions.length} sessions have valid user references`);
 
     // Chuyển đổi dữ liệu trả về cho frontend
-    const onlineUsers = activeSessions.map(session => ({
+    const onlineUsers = validSessions.map(session => ({
       userId: session.userId._id,
       username: session.userId.username,
       email: session.userId.email,
-      subscriptionType: session.userId.subscriptionType,
+      subscriptionType: session.userId.subscriptionType || 'free',
       sessionInfo: {
         lastActivity: session.lastActivity,
         loginAt: session.loginAt,
@@ -56,14 +74,16 @@ router.get('/online', /* isAdmin, */ async (req, res) => {
     // Thống kê
     const stats = {
       totalOnline: onlineUsers.length,
-      totalSessions: activeSessions.length,
+      totalSessions: validSessions.length,
       bySubscription: {
         free: onlineUsers.filter(u => u.subscriptionType === 'free').length,
         monthly: onlineUsers.filter(u => u.subscriptionType === 'monthly').length,
         lifetime: onlineUsers.filter(u => u.subscriptionType === 'lifetime').length
       },
-      averageSessionTime: activeSessions.length > 0 ? Math.round(activeSessions.reduce((sum, s) => sum + (now - s.loginAt), 0) / activeSessions.length) : 0
+      averageSessionTime: validSessions.length > 0 ? Math.round(validSessions.reduce((sum, s) => sum + (now - new Date(s.loginAt)), 0) / validSessions.length) : 0
     };
+
+    console.log(`📈 Online users stats:`, stats);
 
     res.json({
       success: true,
@@ -72,12 +92,12 @@ router.get('/online', /* isAdmin, */ async (req, res) => {
       lastUpdated: now
     });
   } catch (err) {
-    console.error('Error fetching online users:', err);
+    console.error('❌ Error fetching online users:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Server error', 
+      message: 'Server error while fetching online users', 
       error: err.message,
-      stack: err.stack
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 });
@@ -91,6 +111,8 @@ router.get('/online/stats', /* isAdmin, */ async (req, res) => {
     const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const lastHour = new Date(now.getTime() - 60 * 60 * 1000);
     const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
+
+    console.log(`🔍 Fetching online stats at ${now.toISOString()}`);
 
     // Current online users (within 5 minutes)
     const currentOnline = await UserSession.countDocuments({
@@ -117,30 +139,35 @@ router.get('/online/stats', /* isAdmin, */ async (req, res) => {
     const activeSessions = await UserSession.find({
       isActive: true,
       lastActivity: { $gte: last24Hours }
-    });
+    }).lean();
 
-    const avgSessionDuration = activeSessions.reduce((acc, session) => {
-      return acc + (now.getTime() - new Date(session.loginAt).getTime());
-    }, 0) / activeSessions.length || 0;
+    const avgSessionDuration = activeSessions.length > 0 ? 
+      activeSessions.reduce((acc, session) => {
+        return acc + (now.getTime() - new Date(session.loginAt).getTime());
+      }, 0) / activeSessions.length : 0;
+
+    const stats = {
+      currentOnline,
+      activeLastHour,
+      activeLast24Hours,
+      peakOnlineToday,
+      avgSessionDuration: Math.round(avgSessionDuration / 1000 / 60), // minutes
+      totalActiveSessions: activeSessions.length
+    };
+
+    console.log(`📈 Online stats:`, stats);
 
     res.json({
       success: true,
-      stats: {
-        currentOnline,
-        activeLastHour,
-        activeLast24Hours,
-        peakOnlineToday,
-        avgSessionDuration: Math.round(avgSessionDuration / 1000 / 60), // minutes
-        totalActiveSessions: activeSessions.length
-      },
+      stats,
       timestamp: now
     });
 
   } catch (err) {
-    console.error('Error fetching online stats:', err);
+    console.error('❌ Error fetching online stats:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Server error', 
+      message: 'Server error while fetching online stats', 
       error: err.message,
       details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });

@@ -44,8 +44,7 @@ const userSessionSchema = new mongoose.Schema({
   },
   lastActivity: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
   logoutAt: {
     type: Date,
