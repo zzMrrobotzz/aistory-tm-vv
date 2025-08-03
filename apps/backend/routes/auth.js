@@ -241,6 +241,57 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
 // @desc    Keep session alive with heartbeat
 router.post('/heartbeat', sessionHeartbeat);
 
+// @route   POST /api/auth/set-online
+// @desc    Mark user as online when they use the tool
+// @access  Private
+router.post('/set-online', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Find or create active session
+    let session = await UserSession.findOne({
+      userId: userId,
+      isActive: true
+    });
+
+    if (!session) {
+      // Create new session if none exists
+      session = new UserSession({
+        userId: userId,
+        username: user.username,
+        sessionToken: req.headers['x-auth-token'] || 'manual-session',
+        ipAddress: req.ip || req.connection.remoteAddress || 'unknown',
+        userAgent: req.get('User-Agent') || '',
+        isActive: true,
+        loginAt: new Date(),
+        lastActivity: new Date()
+      });
+      await session.save();
+      console.log(`✅ New session created for ${user.username}`);
+    } else {
+      // Update existing session
+      session.lastActivity = new Date();
+      await session.save();
+      console.log(`✅ Session updated for ${user.username}`);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'User marked as online',
+      sessionId: session._id 
+    });
+
+  } catch (err) {
+    console.error('Error setting user online:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @route   GET /api/auth/session-status
 // @desc    Check current session status
 router.get('/session-status', async (req, res) => {

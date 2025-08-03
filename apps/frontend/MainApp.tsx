@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { onlineService } from './services/onlineService';
 import {
   ActiveModule, ApiSettings, ApiProvider,
   SuperAgentModuleState, CreativeLabModuleState, 
@@ -957,6 +958,18 @@ const MainApp: React.FC = () => {
       logModuleAccess(activeModule);
     }
   }, [activeModule, currentUser]);
+
+  // Start online tracking when user enters the app
+  useEffect(() => {
+    if (currentUser) {
+      onlineService.startOnlineTracking();
+      
+      // Cleanup on unmount
+      return () => {
+        onlineService.stopOnlineTracking();
+      };
+    }
+  }, [currentUser]);
 
   useEffect(() => {
      if(outlineForSuperAgent){
