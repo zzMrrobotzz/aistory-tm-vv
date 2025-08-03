@@ -29,35 +29,48 @@ router.get('/test', async (req, res) => {
 // @access  Admin only
 router.get('/online', /* isAdmin, */ async (req, res) => {
   try {
-    // Simple version first - just check if UserSession works
-    console.log('Testing UserSession model:', !!UserSession);
-    
-    const sessionCount = await UserSession.countDocuments({});
-    console.log('Total sessions in DB:', sessionCount);
-    
-    // Return mock data for now to test frontend
-    const mockData = {
-      success: true,
-      onlineUsers: [], // Empty for now
-      stats: {
-        totalOnline: 0,
-        totalSessions: 0,
-        bySubscription: {
-          free: 0,
-          monthly: 0,
-          lifetime: 0
-        },
-        averageSessionTime: 0
-      },
-      lastUpdated: new Date(),
-      debug: {
-        userSessionModelExists: !!UserSession,
-        totalSessionsInDB: sessionCount
+    // Lấy các session còn hoạt động trong 5 phút gần nhất
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    const now = new Date();
+    const activeSessions = await UserSession.find({
+      isActive: true,
+      lastActivity: { $gte: new Date(now.getTime() - FIVE_MINUTES) }
+    }).populate('userId');
+
+    // Chuyển đổi dữ liệu trả về cho frontend
+    const onlineUsers = activeSessions.map(session => ({
+      userId: session.userId._id,
+      username: session.userId.username,
+      email: session.userId.email,
+      subscriptionType: session.userId.subscriptionType,
+      sessionInfo: {
+        lastActivity: session.lastActivity,
+        loginAt: session.loginAt,
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
+        deviceInfo: session.deviceFingerprintId,
+        totalSessions: 1 // Có thể mở rộng nếu cần
       }
+    }));
+
+    // Thống kê
+    const stats = {
+      totalOnline: onlineUsers.length,
+      totalSessions: activeSessions.length,
+      bySubscription: {
+        free: onlineUsers.filter(u => u.subscriptionType === 'free').length,
+        monthly: onlineUsers.filter(u => u.subscriptionType === 'monthly').length,
+        lifetime: onlineUsers.filter(u => u.subscriptionType === 'lifetime').length
+      },
+      averageSessionTime: activeSessions.length > 0 ? Math.round(activeSessions.reduce((sum, s) => sum + (now - s.loginAt), 0) / activeSessions.length) : 0
     };
 
-    res.json(mockData);
-
+    res.json({
+      success: true,
+      onlineUsers,
+      stats,
+      lastUpdated: now
+    });
   } catch (err) {
     console.error('Error fetching online users:', err);
     res.status(500).json({ 
