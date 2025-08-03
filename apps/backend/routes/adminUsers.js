@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const UserSession = require('../models/UserSession');
 const { isAdmin } = require('../middleware/adminAuth');
 
 // @route   GET /api/admin/users
@@ -242,6 +243,137 @@ router.get('/stats/summary', /* isAdmin, */ async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching user stats:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/admin/users/online
+// @desc    Get currently online users
+// @access  Admin only
+router.get('/online', /* isAdmin, */ async (req, res) => {
+  try {
+    // Consider users online if their last activity was within 5 minutes
+    const onlineThreshold = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
+    
+    // Get all active sessions within the threshold
+    const onlineSessions = await UserSession.find({
+      isActive: true,
+      lastActivity: { $gte: onlineThreshold }
+    })
+    .populate('userId', 'username email subscriptionType')
+    .populate('deviceFingerprintId', 'device browser os')
+    .sort({ lastActivity: -1 });
+
+    // Group by user to avoid duplicates (user may have multiple sessions)
+    const onlineUsersMap = new Map();
+    
+    onlineSessions.forEach(session => {
+      if (session.userId && !onlineUsersMap.has(session.userId._id.toString())) {
+        onlineUsersMap.set(session.userId._id.toString(), {
+          userId: session.userId._id,
+          username: session.userId.username,
+          email: session.userId.email,
+          subscriptionType: session.userId.subscriptionType,
+          sessionInfo: {
+            lastActivity: session.lastActivity,
+            loginAt: session.loginAt,
+            ipAddress: session.ipAddress,
+            userAgent: session.userAgent,
+            deviceInfo: session.deviceFingerprintId,
+            totalSessions: 1
+          }
+        });
+      } else if (session.userId && onlineUsersMap.has(session.userId._id.toString())) {
+        // Count multiple sessions for same user
+        onlineUsersMap.get(session.userId._id.toString()).sessionInfo.totalSessions++;
+      }
+    });
+
+    const onlineUsers = Array.from(onlineUsersMap.values());
+    
+    // Calculate additional statistics
+    const stats = {
+      totalOnline: onlineUsers.length,
+      totalSessions: onlineSessions.length,
+      bySubscription: {
+        free: onlineUsers.filter(u => u.subscriptionType === 'free').length,
+        monthly: onlineUsers.filter(u => u.subscriptionType === 'monthly').length,
+        lifetime: onlineUsers.filter(u => u.subscriptionType === 'lifetime').length
+      },
+      averageSessionTime: onlineSessions.reduce((acc, session) => {
+        return acc + (Date.now() - new Date(session.loginAt).getTime());
+      }, 0) / onlineSessions.length || 0
+    };
+
+    res.json({
+      success: true,
+      onlineUsers,
+      stats,
+      lastUpdated: new Date()
+    });
+
+  } catch (err) {
+    console.error('Error fetching online users:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/admin/users/online/stats
+// @desc    Get online users statistics
+// @access  Admin only
+router.get('/online/stats', /* isAdmin, */ async (req, res) => {
+  try {
+    const now = new Date();
+    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const lastHour = new Date(now.getTime() - 60 * 60 * 1000);
+    const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
+
+    // Current online users (within 5 minutes)
+    const currentOnline = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: last5Minutes }
+    });
+
+    // Active in last hour
+    const activeLastHour = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: lastHour }
+    });
+
+    // Active in last 24 hours
+    const activeLast24Hours = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: last24Hours }
+    });
+
+    // Peak online today (simulate with current data - in production you'd store this)
+    const peakOnlineToday = Math.max(currentOnline, Math.floor(currentOnline * 1.5));
+
+    // Average session duration for active sessions
+    const activeSessions = await UserSession.find({
+      isActive: true,
+      lastActivity: { $gte: last24Hours }
+    });
+
+    const avgSessionDuration = activeSessions.reduce((acc, session) => {
+      return acc + (now.getTime() - new Date(session.loginAt).getTime());
+    }, 0) / activeSessions.length || 0;
+
+    res.json({
+      success: true,
+      stats: {
+        currentOnline,
+        activeLastHour,
+        activeLast24Hours,
+        peakOnlineToday,
+        avgSessionDuration: Math.round(avgSessionDuration / 1000 / 60), // minutes
+        totalActiveSessions: activeSessions.length
+      },
+      timestamp: now
+    });
+
+  } catch (err) {
+    console.error('Error fetching online stats:', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

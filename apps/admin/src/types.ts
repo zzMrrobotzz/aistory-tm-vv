@@ -1,6 +1,7 @@
 export type AdminActiveModule =
   | 'dashboard'
   | 'userManagement' // Quản lý người dùng mới
+  | 'onlineUsers' // Theo dõi người dùng online
   | 'keyManagement' // Hợp nhất user và key
   | 'apiProviders' // Quản lý API provider keys
   | 'apiKeyPool' // Quản lý kho API key

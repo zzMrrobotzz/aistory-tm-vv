@@ -13,6 +13,7 @@ import AdminSettings from './pages/AdminSettings';
 import AdminBankInfo from './pages/AdminBankInfo';
 import AdminSubscriptionPlans from './pages/AdminSubscriptionPlans'; // Đổi từ CreditPackages
 import AdminUserManagement from './pages/AdminUserManagement'; // Thêm mới
+import AdminOnlineUsers from './pages/AdminOnlineUsers'; // Thêm mới
 import { AdminActiveModule } from './types';
 
 const AdminApp: React.FC = () => {
@@ -36,6 +37,8 @@ const AdminApp: React.FC = () => {
         return <AdminApiKeyManagement />;
       case 'userManagement': // Thêm mới
         return <AdminUserManagement />;
+      case 'onlineUsers': // Thêm mới
+        return <AdminOnlineUsers />;
       case 'apiProviders':
         return <AdminApiProviders />;
       case 'apiKeyPool':
