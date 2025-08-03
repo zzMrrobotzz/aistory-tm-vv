@@ -164,7 +164,10 @@ const AdminOnlineUsers: React.FC = () => {
           </div>
           <div className="flex items-center text-xs text-gray-500 mt-1">
             <DesktopOutlined className="mr-1" />
-            {record.sessionInfo.deviceInfo?.browser || 'Unknown'} - {record.sessionInfo.deviceInfo?.os || 'Unknown'}
+            {record.sessionInfo.userAgent ? 
+              record.sessionInfo.userAgent.split(' ')[0] || 'Unknown Browser' : 
+              'Unknown Browser'
+            }
           </div>
         </div>
       ),

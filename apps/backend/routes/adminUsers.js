@@ -261,7 +261,6 @@ router.get('/online', /* isAdmin, */ async (req, res) => {
       lastActivity: { $gte: onlineThreshold }
     })
     .populate('userId', 'username email subscriptionType')
-    .populate('deviceFingerprintId', 'device browser os')
     .sort({ lastActivity: -1 });
 
     // Group by user to avoid duplicates (user may have multiple sessions)
@@ -279,7 +278,7 @@ router.get('/online', /* isAdmin, */ async (req, res) => {
             loginAt: session.loginAt,
             ipAddress: session.ipAddress,
             userAgent: session.userAgent,
-            deviceInfo: session.deviceFingerprintId,
+            deviceInfo: null, // Simplified for now
             totalSessions: 1
           }
         });
