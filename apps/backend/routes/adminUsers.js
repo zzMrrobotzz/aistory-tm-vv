@@ -9,10 +9,40 @@ const { isAdmin } = require('../middleware/adminAuth');
 // @access  Admin only  
 router.get('/test', async (req, res) => {
   try {
+    // Get a count of total sessions, active sessions, and recent sessions
+    const totalSessions = await UserSession.countDocuments();
+    const activeSessions = await UserSession.countDocuments({ isActive: true });
+    
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    const now = new Date();
+    const recentSessions = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: new Date(now.getTime() - FIVE_MINUTES) }
+    });
+
+    // Get some sample sessions for debugging
+    const sampleSessions = await UserSession.find({ isActive: true })
+      .populate('userId', 'username email')
+      .sort({ lastActivity: -1 })
+      .limit(5)
+      .lean();
+
     res.json({
       success: true,
       message: 'Test endpoint working',
-      userSessionModel: !!UserSession,
+      debug: {
+        totalSessions,
+        activeSessions,
+        recentSessions,
+        userSessionModel: !!UserSession,
+        sampleSessions: sampleSessions.map(s => ({
+          username: s.userId?.username || 'Unknown',
+          lastActivity: s.lastActivity,
+          loginAt: s.loginAt,
+          isActive: s.isActive,
+          timeSinceActivity: Math.round((now - new Date(s.lastActivity)) / 1000 / 60) + ' minutes'
+        }))
+      },
       timestamp: new Date()
     });
   } catch (err) {

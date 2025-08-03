@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const { updateSessionActivity } = require('../middleware/antiSharing');
 const User = require('../models/User');
 
 // @route   GET /api/user/usage-stats
 // @desc    Get user usage statistics
 // @access  Private
-router.get('/usage-stats', auth, async (req, res) => {
+router.get('/usage-stats', auth, updateSessionActivity, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -105,7 +106,7 @@ router.get('/usage-stats', auth, async (req, res) => {
 // @route   POST /api/user/log-usage
 // @desc    Log user activity (called by frontend when user uses features)
 // @access  Private
-router.post('/log-usage', auth, async (req, res) => {
+router.post('/log-usage', auth, updateSessionActivity, async (req, res) => {
   try {
     const { module, action, count = 1 } = req.body;
     const user = await User.findById(req.user.id);

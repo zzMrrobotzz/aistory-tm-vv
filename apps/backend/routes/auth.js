@@ -3,6 +3,7 @@ const router = express.Router();
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
+const { autoUpdateSessionActivity } = require('../middleware/autoSessionUpdate');
 const { 
   antiSharingMiddleware, 
   validateAntiSharing, 
@@ -28,7 +29,7 @@ router.options('*', (req, res) => {
 // @route   GET api/auth/me
 // @desc    Get user data
 // @access  Private
-router.get('/me', checkAccountBlock, auth, async (req, res) => {
+router.get('/me', checkAccountBlock, auth, autoUpdateSessionActivity, async (req, res) => {
     try {
       const user = await User.findById(req.user.id).select('-password');
       if (!user) {
