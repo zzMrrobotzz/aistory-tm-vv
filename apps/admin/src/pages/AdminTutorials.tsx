@@ -298,6 +298,7 @@ const AdminTutorials: React.FC = () => {
     {
       title: 'Thông Tin',
       key: 'info',
+      width: 300,
       render: (record: Tutorial) => (
         <div>
           <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>
@@ -307,14 +308,19 @@ const AdminTutorials: React.FC = () => {
             fontSize: '12px', 
             color: '#6b7280', 
             marginTop: '4px',
-            maxWidth: 200,
+            maxWidth: 280,
             overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}>
-            {record.description.length > 100 ? record.description.substring(0, 100) + '...' : record.description}
+            {record.description.length > 80 ? record.description.substring(0, 80) + '...' : record.description}
           </div>
-          <div style={{ marginTop: '8px' }}>
-            {record.tags.map((tag, index) => (
+          <div style={{ 
+            marginTop: '8px',
+            maxWidth: 280,
+            overflow: 'hidden'
+          }}>
+            {record.tags.slice(0, 3).map((tag, index) => (
               <Tag 
                 key={index} 
                 style={{ 
@@ -327,6 +333,11 @@ const AdminTutorials: React.FC = () => {
                 {tag}
               </Tag>
             ))}
+            {record.tags.length > 3 && (
+              <Tag style={{ fontSize: '11px', padding: '1px 6px' }}>
+                +{record.tags.length - 3}
+              </Tag>
+            )}
           </div>
         </div>
       ),
@@ -494,8 +505,8 @@ const AdminTutorials: React.FC = () => {
 
       {/* Filters */}
       <Card style={{ marginBottom: '16px' }}>
-        <Row gutter={16} align="middle">
-          <Col flex="auto">
+        <Row gutter={[16, 16]} align="middle" wrap>
+          <Col xs={24} sm={24} md={12} lg={14} xl={16}>
             <Search
               placeholder="Tìm kiếm theo tiêu đề, mô tả, tags..."
               allowClear
@@ -505,11 +516,11 @@ const AdminTutorials: React.FC = () => {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col>
+          <Col xs={12} sm={8} md={6} lg={5} xl={4}>
             <Select
               value={selectedCategory}
               onChange={(value) => setSelectedCategory(value)}
-              style={{ width: 150 }}
+              style={{ width: '100%' }}
             >
               {categoryOptions.map(option => (
                 <Option key={option.value} value={option.value}>
@@ -518,11 +529,12 @@ const AdminTutorials: React.FC = () => {
               ))}
             </Select>
           </Col>
-          <Col>
+          <Col xs={12} sm={8} md={6} lg={5} xl={4}>
             <Button
               type="primary"
               icon={<PlusOutlined />}
               onClick={openCreateModal}
+              style={{ width: '100%' }}
             >
               Thêm Tutorial
             </Button>
@@ -537,6 +549,7 @@ const AdminTutorials: React.FC = () => {
           dataSource={tutorials}
           rowKey="_id"
           loading={loading}
+          scroll={{ x: 1200 }}
           pagination={{
             ...pagination,
             showSizeChanger: true,
