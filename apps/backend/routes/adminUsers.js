@@ -191,6 +191,16 @@ router.get('/', /* isAdmin, */ async (req, res) => {
         isActive: true 
       }).sort({ lastActivity: -1 });
       
+      // Debug log for first few users
+      if (users.indexOf(user) < 3) {
+        console.log(`🔍 Debug user ${user.username} (${user._id}):`, {
+          sessionFound: !!latestSession,
+          sessionUserId: latestSession?.userId,
+          lastActivity: latestSession?.lastActivity,
+          isWithin5Min: latestSession ? latestSession.lastActivity >= fiveMinutesAgo : false
+        });
+      }
+      
       // Determine online status (active within 5 minutes)
       const isOnline = latestSession && 
         latestSession.lastActivity >= fiveMinutesAgo;
