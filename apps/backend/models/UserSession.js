@@ -21,7 +21,7 @@ const userSessionSchema = new mongoose.Schema({
   deviceFingerprintId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DeviceFingerprint',
-    required: true
+    required: false // Made optional for simple login without device fingerprinting
   },
   ipAddress: {
     type: String,
