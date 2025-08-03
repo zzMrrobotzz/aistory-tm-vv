@@ -13,6 +13,7 @@ const Transaction = require('./models/Transaction');
 const AuditLog = require('./models/AuditLog');
 const Package = require('./models/Package');
 const Payment = require('./models/Payment');
+const User = require('./models/User');
 const UserSession = require('./models/UserSession');
 const { createAuditLog } = require('./utils/auditLogger');
 
@@ -181,20 +182,31 @@ app.post('/api/providers', async (req, res) => {
 
 // Package Management - moved to /routes/packages.js
 
-// Dashboard Stats
+// Dashboard Stats - Updated for real User/UserSession data
 app.get('/api/stats/dashboard', async (req, res) => {
   try {
-    console.log('📊 Loading dashboard stats...');
+    console.log('📊 Loading real dashboard stats...');
     
-    // Key stats
-    const totalKeys = await Key.countDocuments();
-    const activeKeys = await Key.countDocuments({ isActive: true });
-    const expiredKeys = await Key.countDocuments({ expiredAt: { $lt: new Date() } });
-    const totalCredits = await Key.aggregate([
-      { $group: { _id: null, total: { $sum: '$credit' } } }
-    ]);
+    // User stats (replacing key stats)
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ isActive: true });
+    const inactiveUsers = await User.countDocuments({ isActive: false });
     
-    // Payment stats (using new Payment model)
+    // Current online users (within 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const onlineUsers = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: fiveMinutesAgo }
+    });
+    
+    // New users today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const newUsersToday = await User.countDocuments({
+      createdAt: { $gte: todayStart }
+    });
+    
+    // Payment stats
     const totalRevenue = await Payment.aggregate([
       { $match: { status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$price' } } }
@@ -207,10 +219,6 @@ app.get('/api/stats/dashboard', async (req, res) => {
       }
     });
     
-    // Today stats
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    
     const todayRevenue = await Payment.aggregate([
       { 
         $match: { 
@@ -221,6 +229,16 @@ app.get('/api/stats/dashboard', async (req, res) => {
       { $group: { _id: null, total: { $sum: '$price' } } }
     ]);
     
+    // Subscription stats
+    const subscriptionStats = await User.aggregate([
+      {
+        $group: {
+          _id: '$subscriptionType',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
     // API usage stats
     const providers = await ApiProvider.find();
     const totalRequests = providers.reduce((sum, p) => sum + (p.totalRequests || 0), 0);
@@ -229,16 +247,43 @@ app.get('/api/stats/dashboard', async (req, res) => {
     // Proxy stats
     const proxyStats = await proxyManager.getProxyStatistics();
     
-    console.log('✅ Dashboard stats loaded:', {
-      totalKeys,
-      activeKeys,
-      totalRevenue: totalRevenue[0]?.total || 0,
-      monthlyTransactions
+    // Process subscription stats
+    const subscriptionBreakdown = {
+      free: 0,
+      monthly: 0,
+      lifetime: 0
+    };
+    subscriptionStats.forEach(stat => {
+      if (stat._id === 'free') subscriptionBreakdown.free = stat.count;
+      else if (stat._id === 'monthly' || stat._id === 'monthly_premium') subscriptionBreakdown.monthly = stat.count;
+      else if (stat._id === 'lifetime') subscriptionBreakdown.lifetime = stat.count;
+    });
+
+    console.log('✅ Real dashboard stats loaded:', {
+      totalUsers,
+      activeUsers,
+      onlineUsers,
+      subscriptionBreakdown,
+      totalRevenue: totalRevenue[0]?.total || 0
     });
 
     res.json({
       success: true,
-      keyStats: { total: totalKeys, active: activeKeys, expired: expiredKeys },
+      // Updated format for real data
+      userStats: { 
+        total: totalUsers, 
+        active: activeUsers, 
+        inactive: inactiveUsers,
+        online: onlineUsers,
+        newToday: newUsersToday
+      },
+      // Keep backward compatibility
+      keyStats: { 
+        total: totalUsers, // Show users as "keys" for compatibility
+        active: activeUsers, 
+        expired: inactiveUsers 
+      },
+      subscriptionStats: subscriptionBreakdown,
       billingStats: { 
         totalRevenue: totalRevenue[0]?.total || 0, 
         monthlyTransactions,
@@ -246,7 +291,7 @@ app.get('/api/stats/dashboard', async (req, res) => {
       },
       apiUsageStats: { totalRequests, costToday },
       proxyStats: proxyStats || { overview: {}, topPerformers: [] },
-      totalCredits: totalCredits[0]?.total || 0
+      totalCredits: 0 // Not applicable for user-based system
     });
   } catch (error) {
     console.error('❌ Error loading dashboard stats:', error);

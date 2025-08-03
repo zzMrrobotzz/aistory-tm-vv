@@ -12,8 +12,9 @@ const formatCurrency = (value: number) => `${(value || 0).toLocaleString('vi-VN'
 type BackendStatus = 'connecting' | 'online' | 'offline';
 
 const AdminDashboard: React.FC = () => {
-    // Data states
-    const [keyStats, setKeyStats] = useState({ total: 0, active: 0, expired: 0 });
+    // Data states  
+    const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0, online: 0, newToday: 0 });
+    const [subscriptionStats, setSubscriptionStats] = useState({ free: 0, monthly: 0, lifetime: 0 });
     const [billingStats, setBillingStats] = useState({ totalRevenue: 0, monthlyTransactions: 0 });
     const [apiUsageStats, setApiUsageStats] = useState({ totalRequests: 0, costToday: 0 });
     const [apiProviders, setApiProviders] = useState<ManagedApiProvider[]>([]);
@@ -34,16 +35,10 @@ const AdminDashboard: React.FC = () => {
                 fetchAuditLogs()
             ]);
 
-            // Process keys
-            if (keysData) {
-                const now = new Date();
-                const activeKeys = keysData.filter((k: AdminKey) => k.isActive).length;
-                const expiredKeys = keysData.filter((k: AdminKey) => k.expiredAt && new Date(k.expiredAt) < now).length;
-                setKeyStats({ total: keysData.length, active: activeKeys, expired: expiredKeys });
-            }
-
-            // Process stats
+            // Process user stats
             if (statsData) {
+                setUserStats(statsData.userStats || { total: 0, active: 0, inactive: 0, online: 0, newToday: 0 });
+                setSubscriptionStats(statsData.subscriptionStats || { free: 0, monthly: 0, lifetime: 0 });
                 setBillingStats(statsData.billingStats || { totalRevenue: 0, monthlyTransactions: 0 });
                 setApiUsageStats(statsData.apiUsageStats || { totalRequests: 0, costToday: 0 });
             }
@@ -122,13 +117,24 @@ const AdminDashboard: React.FC = () => {
             </div>
             
             <Skeleton loading={loadingData} active paragraph={{ rows: 10 }}>
-                {/* Key Statistics */}
+                {/* User Statistics */}
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-700 mb-4">📊 Thống Kê Key</h2>
+                    <h2 className="text-xl font-semibold text-gray-700 mb-4">👥 Thống Kê Người Dùng</h2>
                     <Row gutter={16}>
-                        <Col span={6}><StatCard title="Tổng Số Key" value={formatNumber(keyStats.total)} Icon={KeyRound}/></Col>
-                        <Col span={6}><StatCard title="Key Đang Hoạt Động" value={formatNumber(keyStats.active)} Icon={Users}/></Col>
-                        <Col span={6}><StatCard title="Key Đã Hết Hạn" value={formatNumber(keyStats.expired)} Icon={Activity} changeType="negative"/></Col>
+                        <Col span={6}><StatCard title="Tổng Người Dùng" value={formatNumber(userStats.total)} Icon={Users}/></Col>
+                        <Col span={6}><StatCard title="Đang Hoạt Động" value={formatNumber(userStats.active)} Icon={Activity}/></Col>
+                        <Col span={6}><StatCard title="Đang Online" value={formatNumber(userStats.online)} Icon={Shield} changeType="positive"/></Col>
+                        <Col span={6}><StatCard title="Đăng Ký Hôm Nay" value={formatNumber(userStats.newToday)} Icon={KeyRound}/></Col>
+                    </Row>
+                </div>
+
+                {/* Subscription Statistics */}
+                <div>
+                    <h2 className="text-xl font-semibold text-gray-700 mb-4">📋 Thống Kê Gói Dịch Vụ</h2>
+                    <Row gutter={16}>
+                        <Col span={8}><StatCard title="Gói Miễn Phí" value={formatNumber(subscriptionStats.free)} Icon={Users}/></Col>
+                        <Col span={8}><StatCard title="Gói Hàng Tháng" value={formatNumber(subscriptionStats.monthly)} Icon={CreditCard}/></Col>
+                        <Col span={8}><StatCard title="Gói Trọn Đời" value={formatNumber(subscriptionStats.lifetime)} Icon={Shield}/></Col>
                     </Row>
                 </div>
 
