@@ -35,8 +35,9 @@ const AdminDashboard: React.FC = () => {
                 fetchAuditLogs()
             ]);
 
-            // Process user stats
+            // Process user stats - now coming from fetchDashboardStats response
             if (statsData) {
+                console.log('📊 Processing dashboard stats:', statsData);
                 setUserStats(statsData.userStats || { total: 0, active: 0, inactive: 0, online: 0, newToday: 0 });
                 setSubscriptionStats(statsData.subscriptionStats || { free: 0, monthly: 0, lifetime: 0 });
                 setBillingStats(statsData.billingStats || { totalRevenue: 0, monthlyTransactions: 0 });

@@ -144,16 +144,22 @@ export const fetchDashboardStats = async () => {
         async () => {
             const response = await apiClient.get('/stats/dashboard');
             if (response.data.success) {
-                // Transform backend format to expected frontend format
+                // Return the full response data including userStats and subscriptionStats
                 const stats = response.data;
+                console.log('✅ Dashboard stats received:', stats);
                 return {
+                    // Legacy format for backward compatibility
                     totalKeys: stats.keyStats?.total || 0,
                     activeKeys: stats.keyStats?.active || 0,
                     totalRevenue: stats.billingStats?.totalRevenue || 0,
                     monthlyRevenue: stats.billingStats?.todayRevenue || 0,
-                    billingStats: stats.billingStats,
-                    apiUsageStats: stats.apiUsageStats,
-                    keyUsage: [] // Will implement chart data later
+                    keyUsage: [], // Will implement chart data later
+                    
+                    // New format with full data
+                    userStats: stats.userStats || { total: 0, active: 0, inactive: 0, online: 0, newToday: 0 },
+                    subscriptionStats: stats.subscriptionStats || { free: 0, monthly: 0, lifetime: 0 },
+                    billingStats: stats.billingStats || { totalRevenue: 0, monthlyTransactions: 0, todayRevenue: 0 },
+                    apiUsageStats: stats.apiUsageStats || { totalRequests: 0, costToday: 0 }
                 };
             }
             throw new Error('API response not successful');
