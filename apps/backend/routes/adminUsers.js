@@ -390,4 +390,65 @@ router.get('/stats/summary', /* isAdmin, */ async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/users/debug/sessions
+// @desc    Debug endpoint to see all sessions data
+// @access  Admin only
+router.get('/debug/sessions', async (req, res) => {
+  try {
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    
+    // Get all sessions
+    const allSessions = await UserSession.find()
+      .populate('userId', 'username email subscriptionType')
+      .sort({ lastActivity: -1 });
+    
+    // Get active sessions
+    const activeSessions = allSessions.filter(s => s.isActive);
+    
+    // Get recent sessions (within 5 minutes)
+    const recentSessions = allSessions.filter(s => 
+      s.isActive && s.lastActivity >= fiveMinutesAgo
+    );
+    
+    res.json({
+      success: true,
+      debug: {
+        timestamp: now,
+        threshold: fiveMinutesAgo,
+        counts: {
+          total: allSessions.length,
+          active: activeSessions.length,
+          recent: recentSessions.length
+        },
+        allSessions: allSessions.map(s => ({
+          _id: s._id,
+          userId: s.userId?._id,
+          username: s.userId?.username,
+          email: s.userId?.email,
+          subscriptionType: s.userId?.subscriptionType,
+          isActive: s.isActive,
+          loginAt: s.loginAt,
+          lastActivity: s.lastActivity,
+          logoutAt: s.logoutAt,
+          ipAddress: s.ipAddress,
+          minutesAgo: Math.round((now - s.lastActivity) / 60000)
+        })),
+        recentSessions: recentSessions.map(s => ({
+          username: s.userId?.username,
+          lastActivity: s.lastActivity,
+          minutesAgo: Math.round((now - s.lastActivity) / 60000)
+        }))
+      }
+    });
+    
+  } catch (err) {
+    console.error('Error in debug sessions:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: err.message 
+    });
+  }
+});
+
 module.exports = router;

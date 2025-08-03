@@ -15,6 +15,7 @@ const {
   forceLogoutAllSessions,
   getActiveSessionInfo 
 } = require('../middleware/singleSession');
+const { updateUserActivity, markUserOffline } = require('../middleware/activityTracker');
 
 // Handle preflight OPTIONS requests
 router.options('*', (req, res) => {
@@ -88,35 +89,24 @@ router.post('/register', antiSharingMiddleware, async (req, res) => {
       async (err, token) => {
         if (err) throw err;
         
-        // Create UserSession for online tracking
+        // Create session for new user
         try {
-          const sessionToken = req.antiSharingData?.sessionToken || token;
-          
-          // Create new session for new user
-          const sessionData = {
+          const newSession = new UserSession({
             userId: user._id,
             username: user.username,
-            sessionToken: sessionToken,
-            ipAddress: req.ip || req.connection.remoteAddress || 'unknown',
+            sessionToken: token,
+            ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
             userAgent: req.get('User-Agent') || '',
             isActive: true,
             loginAt: new Date(),
             lastActivity: new Date()
-          };
-          
-          // Only add deviceFingerprintId if it exists
-          if (req.antiSharingData?.deviceFingerprintId) {
-            sessionData.deviceFingerprintId = req.antiSharingData.deviceFingerprintId;
-          }
-          
-          const newSession = new UserSession(sessionData);
+          });
           
           await newSession.save();
-          console.log(`✅ UserSession created for new user ${user.username}`);
+          console.log(`🎉 Registration session created for ${user.username}`);
           
         } catch (sessionErr) {
-          console.error('❌ Error creating UserSession for new user:', sessionErr);
-          // Don't fail registration if session creation fails
+          console.error('❌ Critical: Session creation failed on register:', sessionErr);
         }
         
         res.json({ 
@@ -176,45 +166,34 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
       async (err, token) => {
         if (err) throw err;
         
-        // Create UserSession for online tracking
+        // Force logout previous sessions and create new one
         try {
-          const sessionToken = req.antiSharingData?.sessionToken || token;
-          
-          // Force logout previous sessions (single session enforcement)
           await UserSession.updateMany(
             { userId: user._id, isActive: true },
             { 
               isActive: false, 
               logoutAt: new Date(),
-              logoutReason: 'FORCE_LOGOUT'
+              logoutReason: 'NEW_LOGIN'
             }
           );
           
-          // Create new session
-          const sessionData = {
+          // Create new session - guaranteed creation
+          const newSession = new UserSession({
             userId: user._id,
             username: user.username,
-            sessionToken: sessionToken,
-            ipAddress: req.ip || req.connection.remoteAddress || 'unknown',
+            sessionToken: token,
+            ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
             userAgent: req.get('User-Agent') || '',
             isActive: true,
             loginAt: new Date(),
             lastActivity: new Date()
-          };
-          
-          // Only add deviceFingerprintId if it exists
-          if (req.antiSharingData?.deviceFingerprintId) {
-            sessionData.deviceFingerprintId = req.antiSharingData.deviceFingerprintId;
-          }
-          
-          const newSession = new UserSession(sessionData);
+          });
           
           await newSession.save();
-          console.log(`✅ UserSession created for user ${user.username}`);
+          console.log(`🚀 Login session created for ${user.username}`);
           
         } catch (sessionErr) {
-          console.error('❌ Error creating UserSession:', sessionErr);
-          // Don't fail login if session creation fails
+          console.error('❌ Critical: Session creation failed on login:', sessionErr);
         }
         
         res.json({ 
