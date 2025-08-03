@@ -4,6 +4,136 @@ const User = require('../models/User');
 const UserSession = require('../models/UserSession');
 const { isAdmin } = require('../middleware/adminAuth');
 
+// @route   GET /api/admin/users/test
+// @desc    Test endpoint for debugging
+// @access  Admin only  
+router.get('/test', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: 'Test endpoint working',
+      userSessionModel: !!UserSession,
+      timestamp: new Date()
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      stack: err.stack
+    });
+  }
+});
+
+// @route   GET /api/admin/users/online
+// @desc    Get currently online users
+// @access  Admin only
+router.get('/online', /* isAdmin, */ async (req, res) => {
+  try {
+    // Simple version first - just check if UserSession works
+    console.log('Testing UserSession model:', !!UserSession);
+    
+    const sessionCount = await UserSession.countDocuments({});
+    console.log('Total sessions in DB:', sessionCount);
+    
+    // Return mock data for now to test frontend
+    const mockData = {
+      success: true,
+      onlineUsers: [], // Empty for now
+      stats: {
+        totalOnline: 0,
+        totalSessions: 0,
+        bySubscription: {
+          free: 0,
+          monthly: 0,
+          lifetime: 0
+        },
+        averageSessionTime: 0
+      },
+      lastUpdated: new Date(),
+      debug: {
+        userSessionModelExists: !!UserSession,
+        totalSessionsInDB: sessionCount
+      }
+    };
+
+    res.json(mockData);
+
+  } catch (err) {
+    console.error('Error fetching online users:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: err.message,
+      stack: err.stack
+    });
+  }
+});
+
+// @route   GET /api/admin/users/online/stats
+// @desc    Get online users statistics
+// @access  Admin only
+router.get('/online/stats', /* isAdmin, */ async (req, res) => {
+  try {
+    const now = new Date();
+    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const lastHour = new Date(now.getTime() - 60 * 60 * 1000);
+    const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
+
+    // Current online users (within 5 minutes)
+    const currentOnline = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: last5Minutes }
+    });
+
+    // Active in last hour
+    const activeLastHour = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: lastHour }
+    });
+
+    // Active in last 24 hours
+    const activeLast24Hours = await UserSession.countDocuments({
+      isActive: true,
+      lastActivity: { $gte: last24Hours }
+    });
+
+    // Peak online today (simulate with current data - in production you'd store this)
+    const peakOnlineToday = Math.max(currentOnline, Math.floor(currentOnline * 1.5));
+
+    // Average session duration for active sessions
+    const activeSessions = await UserSession.find({
+      isActive: true,
+      lastActivity: { $gte: last24Hours }
+    });
+
+    const avgSessionDuration = activeSessions.reduce((acc, session) => {
+      return acc + (now.getTime() - new Date(session.loginAt).getTime());
+    }, 0) / activeSessions.length || 0;
+
+    res.json({
+      success: true,
+      stats: {
+        currentOnline,
+        activeLastHour,
+        activeLast24Hours,
+        peakOnlineToday,
+        avgSessionDuration: Math.round(avgSessionDuration / 1000 / 60), // minutes
+        totalActiveSessions: activeSessions.length
+      },
+      timestamp: now
+    });
+
+  } catch (err) {
+    console.error('Error fetching online stats:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  }
+});
+
 // @route   GET /api/admin/users
 // @desc    Get all users for admin panel
 // @access  Admin only (temporarily bypassed for demo)
@@ -244,136 +374,6 @@ router.get('/stats/summary', /* isAdmin, */ async (req, res) => {
   } catch (err) {
     console.error('Error fetching user stats:', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// @route   GET /api/admin/users/test
-// @desc    Test endpoint for debugging
-// @access  Admin only  
-router.get('/test', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: 'Test endpoint working',
-      userSessionModel: !!UserSession,
-      timestamp: new Date()
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err.message,
-      stack: err.stack
-    });
-  }
-});
-
-// @route   GET /api/admin/users/online
-// @desc    Get currently online users
-// @access  Admin only
-router.get('/online', /* isAdmin, */ async (req, res) => {
-  try {
-    // Simple version first - just check if UserSession works
-    console.log('Testing UserSession model:', !!UserSession);
-    
-    const sessionCount = await UserSession.countDocuments({});
-    console.log('Total sessions in DB:', sessionCount);
-    
-    // Return mock data for now to test frontend
-    const mockData = {
-      success: true,
-      onlineUsers: [], // Empty for now
-      stats: {
-        totalOnline: 0,
-        totalSessions: 0,
-        bySubscription: {
-          free: 0,
-          monthly: 0,
-          lifetime: 0
-        },
-        averageSessionTime: 0
-      },
-      lastUpdated: new Date(),
-      debug: {
-        userSessionModelExists: !!UserSession,
-        totalSessionsInDB: sessionCount
-      }
-    };
-
-    res.json(mockData);
-
-  } catch (err) {
-    console.error('Error fetching online users:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: err.message,
-      stack: err.stack
-    });
-  }
-});
-
-// @route   GET /api/admin/users/online/stats
-// @desc    Get online users statistics
-// @access  Admin only
-router.get('/online/stats', /* isAdmin, */ async (req, res) => {
-  try {
-    const now = new Date();
-    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const lastHour = new Date(now.getTime() - 60 * 60 * 1000);
-    const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
-
-    // Current online users (within 5 minutes)
-    const currentOnline = await UserSession.countDocuments({
-      isActive: true,
-      lastActivity: { $gte: last5Minutes }
-    });
-
-    // Active in last hour
-    const activeLastHour = await UserSession.countDocuments({
-      isActive: true,
-      lastActivity: { $gte: lastHour }
-    });
-
-    // Active in last 24 hours
-    const activeLast24Hours = await UserSession.countDocuments({
-      isActive: true,
-      lastActivity: { $gte: last24Hours }
-    });
-
-    // Peak online today (simulate with current data - in production you'd store this)
-    const peakOnlineToday = Math.max(currentOnline, Math.floor(currentOnline * 1.5));
-
-    // Average session duration for active sessions
-    const activeSessions = await UserSession.find({
-      isActive: true,
-      lastActivity: { $gte: last24Hours }
-    });
-
-    const avgSessionDuration = activeSessions.reduce((acc, session) => {
-      return acc + (now.getTime() - new Date(session.loginAt).getTime());
-    }, 0) / activeSessions.length || 0;
-
-    res.json({
-      success: true,
-      stats: {
-        currentOnline,
-        activeLastHour,
-        activeLast24Hours,
-        peakOnlineToday,
-        avgSessionDuration: Math.round(avgSessionDuration / 1000 / 60), // minutes
-        totalActiveSessions: activeSessions.length
-      },
-      timestamp: now
-    });
-
-  } catch (err) {
-    console.error('Error fetching online stats:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: err.message,
-      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
   }
 });
 
