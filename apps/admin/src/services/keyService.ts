@@ -380,11 +380,11 @@ export const deletePackage = async (packageId: string) => {
 
 // --- User Management Functions ---
 
-export const fetchUsers = async (page = 1, limit = 10, search = '', status = 'all') => {
+export const fetchUsers = async (page = 1, limit = 10, search = '', status = 'all', onlineStatus = 'all') => {
     return handleApiCall(
         async () => {
             const response = await apiClient.get('/admin/users', {
-                params: { page, limit, search, status }
+                params: { page, limit, search, status, onlineStatus }
             });
             if (response.data.success) {
                 return response.data;

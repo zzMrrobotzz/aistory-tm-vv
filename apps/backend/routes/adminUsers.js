@@ -152,7 +152,7 @@ router.get('/online/stats', /* isAdmin, */ async (req, res) => {
 // @access  Admin only (temporarily bypassed for demo)
 router.get('/', /* isAdmin, */ async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', status = 'all' } = req.query;
+    const { page = 1, limit = 10, search = '', status = 'all', onlineStatus = 'all' } = req.query;
     
     let query = {};
     
@@ -214,15 +214,33 @@ router.get('/', /* isAdmin, */ async (req, res) => {
       };
     }));
     
+    // Filter by online status if specified
+    let filteredUsers = usersWithSessionInfo;
+    if (onlineStatus !== 'all') {
+      if (onlineStatus === 'online') {
+        filteredUsers = usersWithSessionInfo.filter(user => user.sessionInfo?.isOnline === true);
+      } else if (onlineStatus === 'offline') {
+        filteredUsers = usersWithSessionInfo.filter(user => user.sessionInfo?.isOnline === false || !user.sessionInfo);
+      }
+    }
+    
+    // Update pagination to reflect filtered results
     const total = await User.countDocuments(query);
+    const filteredTotal = filteredUsers.length;
+    
+    // Apply pagination to filtered results
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
     
     res.json({
       success: true,
-      users: usersWithSessionInfo,
+      users: paginatedUsers,
       pagination: {
-        current: page,
-        pages: Math.ceil(total / limit),
-        total
+        current: parseInt(page),
+        pages: Math.ceil(filteredTotal / limit),
+        total: filteredTotal,
+        totalUsers: total // Total before online filter
       }
     });
   } catch (err) {

@@ -55,6 +55,7 @@ const UserManagement: React.FC = () => {
   });
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [onlineStatusFilter, setOnlineStatusFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newCredits, setNewCredits] = useState(0);
@@ -63,10 +64,10 @@ const UserManagement: React.FC = () => {
   const [newSubscriptionExpiry, setNewSubscriptionExpiry] = useState('');
   const [manualTrialDays, setManualTrialDays] = useState(3);
 
-  const loadUsers = async (page = 1, search = searchText, status = statusFilter) => {
+  const loadUsers = async (page = 1, search = searchText, status = statusFilter, onlineStatus = onlineStatusFilter) => {
     setLoading(true);
     try {
-      const response = await fetchUsers(page, pagination.pageSize, search, status);
+      const response = await fetchUsers(page, pagination.pageSize, search, status, onlineStatus);
       setUsers(response.users || []);
       setPagination(prev => ({
         ...prev,
@@ -97,7 +98,7 @@ const UserManagement: React.FC = () => {
     
     // Auto-refresh mỗi 30 giây để cập nhật trạng thái online
     const interval = setInterval(() => {
-      loadUsers(pagination.current, searchText, statusFilter);
+      loadUsers(pagination.current, searchText, statusFilter, onlineStatusFilter);
     }, 30000);
     
     return () => clearInterval(interval);
@@ -118,12 +119,17 @@ const UserManagement: React.FC = () => {
 
   const handleSearch = (value: string) => {
     setSearchText(value);
-    loadUsers(1, value, statusFilter);
+    loadUsers(1, value, statusFilter, onlineStatusFilter);
   };
 
   const handleStatusFilter = (value: string) => {
     setStatusFilter(value);
-    loadUsers(1, searchText, value);
+    loadUsers(1, searchText, value, onlineStatusFilter);
+  };
+
+  const handleOnlineStatusFilter = (value: string) => {
+    setOnlineStatusFilter(value);
+    loadUsers(1, searchText, statusFilter, value);
   };
 
   const handleTableChange = (paginationInfo: any) => {
@@ -436,7 +442,7 @@ const UserManagement: React.FC = () => {
 
       {/* Search and Filters */}
       <div className="filters-row" style={{ marginBottom: 16 }}>
-        <Space size="middle">
+        <Space size="middle" wrap>
           <Input.Search
             placeholder="Tìm kiếm username hoặc email..."
             allowClear
@@ -448,10 +454,21 @@ const UserManagement: React.FC = () => {
             value={statusFilter}
             style={{ width: 150 }}
             onChange={handleStatusFilter}
+            placeholder="Trạng thái"
           >
-            <Option value="all">Tất cả</Option>
-            <Option value="active">Hoạt động</Option>
-            <Option value="inactive">Vô hiệu</Option>
+            <Option value="all">🟢 Tất cả</Option>
+            <Option value="active">✅ Hoạt động</Option>
+            <Option value="inactive">❌ Vô hiệu</Option>
+          </Select>
+          <Select
+            value={onlineStatusFilter}
+            style={{ width: 150 }}
+            onChange={handleOnlineStatusFilter}
+            placeholder="Online Status"
+          >
+            <Option value="all">🌐 Tất cả</Option>
+            <Option value="online">🟢 Online</Option>
+            <Option value="offline">⚪ Offline</Option>
           </Select>
           <Button onClick={() => loadUsers(1)}>
             Làm mới
