@@ -9,6 +9,28 @@ const authApi = axios.create({
   baseURL: API_URL,
 });
 
+// Add response interceptor to handle session termination
+authApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && error.response?.data?.sessionTerminated) {
+      // Session terminated due to concurrent login
+      console.log('🔒 Session terminated:', error.response.data.reason);
+      
+      // Clear local auth data
+      localStorage.removeItem('userToken');
+      delete authApi.defaults.headers.common['x-auth-token'];
+      
+      // Redirect to login with message
+      alert(error.response.data.reason || 'Your session has been terminated due to login from another device');
+      window.location.replace('/login');
+      
+      return Promise.reject(error);
+    }
+    return Promise.reject(error);
+  }
+);
+
 const setAuthToken = (token: string | null) => {
   if (token) {
     authApi.defaults.headers.common['x-auth-token'] = token;
