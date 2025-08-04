@@ -878,3 +878,11 @@ export interface AiAssistantModuleState {
     isChatting: boolean;
     error: string | null;
 }
+
+// --- Support Chatbot Widget ---
+export interface ChatbotWidgetState {
+    isOpen: boolean;
+    chatHistory: ChatMessage[];
+    isLoading: boolean;
+    error: string | null;
+}

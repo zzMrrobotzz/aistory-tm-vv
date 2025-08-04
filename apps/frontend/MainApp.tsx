@@ -1183,7 +1183,7 @@ const MainApp: React.FC = () => {
       </div>
       
       {/* Support Chatbot */}
-      <SupportChatbot />
+      <SupportChatbot apiSettings={apiSettings} />
     </div>
   );
 };
