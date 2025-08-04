@@ -15,6 +15,7 @@ import AdminSubscriptionPlans from './pages/AdminSubscriptionPlans'; // Đổi t
 import AdminUserManagement from './pages/AdminUserManagement'; // Thêm mới
 import AdminOnlineUsers from './pages/AdminOnlineUsers'; // Thêm mới
 import AdminTutorials from './pages/AdminTutorials'; // Quản lý hướng dẫn
+import AdminSupportContent from './pages/AdminSupportContent'; // Quản lý nội dung hỗ trợ
 import { AdminActiveModule } from './types';
 
 const AdminApp: React.FC = () => {
@@ -42,6 +43,8 @@ const AdminApp: React.FC = () => {
         return <AdminOnlineUsers />;
       case 'tutorials': // Quản lý hướng dẫn
         return <AdminTutorials />;
+      case 'supportContent': // Quản lý nội dung hỗ trợ
+        return <AdminSupportContent />;
       case 'apiProviders':
         return <AdminApiProviders />;
       case 'apiKeyPool':

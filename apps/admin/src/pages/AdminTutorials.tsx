@@ -563,7 +563,6 @@ const AdminTutorials: React.FC = () => {
               }));
             }
           }}
-          scroll={{ x: 1200 }}
         />
       </Card>
 

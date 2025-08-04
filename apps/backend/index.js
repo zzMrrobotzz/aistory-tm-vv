@@ -523,9 +523,11 @@ app.use('/api/admin/tutorials', require('./routes/adminTutorials')); // Tutorial
 app.use('/api/admin', require('./routes/adminPackages')); // Package management
 app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment management
 app.use('/api/admin/anti-sharing', require('./routes/adminAntiSharing')); // Anti-sharing management
+app.use('/api/admin/support-content', require('./routes/adminSupportContent')); // Support content management
 // Apply universal activity tracking to protected routes
 app.use('/api/ai', auth, updateUserActivity, aiProxyRouter);
 app.use('/api/tutorials', require('./routes/tutorials')); // Public tutorials for end users
+app.use('/api/support-content', require('./routes/supportContent')); // Public support content
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution  
 app.use('/api/user', auth, updateUserActivity, require('./routes/userStats')); // User statistics
