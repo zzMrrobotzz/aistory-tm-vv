@@ -168,16 +168,7 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
         
         // Force logout previous sessions and create new one
         try {
-          await UserSession.updateMany(
-            { userId: user._id, isActive: true },
-            { 
-              isActive: false, 
-              logoutAt: new Date(),
-              logoutReason: 'NEW_LOGIN'
-            }
-          );
-          
-          // Create new session - guaranteed creation
+          // First create new session with new token
           const newSession = new UserSession({
             userId: user._id,
             username: user.username,
@@ -190,7 +181,22 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
           });
           
           await newSession.save();
-          console.log(`🚀 Login session created for ${user.username}`);
+          
+          // Then logout all OTHER sessions (not the new one we just created)
+          await UserSession.updateMany(
+            { 
+              userId: user._id, 
+              isActive: true,
+              sessionToken: { $ne: token }  // Don't logout the new session
+            },
+            { 
+              isActive: false, 
+              logoutAt: new Date(),
+              logoutReason: 'NEW_LOGIN_CONCURRENT'
+            }
+          );
+          
+          console.log(`🚀 New session created for ${user.username}, old sessions terminated`);
           
         } catch (sessionErr) {
           console.error('❌ Critical: Session creation failed on login:', sessionErr);
