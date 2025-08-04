@@ -29,6 +29,7 @@ export const NAVIGATION_GROUPS = [
     icon: "✨",
     subItems: [
       { id: ActiveModule.Analysis, label: "Phân Tích Truyện", icon: "✨" },
+      { id: ActiveModule.ContentSummarizer, label: "Tóm Tắt Nội Dung", icon: "📋" },
       { id: ActiveModule.ViralTitleGenerator, label: "Phân tích & Mở rộng Chủ đề", icon: "💡" },
       { id: ActiveModule.Dream100CompetitorAnalysis, label: "Dream 100 (Đối Thủ)", icon: "🎯" },
       { id: ActiveModule.YouTubeSEO, label: "YouTube SEO & Từ Khóa", icon: "📊" },

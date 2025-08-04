@@ -21,6 +21,7 @@ export enum ActiveModule {
   // NicheThemeExplorer = "niche-theme-explorer", // Removed and merged into ViralTitleGenerator
   Dream100CompetitorAnalysis = "dream-100-competitor-analysis", // Added
   CharacterStudio = "character-studio", // Added for Character Locking Prompts
+  ContentSummarizer = "content-summarizer", // Added for Content Summarization
   Support = "support", // Added
   Settings = "settings", // Added for API key management
   Tutorials = "tutorials", // Added for tutorial videos
@@ -854,4 +855,26 @@ export interface UserProfile {
     subscriptionType: 'free' | 'monthly' | 'quarterly' | 'lifetime';
     subscriptionExpiresAt: string; // ISO date string
     createdAt: string; // ISO date string
+}
+
+// --- Content Summarizer Module ---
+export type AiAssistantInputType = 'youtubeLink' | 'text';
+
+export interface ChatMessage {
+    role: 'user' | 'model';
+    message: string;
+}
+
+export interface AiAssistantModuleState {
+    activeInputTab: AiAssistantInputType;
+    youtubeLinkInput: string;
+    textInput: string;
+    processedSourceText: string | null;
+    summary: string | null;
+    chatHistory: ChatMessage[];
+    groundingSources: GroundingChunk[];
+    currentQuestion: string;
+    isLoading: boolean;
+    isChatting: boolean;
+    error: string | null;
 }

@@ -18,6 +18,7 @@ import {
   ElevenLabsApiKey, ElevenLabsVoice, // Added for ElevenLabs TTS
   // QuickRewriteState removed as it's merged into RewriteModuleState
   UserProfile, // Add UserProfile
+  AiAssistantModuleState, // Added for Content Summarizer
 } from './types';
 import { 
     DEFAULT_API_PROVIDER, HOOK_LANGUAGE_OPTIONS, 
@@ -50,6 +51,7 @@ import BatchStoryWritingModule from './components/modules/BatchStoryWritingModul
 import BatchRewriteModule from './components/modules/BatchRewriteModule'; // Added
 import Dream100CompetitorAnalysisModule from './components/modules/Dream100CompetitorAnalysisModule'; // Added
 import CharacterStudioModule from './components/modules/CharacterStudioModule'; // Added
+import ContentSummarizerModule from './components/modules/ContentSummarizerModule'; // Added for Content Summarizer
 import SupportModule from './components/modules/SupportModule'; // Added
 import TutorialComponent from './components/TutorialComponent'; // Added for tutorials
 import SupportChatbot from './components/SupportChatbot'; // Added for chatbot
@@ -660,6 +662,21 @@ const MainApp: React.FC = () => {
   };
   const [characterStudioState, setCharacterStudioState] = useState<CharacterStudioModuleState>(initialCharacterStudioState);
 
+  // Content Summarizer Module State
+  const initialContentSummarizerState: AiAssistantModuleState = {
+    activeInputTab: 'text',
+    youtubeLinkInput: '',
+    textInput: '',
+    processedSourceText: null,
+    summary: null,
+    chatHistory: [],
+    groundingSources: [],
+    currentQuestion: '',
+    isLoading: false,
+    isChatting: false,
+    error: null,
+  };
+  const [contentSummarizerState, setContentSummarizerState] = useState<AiAssistantModuleState>(initialContentSummarizerState);
 
   // The useEffect for loading 'allowUserApiKeys' has been removed to make settings always visible.
 
@@ -1074,6 +1091,12 @@ const MainApp: React.FC = () => {
                   moduleState={analysisState}
                   setModuleState={setAnalysisState}
                   currentUser={currentUser} // Pass user profile
+                />;
+      case ActiveModule.ContentSummarizer:
+        return <ContentSummarizerModule 
+                  apiSettings={apiSettings}
+                  moduleState={contentSummarizerState}
+                  setModuleState={setContentSummarizerState}
                 />;
        case ActiveModule.Dream100CompetitorAnalysis: // Added
         return <Dream100CompetitorAnalysisModule
