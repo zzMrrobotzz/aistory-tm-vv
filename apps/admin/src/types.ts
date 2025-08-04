@@ -14,6 +14,7 @@ export type AdminActiveModule =
   | 'subscriptionPlans' // Thay thế creditPackages
   | 'suspiciousActivity'
   | 'apis'
+  | 'iconManager' // Quản lý icons tùy chỉnh
   | 'settings';
 
 export interface AdminUser {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { AdminActiveModule } from './types';
-import { LayoutDashboard, KeyRound, CreditCard, ShieldAlert, Cloud, Settings, LogOut, Cpu, Database, Wifi, Banknote, Gift, Users, UserCheck, PlayCircle, HelpCircle, Timer } from 'lucide-react';
+import { LayoutDashboard, KeyRound, CreditCard, ShieldAlert, Cloud, Settings, LogOut, Cpu, Database, Wifi, Banknote, Gift, Users, UserCheck, PlayCircle, HelpCircle, Timer, Palette } from 'lucide-react';
+import CustomIcon from './components/CustomIcon';
 
 interface AdminSidebarProps {
   activeModule: AdminActiveModule;
@@ -24,6 +25,7 @@ const NAVIGATION_ITEMS = [
   { id: 'subscriptionPlans', label: 'Quản Lý Gói Cước', icon: Gift },
   { id: 'suspiciousActivity', label: 'Giám Sát & Log', icon: ShieldAlert },
   { id: 'apis', label: 'Theo Dõi API', icon: Cloud },
+  { id: 'iconManager', label: 'Quản Lý Icons', icon: Palette },
   { id: 'settings', label: 'Cài Đặt Hệ Thống', icon: Settings },
 ];
 

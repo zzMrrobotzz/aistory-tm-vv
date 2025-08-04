@@ -17,6 +17,7 @@ import AdminOnlineUsers from './pages/AdminOnlineUsers'; // Thêm mới
 import AdminTutorials from './pages/AdminTutorials'; // Quản lý hướng dẫn
 import AdminSupportContent from './pages/AdminSupportContent'; // Quản lý nội dung hỗ trợ
 import AdminRateLimiting from './pages/AdminRateLimiting'; // Quản lý rate limiting
+import AdminIconManager from './pages/AdminIconManager'; // Quản lý icons tùy chỉnh
 import { AdminActiveModule } from './types';
 
 const AdminApp: React.FC = () => {
@@ -64,6 +65,8 @@ const AdminApp: React.FC = () => {
         return <AdminSubscriptionPlans />;
       case 'suspiciousActivity':
         return <AdminSuspiciousActivity />;
+      case 'iconManager':
+        return <AdminIconManager />;
       case 'settings':
         return <AdminSettings />;
       default:
