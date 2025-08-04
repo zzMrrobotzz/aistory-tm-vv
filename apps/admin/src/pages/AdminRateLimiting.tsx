@@ -11,6 +11,8 @@ import {
   SaveOutlined
 } from '@ant-design/icons';
 
+const API_BASE_URL = 'https://aistory-backend.onrender.com';
+
 const { Option } = Select;
 
 interface RateLimitConfig {
@@ -92,7 +94,7 @@ const AdminRateLimiting: React.FC = () => {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/rate-limit/config');
+      const response = await fetch(`${API_BASE_URL}/api/admin/rate-limit/config`);
       if (response.ok) {
         const data = await response.json();
         setConfig(data.config);
@@ -109,7 +111,7 @@ const AdminRateLimiting: React.FC = () => {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/admin/rate-limit/stats');
+      const response = await fetch(`${API_BASE_URL}/api/admin/rate-limit/stats`);
       if (response.ok) {
         const data = await response.json();
         setStats(data.stats);
@@ -121,7 +123,7 @@ const AdminRateLimiting: React.FC = () => {
 
   const loadUserUsages = async () => {
     try {
-      const response = await fetch('/api/admin/rate-limit/users?limit=50');
+      const response = await fetch(`${API_BASE_URL}/api/admin/rate-limit/users?limit=50`);
       if (response.ok) {
         const data = await response.json();
         setUserUsages(data.usages);
@@ -155,7 +157,7 @@ const AdminRateLimiting: React.FC = () => {
         isActive: values.isActive
       };
 
-      const response = await fetch('/api/admin/rate-limit/config', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/rate-limit/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(configData)
@@ -179,7 +181,7 @@ const AdminRateLimiting: React.FC = () => {
 
   const resetUserUsage = async (userId: string) => {
     try {
-      const response = await fetch(`/api/admin/rate-limit/reset-user/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/rate-limit/reset-user/${userId}`, {
         method: 'POST'
       });
       
