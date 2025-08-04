@@ -13,7 +13,7 @@ router.get('/config', async (req, res) => {
         
         res.json({
             success: true,
-            data: config
+            config: config
         });
     } catch (error) {
         console.error('Error fetching rate limit config:', error);
@@ -25,10 +25,10 @@ router.get('/config', async (req, res) => {
     }
 });
 
-// @route   PUT /api/admin/rate-limit/config
+// @route   POST /api/admin/rate-limit/config  
 // @desc    Update rate limit configuration
 // @access  Admin
-router.put('/config', async (req, res) => {
+router.post('/config', async (req, res) => {
     try {
         const updateData = req.body;
         
@@ -102,16 +102,13 @@ router.get('/stats', async (req, res) => {
 
         res.json({
             success: true,
-            data: {
-                historical: stats,
-                today: todayStats[0] || {
-                    totalUsers: 0,
-                    activeUsers: 0,
-                    totalUsage: 0,
-                    avgUsage: 0,
-                    blockedUsers: 0,
-                    heavyUsers: 0
-                }
+            stats: {
+                totalUsers: todayStats[0]?.totalUsers || 0,
+                activeToday: todayStats[0]?.activeUsers || 0,
+                totalRequests: todayStats[0]?.totalUsage || 0,
+                averageRequestsPerUser: Math.round(todayStats[0]?.avgUsage || 0),
+                limitExceeded: todayStats[0]?.heavyUsers || 0,
+                topModules: []
             }
         });
     } catch (error) {
@@ -119,6 +116,60 @@ router.get('/stats', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Không thể tải thống kê',
+            error: error.message
+        });
+    }
+});
+
+// @route   GET /api/admin/rate-limit/users
+// @desc    Get all users with their usage info
+// @access  Admin
+router.get('/users', async (req, res) => {
+    try {
+        const { limit = 50, days = 1 } = req.query;
+        
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Get user usage data with User info
+        const pipeline = [
+            { $match: { date: today } },
+            { 
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'userInfo'
+                }
+            },
+            { $unwind: { path: '$userInfo', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    userId: 1,
+                    username: '$userInfo.username',
+                    email: '$userInfo.email',
+                    subscriptionType: '$userInfo.subscriptionType',
+                    date: 1,
+                    totalUsage: 1,
+                    usageLimit: '$dailyLimit',
+                    moduleUsage: 1,
+                    lastRequest: '$lastActivity',
+                    isBlocked: 1
+                }
+            },
+            { $limit: parseInt(limit) }
+        ];
+        
+        const usages = await DailyUsageLimit.aggregate(pipeline);
+        
+        res.json({
+            success: true,
+            usages: usages
+        });
+    } catch (error) {
+        console.error('Error fetching user usages:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Không thể tải danh sách user usage',
             error: error.message
         });
     }
@@ -234,6 +285,31 @@ router.post('/block-user', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Không thể thay đổi trạng thái block của user',
+            error: error.message
+        });
+    }
+});
+
+// @route   POST /api/admin/rate-limit/reset-user/:userId
+// @desc    Reset usage for specific user (admin panel format)
+// @access  Admin
+router.post('/reset-user/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const today = new Date().toISOString().split('T')[0];
+        
+        const result = await resetDailyUsage(userId, today);
+        
+        res.json({
+            success: true,
+            message: 'Đã reset usage cho user',
+            data: result
+        });
+    } catch (error) {
+        console.error('Error resetting user usage:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Không thể reset usage cho user',
             error: error.message
         });
     }
