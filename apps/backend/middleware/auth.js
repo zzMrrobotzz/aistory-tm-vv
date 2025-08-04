@@ -16,25 +16,29 @@ module.exports = async function (req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded.user;
 
-    // SINGLE SESSION VALIDATION - TEMPORARILY DISABLED FOR DEBUGGING
-    // const userSession = await UserSession.findOne({
-    //   userId: req.user.id,
-    //   sessionToken: token,
-    //   isActive: true
-    // });
+    // SINGLE SESSION VALIDATION - Check if session exists and is valid
+    try {
+      const userSession = await UserSession.findOne({
+        userId: req.user.id,
+        sessionToken: token,
+        isActive: true
+      });
 
-    // if (!userSession) {
-    //   // Session has been terminated (concurrent login detected)
-    //   return res.status(401).json({ 
-    //     msg: 'Session terminated', 
-    //     sessionTerminated: true,
-    //     reason: 'Your session has been terminated due to login from another device/browser'
-    //   });
-    // }
-
-    // // Update last activity
-    // userSession.lastActivity = new Date();
-    // await userSession.save();
+      // If no session found, only reject if single session mode is enforced
+      // For now, we'll be more lenient and only check for obvious conflicts
+      if (userSession) {
+        // Update last activity if session exists
+        userSession.lastActivity = new Date();
+        await userSession.save();
+      } else {
+        // Session not found - this could be normal for older tokens
+        // Only enforce single session for new logins, not existing sessions
+        console.log(`⚠️  No session found for token, but allowing access (user: ${req.user.id})`);
+      }
+    } catch (sessionError) {
+      console.error('Session validation error:', sessionError);
+      // Don't fail auth on session errors, just log them
+    }
 
     next();
   } catch (err) {

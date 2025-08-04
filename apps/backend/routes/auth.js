@@ -167,40 +167,55 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
       async (err, token) => {
         if (err) throw err;
         
-        // Force logout previous sessions and create new one
+        // Create session for single session tracking (optional, non-blocking)
         try {
-          // First create new session with new token
-          const newSession = new UserSession({
+          // Check if session already exists for this token
+          const existingSession = await UserSession.findOne({
             userId: user._id,
-            username: user.username,
-            sessionToken: token,
-            ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
-            userAgent: req.get('User-Agent') || '',
-            isActive: true,
-            loginAt: new Date(),
-            lastActivity: new Date()
+            sessionToken: token
           });
-          
-          await newSession.save();
-          
-          // Then logout all OTHER sessions (not the new one we just created)
-          await UserSession.updateMany(
-            { 
-              userId: user._id, 
+
+          if (!existingSession) {
+            // Create new session
+            const newSession = new UserSession({
+              userId: user._id,
+              username: user.username,
+              sessionToken: token,
+              ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
+              userAgent: req.get('User-Agent') || '',
               isActive: true,
-              sessionToken: { $ne: token }  // Don't logout the new session
-            },
-            { 
-              isActive: false, 
-              logoutAt: new Date(),
-              logoutReason: 'NEW_LOGIN_CONCURRENT'
-            }
-          );
-          
-          console.log(`🚀 New session created for ${user.username}, old sessions terminated`);
+              loginAt: new Date(),
+              lastActivity: new Date()
+            });
+            
+            await newSession.save();
+            console.log(`✅ Session created for ${user.username}`);
+
+            // Optionally cleanup old sessions (but don't enforce strictly)
+            await UserSession.updateMany(
+              { 
+                userId: user._id, 
+                isActive: true,
+                sessionToken: { $ne: token },
+                lastActivity: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Only cleanup sessions older than 24 hours
+              },
+              { 
+                isActive: false, 
+                logoutAt: new Date(),
+                logoutReason: 'OLD_SESSION_CLEANUP'
+              }
+            );
+          } else {
+            // Reactivate existing session
+            existingSession.isActive = true;
+            existingSession.lastActivity = new Date();
+            await existingSession.save();
+            console.log(`✅ Session reactivated for ${user.username}`);
+          }
           
         } catch (sessionErr) {
-          console.error('❌ Critical: Session creation failed on login:', sessionErr);
+          console.error('⚠️  Session creation failed (non-critical):', sessionErr);
+          // Don't fail login if session creation fails
         }
         
         res.json({ 
