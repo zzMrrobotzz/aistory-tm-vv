@@ -59,6 +59,7 @@ export const NAVIGATION_GROUPS = [
     icon: "⚙️",
     subItems: [
        { id: ActiveModule.Settings, label: "Quản Lý API Keys", icon: "🔑" },
+       { id: ActiveModule.UsageStats, label: "Thống Kê Usage", icon: "📊" },
     ]
   }
 ];

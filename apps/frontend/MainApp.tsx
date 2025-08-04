@@ -55,6 +55,7 @@ import ContentSummarizerModule from './components/modules/ContentSummarizerModul
 import SupportModule from './components/modules/SupportModule'; // Added
 import TutorialComponent from './components/TutorialComponent'; // Added for tutorials
 import SupportChatbot from './components/SupportChatbot'; // Added for chatbot
+import UsageStatsModule from './components/modules/UsageStatsModule'; // Added for usage statistics
 import { getUserProfile, refreshUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
@@ -1155,6 +1156,8 @@ const MainApp: React.FC = () => {
         return <TutorialComponent />;
       case ActiveModule.Settings:
         return <Settings onApiKeysChange={handleApiKeysChange} />;
+      case ActiveModule.UsageStats:
+        return <UsageStatsModule currentUser={currentUser} />;
       case ActiveModule.Pricing:
         return <Pricing />;
       default:

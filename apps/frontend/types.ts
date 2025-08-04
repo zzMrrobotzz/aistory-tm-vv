@@ -26,6 +26,7 @@ export enum ActiveModule {
   Settings = "settings", // Added for API key management
   Tutorials = "tutorials", // Added for tutorial videos
   Pricing = "pricing",
+  UsageStats = "usage-stats", // Added for usage statistics
 }
 
 // Interface for ElevenLabs API key management

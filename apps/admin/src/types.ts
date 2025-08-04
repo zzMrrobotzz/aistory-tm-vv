@@ -4,6 +4,7 @@ export type AdminActiveModule =
   | 'onlineUsers' // Theo dõi người dùng online
   | 'tutorials' // Quản lý hướng dẫn video
   | 'supportContent' // Quản lý nội dung hỗ trợ
+  | 'rateLimiting' // Quản lý rate limiting
   | 'keyManagement' // Hợp nhất user và key
   | 'apiProviders' // Quản lý API provider keys
   | 'apiKeyPool' // Quản lý kho API key

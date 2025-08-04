@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ActiveModule, UserProfile } from '../types';
 import { NAVIGATION_GROUPS } from '../constants';
 import { ChevronDown, LogOut, User } from 'lucide-react';
+import UsageQuotaDisplay from './UsageQuotaDisplay';
 
 interface SidebarProps {
   activeModule: ActiveModule;
@@ -81,6 +82,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, curren
           </div>
         ))}
       </nav>
+      
+      {/* Usage Quota Display */}
+      {currentUser && (
+        <div className="mb-4">
+          <UsageQuotaDisplay compact={true} showDetails={false} />
+        </div>
+      )}
       
       {/* User Info & Logout Section */}
       <div className="border-t border-gray-700 pt-4 mt-4">

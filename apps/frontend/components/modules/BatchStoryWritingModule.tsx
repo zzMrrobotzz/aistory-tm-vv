@@ -19,8 +19,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import HistoryPanel from '../HistoryPanel';
-import { generateText as generateGeminiText, generateTextWithJsonOutput as generateGeminiJson } from '../../services/geminiService';
-import { generateText as generateDeepSeekText, generateTextWithJsonOutput as generateDeepSeekJson } from '../../services/deepseekService';
+import { generateText, generateTextWithJsonOutput } from '../../services/textGenerationService';
 import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import { StopCircle } from 'lucide-react';
@@ -83,15 +82,10 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
   ): Promise<Omit<GeneratedBatchStoryOutputItem, 'id' | 'originalOutline'>> => {
     
     // --- Define service functions based on provider ---
-    const textGenerator = apiSettings.provider === 'deepseek'
-        ? (prompt: string) => generateDeepSeekText(prompt, undefined, deepseekApiKeyForService)
-        : (prompt: string) => generateGeminiText(prompt, undefined, undefined, geminiApiKeyForService).then(res => res.text);
+    const textGenerator = (prompt: string) => generateText(prompt, undefined, false, apiSettings, 'batch-story-writing').then(res => res.text);
     
     const jsonGenerator = <T,>(prompt: string): Promise<T> => {
-        if (apiSettings.provider === 'deepseek') {
-            return generateDeepSeekJson<T>(prompt, deepseekApiKeyForService);
-        }
-        return generateGeminiJson<T>(prompt, undefined, geminiApiKeyForService);
+        return generateTextWithJsonOutput<T>(prompt, undefined, apiSettings, 'batch-story-writing');
     };
 
 

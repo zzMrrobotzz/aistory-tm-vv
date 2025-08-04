@@ -348,7 +348,7 @@ ${fullGeneratedStory || "This is the beginning of the story."}
 Provide ONLY the story content for this section:`;
       
       await delay(500);
-      const result = await generateText(prompt, undefined, false, apiSettings);
+      const result = await generateText(prompt, undefined, false, apiSettings, 'write-story');
       fullGeneratedStory += (fullGeneratedStory ? '\n\n' : '') + (result?.text || '').trim();
       
       // Update progress after chunk completion
@@ -1014,7 +1014,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
     Không thêm bất kỳ lời bình, giới thiệu, hay tiêu đề nào.`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, apiSettings);
+      const result = await generateText(prompt, undefined, undefined, apiSettings, 'write-story');
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const editedStory = result.text;
       updateState({ 

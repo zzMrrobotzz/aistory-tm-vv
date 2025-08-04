@@ -160,7 +160,7 @@ ${rewrittenText}
 
 Chỉ trả về JSON.`;
 
-            const result = await generateText(analysisPrompt, undefined, false, apiSettings);
+            const result = await generateText(analysisPrompt, undefined, false, apiSettings, 'rewrite');
             const jsonMatch = result?.text.match(/\{[\s\S]*\}/);
             
             if (jsonMatch) {
@@ -498,7 +498,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             // Longer delay for queue mode to prevent rate limiting
             await delay(1500);
             const result = await retryApiCall(
-                () => generateText(prompt, undefined, false, apiSettings),
+                () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
                 3,
                 true // isQueueMode = true
             );
@@ -678,7 +678,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 
                 await delay(500);
                 const result = await retryApiCall(
-                    () => generateText(prompt, undefined, false, apiSettings),
+                    () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
                     3,
                     false // isQueueMode = false
                 );
@@ -801,7 +801,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         
         try {
             const result = await retryApiCall(
-                () => generateText(editPrompt, undefined, false, apiSettings),
+                () => generateText(editPrompt, undefined, false, apiSettings, 'rewrite'),
                 3,
                 false
             );
@@ -845,7 +845,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
             const prompt = `Translate the following text to ${translateTargetLang}${styleInstruction}. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${rewrittenText.trim()}\n"""`;
 
             const result = await retryApiCall(
-                () => generateText(prompt, undefined, false, apiSettings),
+                () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
                 3,
                 false
             );

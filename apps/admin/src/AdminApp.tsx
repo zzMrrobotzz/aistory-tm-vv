@@ -16,6 +16,7 @@ import AdminUserManagement from './pages/AdminUserManagement'; // Thêm mới
 import AdminOnlineUsers from './pages/AdminOnlineUsers'; // Thêm mới
 import AdminTutorials from './pages/AdminTutorials'; // Quản lý hướng dẫn
 import AdminSupportContent from './pages/AdminSupportContent'; // Quản lý nội dung hỗ trợ
+import AdminRateLimiting from './pages/AdminRateLimiting'; // Quản lý rate limiting
 import { AdminActiveModule } from './types';
 
 const AdminApp: React.FC = () => {
@@ -45,6 +46,8 @@ const AdminApp: React.FC = () => {
         return <AdminTutorials />;
       case 'supportContent': // Quản lý nội dung hỗ trợ
         return <AdminSupportContent />;
+      case 'rateLimiting': // Quản lý rate limiting
+        return <AdminRateLimiting />;
       case 'apiProviders':
         return <AdminApiProviders />;
       case 'apiKeyPool':

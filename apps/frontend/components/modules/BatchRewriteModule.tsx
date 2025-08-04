@@ -19,8 +19,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import HistoryPanel from '../HistoryPanel';
-import { generateText as generateGeminiText } from '../../services/geminiService';
-import { generateText as generateDeepSeekText } from '../../services/deepseekService';
+import { generateText } from '../../services/textGenerationService';
 import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
@@ -45,8 +44,7 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     setModuleState(prev => ({ ...prev, ...updates }));
   };
   
-  const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
-  const deepseekApiKeyForService = apiSettings.provider === 'deepseek' ? apiSettings.apiKey : undefined;
+  // Using textGenerationService which handles provider selection automatically
 
 
   // Sync globalAdaptContext based on global languages
@@ -97,8 +95,7 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     userProvidedCustomInstructions: string, // Actual custom instructions text, or empty if not 'custom'
     currentAdaptContext: boolean,
     itemId: string, // For progress updates
-    onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null, charMap?: string) => void,
-    textGenerator: (prompt: string, systemInstruction?: string) => Promise<string>
+    onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null, charMap?: string) => void
   ): Promise<{ rewrittenText: string, characterMapUsed: string | null }> => {
     const CHUNK_REWRITE_CHAR_COUNT = 4000; 
     const numChunks = Math.ceil(textToRewrite.length / CHUNK_REWRITE_CHAR_COUNT);
@@ -204,8 +201,8 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
       \n**Perform the rewrite for THIS CHUNK ONLY in ${selectedTargetLangLabel}. Adhere strictly to all instructions. Remember, ONLY the rewritten story text.**`;
 
       if (i > 0) await delay(750);
-      const result = await textGenerator(prompt, systemInstructionForRewrite);
-      let partResultText = result || "";
+      const result = await generateText(prompt, systemInstructionForRewrite, false, apiSettings, 'batch-rewrite');
+      let partResultText = result?.text || "";
 
       if (i === 0 && currentRewriteLevel >= 75) {
           const mapMatch = partResultText.match(/\[CHARACTER_MAP\]([\s\S]*?)\[\/CHARACTER_MAP\]/);
@@ -240,8 +237,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     currentRewriteStyle: string, // The actual style string (e.g., label or custom text)
     currentAdaptContext: boolean,
     itemId: string, // For progress updates
-    onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null) => void,
-    textGenerator: (prompt: string, systemInstruction?: string) => Promise<string>
+    onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null) => void
   ): Promise<string> => {
     onProgress(itemId, 'editing', 'Đang tinh chỉnh logic...');
     
@@ -291,16 +287,15 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     const systemInstructionForEdit = "You are a meticulous story editor. Your task is to refine and polish a given text, ensuring consistency, logical flow, and improved style, while respecting previous rewrite intentions.";
     
     await delay(1000);
-    const result = await textGenerator(editPrompt, systemInstructionForEdit);
-    return result.trim();
+    const result = await generateText(editPrompt, systemInstructionForEdit, false, apiSettings, 'batch-rewrite');
+    return result.text.trim();
   };
 
   const processSingleBatchItem = async (
       item: BatchRewriteInputItem, 
       index: number, 
       totalItems: number,
-      updateResultCallback: (id: string, updates: Partial<GeneratedBatchRewriteOutputItem>) => void,
-      textGenerator: (prompt: string, systemInstruction?: string) => Promise<string>
+      updateResultCallback: (id: string, updates: Partial<GeneratedBatchRewriteOutputItem>) => void
     ) => {
     
     // Determine effective settings for the item
@@ -347,8 +342,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
                 progressMessage: message, 
                 ...(charMap && { characterMap: charMap }) // Store character map if provided
             });
-        },
-        textGenerator
+        }
       );
       
       updateResultCallback(item.id, { rewrittenText: initiallyRewrittenText, progressMessage: 'Hoàn thành viết lại. Chuẩn bị tinh chỉnh...', characterMap: characterMapUsed });
@@ -366,8 +360,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         effectiveRewriteStyleForPrompt, // Use the same style context for editing
         effectiveAdaptContext,
         item.id,
-        (itemId, status, message) => updateResultCallback(itemId, { status: status, progressMessage: message }),
-        textGenerator
+        (itemId, status, message) => updateResultCallback(itemId, { status: status, progressMessage: message })
       );
 
       updateResultCallback(item.id, { 
@@ -398,10 +391,6 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     // Create new AbortController for this batch operation
     abortControllerRef.current = new AbortController();
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
-    
-    const textGenerator = apiSettings.provider === 'deepseek'
-        ? (prompt: string, systemInstruction?: string) => generateDeepSeekText(prompt, systemInstruction, deepseekApiKeyForService)
-        : (prompt: string, systemInstruction?: string) => generateGeminiText(prompt, systemInstruction, undefined, geminiApiKeyForService).then(res => res.text);
 
 
     updateState({
@@ -452,7 +441,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
                 break;
             }
             
-            await processSingleBatchItem(item, index, validItems.length, updateResultCallback, textGenerator);
+            await processSingleBatchItem(item, index, validItems.length, updateResultCallback);
         }
     };
     
@@ -513,9 +502,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         results: prev.results.map(r => r.id === resultId ? {...r, status: 'editing', progressMessage: "Đang tinh chỉnh lại..."} : r)
     }));
     
-    const textGenerator = apiSettings.provider === 'deepseek'
-        ? (prompt: string, systemInstruction?: string) => generateDeepSeekText(prompt, systemInstruction, deepseekApiKeyForService)
-        : (prompt: string, systemInstruction?: string) => generateGeminiText(prompt, systemInstruction, undefined, geminiApiKeyForService).then(res => res.text);
+    // Using unified textGenerationService
 
 
     // Determine effective settings for the item
@@ -563,8 +550,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
                     ...prev,
                     results: prev.results.map(r => r.id === itemId ? {...r, status: status, progressMessage: message} : r)
                 }));
-            },
-            textGenerator
+            }
         );
         setModuleState(prev => ({
             ...prev,
