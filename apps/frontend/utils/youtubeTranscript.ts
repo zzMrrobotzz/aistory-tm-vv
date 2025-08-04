@@ -63,21 +63,32 @@ async function tryBackendTranscript(videoId: string): Promise<TranscriptResult> 
     return { success: false, transcript: '', error: 'Backend API not available', source: 'api' };
 }
 
-// Approach 2: YouTube Transcript API (third-party service) - FREE
+// Approach 2: CORS-free transcript services using proxy
 async function tryThirdPartyTranscript(videoId: string): Promise<TranscriptResult> {
-    const services = [
-        // Free transcript services
-        `https://youtube-transcript-api.vercel.app/api/transcript?videoId=${videoId}`,
-        `https://youtubetranscript.com/?server_vid2=${videoId}`,
+    // Try multiple working CORS proxy services
+    const corsProxies = [
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.org/?',
+        'https://cors-proxy.htmldriven.com/?url=',
+        'https://yacdn.org/proxy/',
     ];
 
-    for (const serviceUrl of services) {
+    const transcriptServices = [
+        `https://youtube-transcript-api.vercel.app/api/transcript?videoId=${videoId}`,
+        `https://api.ksoft.si/kumo/api/transcript?video_id=${videoId}`,
+        `https://transcript-api.herokuapp.com/api/transcript/${videoId}`,
+    ];
+
+    // Try direct access first (might work in some environments)
+    for (const serviceUrl of transcriptServices) {
         try {
             const response = await fetch(serviceUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                }
+                    'User-Agent': 'Mozilla/5.0 (compatible; AIStoryBot/1.0)',
+                },
+                mode: 'cors'
             });
 
             if (response.ok) {
@@ -94,51 +105,154 @@ async function tryThirdPartyTranscript(videoId: string): Promise<TranscriptResul
                         })),
                         source: 'api'
                     };
-                } else if (data && data.transcript) {
-                    return {
-                        success: true,
-                        transcript: data.transcript,
-                        source: 'api'
-                    };
                 }
             }
         } catch (error) {
-            console.log(`Service ${serviceUrl} failed:`, error);
-            continue;
+            console.log(`Direct service ${serviceUrl} failed:`, error);
         }
     }
 
-    return { success: false, transcript: '', error: 'Third-party API failed', source: 'api' };
+    // Try with CORS proxies
+    for (const proxy of corsProxies) {
+        for (const serviceUrl of transcriptServices) {
+            try {
+                const proxiedUrl = proxy + encodeURIComponent(serviceUrl);
+                const response = await fetch(proxiedUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'Mozilla/5.0 (compatible; AIStoryBot/1.0)',
+                    },
+                    // Add timeout to prevent hanging
+                    signal: AbortSignal.timeout(10000) // 10 second timeout
+                });
+
+                if (response.ok) {
+                    const responseText = await response.text();
+                    let data;
+                    
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.log(`Failed to parse JSON from ${proxy}:`, parseError);
+                        continue;
+                    }
+                    
+                    // Handle different response formats
+                    if (data && Array.isArray(data)) {
+                        const transcript = data.map((segment: any) => segment.text || segment.content || '').join(' ');
+                        if (transcript.trim()) {
+                            return {
+                                success: true,
+                                transcript: transcript.trim(),
+                                segments: data.map((segment: any) => ({
+                                    text: segment.text || segment.content,
+                                    start: segment.offset || segment.start || 0,
+                                    duration: segment.duration || 0
+                                })),
+                                source: 'api'
+                            };
+                        }
+                    } else if (data && data.transcript) {
+                        // Some services return {transcript: "..."}
+                        return {
+                            success: true,
+                            transcript: data.transcript.trim(),
+                            source: 'api'
+                        };
+                    }
+                }
+            } catch (error) {
+                console.log(`Proxied service ${proxy} + ${serviceUrl} failed:`, error);
+                continue;
+            }
+        }
+    }
+
+    return { success: false, transcript: '', error: 'All third-party services blocked by CORS', source: 'api' };
 }
 
-// Approach 3: Alternative transcript services - FREE
-async function tryAlternativeServices(videoId: string): Promise<TranscriptResult> {
+// Approach 3: Use AI Story Creator backend as proxy
+async function tryBackendProxy(videoId: string): Promise<TranscriptResult> {
     try {
-        // Try CORS-friendly approach with a transcript service
-        const proxyUrl = 'https://api.allorigins.win/raw?url=';
-        const targetUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        const token = localStorage.getItem('userToken');
         
-        const response = await fetch(proxyUrl + encodeURIComponent(targetUrl));
-        
+        // Try using our backend as a proxy for transcript extraction
+        const response = await fetch('https://aistory-backend.onrender.com/api/proxy/youtube-transcript', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token || ''
+            },
+            body: JSON.stringify({ 
+                videoId: videoId,
+                method: 'multiple' // Try multiple services
+            })
+        });
+
         if (response.ok) {
-            const html = await response.text();
-            
-            // Try to extract captions from page source
-            const captionMatches = html.match(/"captions":\s*({[^}]+})/);
-            if (captionMatches) {
-                // Found captions data in page source
+            const data = await response.json();
+            if (data.success && data.transcript) {
                 return {
                     success: true,
-                    transcript: `Đã tìm thấy dữ liệu phụ đề trong video này, nhưng cần xử lý thêm để trích xuất. Video ID: ${videoId}`,
-                    source: 'scraping'
+                    transcript: data.transcript,
+                    segments: data.segments,
+                    source: 'api'
                 };
             }
         }
     } catch (error) {
-        console.log('Alternative services failed:', error);
+        console.log('Backend proxy failed:', error);
     }
 
-    return { success: false, transcript: '', error: 'Alternative services failed', source: 'scraping' };
+    return { success: false, transcript: '', error: 'Backend proxy not available', source: 'api' };
+}
+
+// Approach 4: Alternative methods - Direct AI analysis
+async function tryAIVideoAnalysis(videoId: string): Promise<TranscriptResult> {
+    try {
+        // Use AI to analyze the video URL and extract what it can
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        
+        // Try to get basic video info first
+        const oembedResponse = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`);
+        
+        if (oembedResponse.ok) {
+            const videoInfo = await oembedResponse.json();
+            
+            // Create a rich description for AI to work with
+            let analysisContent = `Video YouTube Analysis:\n\n`;
+            analysisContent += `Tiêu đề: ${videoInfo.title}\n`;
+            analysisContent += `Kênh: ${videoInfo.author_name}\n`;
+            analysisContent += `URL: ${videoUrl}\n\n`;
+            
+            // Add contextual information that AI can work with
+            analysisContent += `Phân tích nội dung dựa trên metadata:\n`;
+            analysisContent += `- Đây là video từ kênh "${videoInfo.author_name}"\n`;
+            analysisContent += `- Tiêu đề video: "${videoInfo.title}"\n`;
+            analysisContent += `- Video có thể chứa thông tin, hướng dẫn hoặc giải trí liên quan đến chủ đề trong tiêu đề\n`;
+            analysisContent += `- Để có thông tin chi tiết, cần xem trực tiếp video hoặc có transcript thủ công\n\n`;
+            
+            // Add suggestions for the user
+            analysisContent += `Gợi ý để có transcript chi tiết:\n`;
+            analysisContent += `1. Mở video trên YouTube và bật phụ đề (CC)\n`;
+            analysisContent += `2. Copy nội dung phụ đề thủ công\n`;
+            analysisContent += `3. Dán vào tab "Văn bản" để AI phân tích chi tiết\n`;
+            analysisContent += `4. Hoặc mô tả nội dung video bằng lời để AI tư vấn\n\n`;
+            
+            analysisContent += `Video này có ID: ${videoId} và có thể được phân tích sâu hơn nếu có transcript đầy đủ.`;
+
+            return {
+                success: true,
+                transcript: analysisContent,
+                source: 'fallback'
+            };
+        }
+    } catch (error) {
+        console.log('AI video analysis failed:', error);
+    }
+
+    return { success: false, transcript: '', error: 'AI analysis failed', source: 'fallback' };
 }
 
 // Approach 4: Extract video metadata as fallback - ALWAYS WORKS
@@ -215,7 +329,8 @@ export async function extractYouTubeTranscript(url: string): Promise<TranscriptR
     const approaches = [
         { name: 'Backend API', fn: () => tryBackendTranscript(videoId) },
         { name: 'Third-party Services', fn: () => tryThirdPartyTranscript(videoId) },
-        { name: 'Alternative Methods', fn: () => tryAlternativeServices(videoId) },
+        { name: 'Backend Proxy', fn: () => tryBackendProxy(videoId) },
+        { name: 'AI Video Analysis', fn: () => tryAIVideoAnalysis(videoId) },
         { name: 'Video Metadata', fn: () => tryVideoMetadata(videoId) }
     ];
 
