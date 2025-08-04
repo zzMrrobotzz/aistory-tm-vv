@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ApiSettings, AiAssistantModuleState, AiAssistantInputType, GroundingChunk, ChatMessage } from '../../types';
 import { generateText } from '../../services/textGenerationService';
+import { extractYouTubeTranscript, formatTranscript, isValidYouTubeUrl } from '../../utils/youtubeTranscript';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { Youtube, FileText, Bot, User, Send, ChevronDown, ChevronUp, Copy, CopyCheck } from 'lucide-react';
+import { Youtube, FileText, Bot, User, Send, ChevronDown, ChevronUp, Copy, CopyCheck, Play, AlertCircle } from 'lucide-react';
 
 interface ContentSummarizerModuleProps {
     apiSettings: ApiSettings;
@@ -40,25 +41,23 @@ const ContentSummarizerModule: React.FC<ContentSummarizerModuleProps> = ({
     const handleAnalyze = async () => {
         let validationError = '';
         let sourceContent = '';
-        let useSearch = false;
+        let isYouTubeMode = false;
 
         if (activeInputTab === 'youtubeLink') {
             if (!youtubeLinkInput.trim()) {
                 validationError = 'Vui lòng nhập link video YouTube.';
+            } else if (!isValidYouTubeUrl(youtubeLinkInput)) {
+                validationError = 'Link YouTube không hợp lệ. Vui lòng nhập URL YouTube chính xác.';
             } else {
-                try {
-                    new URL(youtubeLinkInput);
-                    sourceContent = youtubeLinkInput.trim();
-                    useSearch = true;
-                } catch (_) {
-                    validationError = 'Link YouTube không hợp lệ.';
-                }
+                sourceContent = youtubeLinkInput.trim();
+                isYouTubeMode = true;
             }
         } else { // 'text'
             if (!textInput.trim()) {
                 validationError = 'Vui lòng nhập văn bản.';
             } else {
                 sourceContent = textInput.trim();
+                isYouTubeMode = false;
             }
         }
 
@@ -76,48 +75,85 @@ const ContentSummarizerModule: React.FC<ContentSummarizerModuleProps> = ({
             groundingSources: [] 
         });
 
-        // This marker is a trick to ask the AI for two things in one call.
-        const fullTextMarker = "---FULL_TEXT_BELOW---";
-        const prompt = useSearch
-            ? `Phân tích nội dung video YouTube tại URL sau để hiểu chủ đề và các điểm chính. Nhiệm vụ của bạn là trích xuất nội dung hoặc bản ghi của video.
-
-URL YouTube: ${sourceContent}
-
-Dựa trên thông tin bạn tìm được từ việc tìm kiếm về video này, thực hiện hai bước sau:
-1. Viết một bản tóm tắt ngắn gọn về video bằng tiếng Việt.
-2. Sau bản tóm tắt, thêm dấu hiệu "${fullTextMarker}" trên một dòng mới.
-3. Sau dấu hiệu, cung cấp toàn bộ nội dung chi tiết hoặc bản ghi của video mà bạn có thể tìm được, cũng bằng tiếng Việt.
-
-Nếu bạn không thể tìm thấy bản ghi, hãy nói "Không tìm thấy bản ghi chi tiết (transcript) cho video này." và cố gắng tạo một bản tóm tắt chi tiết về nội dung video dựa trên tiêu đề, mô tả và bất kỳ thông tin nào khác có sẵn từ tìm kiếm của bạn, và đặt bản tóm tắt chi tiết đó sau dấu hiệu thay vì bản ghi.`
-            : `Đầu tiên, hãy cung cấp một bản tóm tắt ngắn gọn về văn bản sau. Sau đó, sau bản tóm tắt, thêm dấu hiệu "${fullTextMarker}" trên một dòng mới, theo sau là toàn bộ văn bản gốc.\n\nVăn bản:\n---\n${sourceContent}`;
-
         try {
-            const result = await generateText(prompt, undefined, useSearch, apiSettings);
-            let resultSummary = '';
             let fullText = '';
-            
-            if (result.text.includes(fullTextMarker)) {
-                const parts = result.text.split(fullTextMarker);
-                resultSummary = parts[0].trim();
-                fullText = parts[1].trim();
+            let resultSummary = '';
+
+            if (isYouTubeMode) {
+                // Extract transcript from YouTube first
+                console.log('🎬 Bắt đầu trích xuất transcript từ YouTube...');
+                const transcriptResult = await extractYouTubeTranscript(sourceContent);
+                
+                if (transcriptResult.success && transcriptResult.transcript) {
+                    // Format transcript for better readability
+                    fullText = formatTranscript(transcriptResult.transcript, transcriptResult.segments);
+                    
+                    // Generate summary using AI
+                    const summaryPrompt = `Hãy tóm tắt nội dung video YouTube sau bằng tiếng Việt một cách ngắn gọn và súc tích:
+
+TRANSCRIPT/NỘI DUNG VIDEO:
+---
+${fullText}
+---
+
+Yêu cầu:
+1. Tóm tắt các điểm chính của video
+2. Nêu rõ chủ đề và mục đích của video  
+3. Liệt kê những thông tin quan trọng
+4. Sử dụng ngôn ngữ dễ hiểu và mạch lạc
+5. Độ dài khoảng 3-5 câu`;
+
+                    const summaryResult = await generateText(summaryPrompt, undefined, false, apiSettings);
+                    resultSummary = summaryResult.text.trim();
+                    
+                    // Add source information
+                    if (transcriptResult.source === 'fallback') {
+                        resultSummary += '\n\n⚠️ Lưu ý: Không thể trích xuất transcript tự động từ video này, tóm tắt dựa trên thông tin cơ bản có sẵn.';
+                    } else {
+                        resultSummary += '\n\n✅ Transcript đã được trích xuất thành công từ video.';
+                    }
+                } else {
+                    throw new Error('Không thể trích xuất nội dung từ video YouTube');
+                }
             } else {
-                // Fallback if the marker is not found
-                resultSummary = result.text.trim();
-                fullText = sourceContent; // Use the original input as the context
+                // Handle text input
+                const fullTextMarker = "---FULL_TEXT_BELOW---";
+                const prompt = `Đầu tiên, hãy cung cấp một bản tóm tắt ngắn gọn về văn bản sau bằng tiếng Việt. Sau đó, sau bản tóm tắt, thêm dấu hiệu "${fullTextMarker}" trên một dòng mới, theo sau là toàn bộ văn bản gốc.\n\nVăn bản:\n---\n${sourceContent}`;
+
+                const result = await generateText(prompt, undefined, false, apiSettings);
+                
+                if (result.text.includes(fullTextMarker)) {
+                    const parts = result.text.split(fullTextMarker);
+                    resultSummary = parts[0].trim();
+                    fullText = parts[1].trim();
+                } else {
+                    // Fallback if the marker is not found
+                    resultSummary = result.text.trim();
+                    fullText = sourceContent;
+                }
             }
             
             updateState({
                 summary: resultSummary,
                 processedSourceText: fullText,
-                groundingSources: result.groundingChunks || [],
+                groundingSources: [], // YouTube doesn't use grounding sources
                 chatHistory: [{
                     role: 'model',
-                    message: "Phân tích hoàn tất! Tôi đã đọc và tóm tắt nội dung. Bạn có câu hỏi nào không?"
+                    message: isYouTubeMode 
+                        ? "✅ Đã trích xuất và phân tích nội dung video thành công! Bạn có thể hỏi tôi bất cứ điều gì về video này."
+                        : "✅ Phân tích văn bản hoàn tất! Tôi đã đọc và tóm tắt nội dung. Bạn có câu hỏi nào không?"
                 }]
             });
 
         } catch (e) {
-            updateState({ error: `Đã xảy ra lỗi khi phân tích: ${(e as Error).message}` });
+            const errorMessage = (e as Error).message;
+            updateState({ 
+                error: `Đã xảy ra lỗi khi phân tích: ${errorMessage}`,
+                chatHistory: [{
+                    role: 'model',
+                    message: `❌ Xin lỗi, tôi gặp lỗi khi xử lý ${isYouTubeMode ? 'video YouTube' : 'văn bản'}: ${errorMessage}\n\nBạn có thể thử:\n${isYouTubeMode ? '• Kiểm tra link YouTube có chính xác không\n• Thử lại sau vài phút\n• Sử dụng tab "Văn bản" để dán transcript thủ công' : '• Kiểm tra định dạng văn bản\n• Thử với đoạn văn ngắn hơn\n• Liên hệ support nếu vấn đề vẫn tiếp tục'}`
+                }]
+            });
         } finally {
             updateState({ isLoading: false });
         }
@@ -186,14 +222,25 @@ Nếu bạn không thể tìm thấy bản ghi, hãy nói "Không tìm thấy b�
                     </div>
                     <div className="py-4 flex-grow">
                         {activeInputTab === 'youtubeLink' && (
-                            <input 
-                                type="url" 
-                                value={youtubeLinkInput} 
-                                onChange={e => updateState({ youtubeLinkInput: e.target.value })} 
-                                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
-                                placeholder="Dán link video YouTube vào đây..." 
-                                disabled={isLoading} 
-                            />
+                            <div className="space-y-3">
+                                <input 
+                                    type="url" 
+                                    value={youtubeLinkInput} 
+                                    onChange={e => updateState({ youtubeLinkInput: e.target.value })} 
+                                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                                    placeholder="Dán link video YouTube vào đây (ví dụ: https://youtube.com/watch?v=...)..." 
+                                    disabled={isLoading} 
+                                />
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <div className="flex items-start space-x-2">
+                                        <Play size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                                        <div className="text-sm text-blue-800">
+                                            <p className="font-medium mb-1">🎬 Trích xuất transcript tự động</p>
+                                            <p>AI sẽ tự động trích xuất phụ đề/transcript từ video YouTube để phân tích chi tiết. Hỗ trợ nhiều định dạng URL YouTube.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         )}
                         {activeInputTab === 'text' && (
                             <textarea 
@@ -219,7 +266,11 @@ Nếu bạn không thể tìm thấy bản ghi, hãy nói "Không tìm thấy b�
                     <h3 className="text-xl font-semibold text-gray-800 mb-4">2. Tóm tắt & Trò chuyện</h3>
                     {isLoading ? (
                         <div className="flex-grow flex items-center justify-center">
-                            <LoadingSpinner message="AI đang đọc và phân tích nội dung..." />
+                            <LoadingSpinner message={
+                                activeInputTab === 'youtubeLink' 
+                                    ? "🎬 Đang trích xuất transcript từ YouTube và phân tích nội dung..." 
+                                    : "📝 AI đang đọc và phân tích văn bản..."
+                            } />
                         </div>
                     ) : error ? (
                         <ErrorAlert message={error} />
