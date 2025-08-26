@@ -554,6 +554,11 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'ai-story-backend' });
 });
 
+// Health check endpoint with API prefix (for desktop app)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', service: 'ai-story-backend', timestamp: new Date().toISOString() });
+});
+
 // Subscription health check endpoint (admin only)
 app.get('/api/admin/subscription-health', async (req, res) => {
   try {
