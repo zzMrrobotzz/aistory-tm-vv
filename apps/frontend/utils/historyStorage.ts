@@ -104,5 +104,7 @@ export const MODULE_KEYS = {
   WRITE_STORY: 'write_story',
   BATCH_STORY_WRITING: 'batch_story_writing',
   REWRITE: 'rewrite',
-  BATCH_REWRITE: 'batch_rewrite'
+  BATCH_REWRITE: 'batch_rewrite',
+  ANALYSIS: 'analysis',
+  EDIT_STORY: 'edit_story'
 } as const;

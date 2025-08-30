@@ -16,8 +16,10 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
 import { delay } from '../../utils';
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 
 interface EditStoryModuleProps {
   apiSettings: ApiSettings;
@@ -201,6 +203,25 @@ CHỈ TRẢ VỀ JSON.`;
             }
         );
         updateState({ editedStoryOutput: editedText, isLoadingEditing: false });
+
+        // Save single edit to history
+        if (editedText?.trim()) {
+          const title = `Biên tập đơn - ${new Date().toLocaleString('vi-VN')}`;
+          const historyContent = `Truyện gốc: ${originalStoryToEdit.substring(0, 100)}...\n\n` +
+            `=== TRUYỆN ĐÃ BIÊN TẬP ===\n${editedText.trim()}`;
+          
+          const metadata = {
+            editType: 'single',
+            originalStory: originalStoryToEdit.trim(),
+            editedStory: editedText.trim(),
+            outline: outlineForEditing?.trim() || null,
+            targetLength: targetLengthForEditing,
+            language: languageForEditing,
+            postEditAnalysis: analysisReport
+          };
+          
+          HistoryStorage.saveToHistory(MODULE_KEYS.EDIT_STORY, title, historyContent, metadata);
+        }
     } catch (e) {
         updateState({ 
             errorEditing: `Lỗi trong quá trình biên tập hoặc phân tích: ${(e as Error).message}`, 
@@ -241,11 +262,69 @@ CHỈ TRẢ VỀ JSON.`;
     try {
       const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
       updateState({ editedStoryOutput: result.text, isRefiningFurther: false, postEditAnalysis: null, refinementInstruction: '' }); // Clear instruction after use, optionally clear analysis
+
+      // Save refinement to history
+      if (result.text?.trim()) {
+        const title = `Tinh chỉnh biên tập - ${new Date().toLocaleString('vi-VN')}`;
+        const historyContent = `Yêu cầu tinh chỉnh: ${refinementInstruction.substring(0, 100)}...\n\n` +
+          `=== TRUYỆN SAU TINH CHỈNH ===\n${result.text.trim()}`;
+        
+        const metadata = {
+          editType: 'refinement',
+          originalStory: originalStoryToEdit.trim(),
+          refinementInstruction: refinementInstruction.trim(),
+          refinedStory: result.text.trim(),
+          targetLength: targetLengthForEditing,
+          language: languageForEditing
+        };
+        
+        HistoryStorage.saveToHistory(MODULE_KEYS.EDIT_STORY, title, historyContent, metadata);
+      }
     } catch (e) {
       updateState({ furtherRefinementError: `Lỗi khi tinh chỉnh thêm: ${(e as Error).message}`, isRefiningFurther: false });
     }
   };
 
+  // Handle selecting item from history
+  const handleSelectHistory = (historyItem: any) => {
+    const metadata = historyItem.metadata || {};
+    
+    // Load the story and settings from history
+    if (metadata.originalStory) {
+      updateState({ 
+        originalStoryToEdit: metadata.originalStory,
+        outlineForEditing: metadata.outline || '',
+        targetLengthForEditing: metadata.targetLength || targetLengthForEditing,
+        languageForEditing: metadata.language || languageForEditing,
+        // Clear current results  
+        editedStoryOutput: '',
+        postEditAnalysis: null,
+        errorEditing: null,
+        furtherRefinementError: null,
+        refinementInstruction: '',
+        isLoadingEditing: false,
+        isRefiningFurther: false,
+        loadingMessageEditing: null
+      });
+    }
+    
+    // Load the edited result based on edit type
+    if (metadata.editType === 'single' && metadata.editedStory) {
+      updateState({
+        editedStoryOutput: metadata.editedStory,
+        postEditAnalysis: metadata.postEditAnalysis || null
+      });
+    } else if (metadata.editType === 'refinement' && metadata.refinedStory) {
+      updateState({
+        editedStoryOutput: metadata.refinedStory
+      });
+    } else if (metadata.editType === 'batch_item' && metadata.editedStory) {
+      updateState({
+        editedStoryOutput: metadata.editedStory,
+        postEditAnalysis: metadata.postEditAnalysis || null
+      });
+    }
+  };
 
   // --- Batch Edit Functions ---
   const handleAddBatchItem = () => {
@@ -351,6 +430,25 @@ CHỈ TRẢ VỀ JSON.`;
                     : r
                 )
             }));
+
+            // Save batch item to history
+            if (editedText?.trim()) {
+              const title = `Biên tập hàng loạt - ${new Date().toLocaleString('vi-VN')}`;
+              const historyContent = `Truyện gốc: ${item.originalStory.substring(0, 100)}...\n\n` +
+                `=== TRUYỆN ĐÃ BIÊN TẬP ===\n${editedText.trim()}`;
+              
+              const metadata = {
+                editType: 'batch_item',
+                originalStory: item.originalStory.trim(),
+                editedStory: editedText.trim(),
+                outline: item.outline?.trim() || null,
+                targetLength: item.specificTargetLength || targetLengthForEditing,
+                language: item.specificLanguage || languageForEditing,
+                postEditAnalysis: analysisReport
+              };
+              
+              HistoryStorage.saveToHistory(MODULE_KEYS.EDIT_STORY, title, historyContent, metadata);
+            }
 
         } catch (e) {
             setModuleState(prev => ({
@@ -732,6 +830,14 @@ CHỈ TRẢ VỀ JSON.`;
             )}
         </div>
       )}
+
+      {/* History Panel */}
+      <div className="mt-8">
+        <HistoryPanel 
+          moduleKey={MODULE_KEYS.EDIT_STORY}
+          onSelectHistory={handleSelectHistory}
+        />
+      </div>
     </ModuleContainer>
   );
 };

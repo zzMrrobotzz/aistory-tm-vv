@@ -5,7 +5,9 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService'; // Corrected import path
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 
 
 interface AnalysisModuleProps {
@@ -68,11 +70,30 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
       }
       
       const suggestionMatch = resultText.match(suggestionRegex);
+      const finalSuggestions = (suggestionMatch && suggestionMatch[1].trim()) ? suggestionMatch[1].trim() : '';
+      
       updateState({ 
         analysisFactors: factors, 
-        suggestions: (suggestionMatch && suggestionMatch[1].trim()) ? suggestionMatch[1].trim() : '',
+        suggestions: finalSuggestions,
         loadingMessage: "Phân tích tiêu chuẩn hoàn tất!"
       });
+
+      // Save analysis to history
+      if (factors.length > 0 || finalSuggestions) {
+        const title = `Phân tích tiêu chuẩn - ${new Date().toLocaleString('vi-VN')}`;
+        const analysisContent = `Phân tích cho: ${sourceText.substring(0, 100)}...\n\n` +
+          `=== KẾT QUẢ PHÂN TÍCH ===\n${factors.map(f => `${f.title}: ${f.percentage} - ${f.analysis}`).join('\n')}\n\n` +
+          `=== GỢI Ý CẢI THIỆN ===\n${finalSuggestions}`;
+        
+        const metadata = {
+          analysisType: 'standard',
+          analysisFactors: factors,
+          suggestions: finalSuggestions,
+          originalText: sourceText.trim()
+        };
+        
+        HistoryStorage.saveToHistory(MODULE_KEYS.ANALYSIS, title, analysisContent, metadata);
+      }
     } catch (e) {
       updateState({ errorAnalysis: `Đã xảy ra lỗi khi phân tích: ${(e as Error).message}`, loadingMessage: "Lỗi phân tích tiêu chuẩn." });
     } finally {
@@ -109,6 +130,21 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
     try {
         const result = await generateText(prompt, undefined, false, apiSettings);
         updateState({ suggestions: result.text, loadingMessage: "Nhận gợi ý Gemini hoàn tất!" });
+
+        // Save Gemini suggestions to history
+        if (result.text?.trim()) {
+          const title = `Gợi ý Gemini - ${new Date().toLocaleString('vi-VN')}`;
+          const analysisContent = `Phân tích cho: ${sourceText.substring(0, 100)}...\n\n` +
+            `=== GỢI Ý TỪ GEMINI ===\n${result.text.trim()}`;
+          
+          const metadata = {
+            analysisType: 'gemini_suggestions',
+            suggestions: result.text.trim(),
+            originalText: sourceText.trim()
+          };
+          
+          HistoryStorage.saveToHistory(MODULE_KEYS.ANALYSIS, title, analysisContent, metadata);
+        }
     } catch (e) {
         updateState({ errorImprovement: `Lỗi khi nhận gợi ý từ Gemini: ${(e as Error).message}`, loadingMessage: "Lỗi nhận gợi ý Gemini." });
     } finally {
@@ -148,6 +184,23 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
     try {
       const result = await generateText(prompt, undefined, false, apiSettings);
       updateState({ improvedStory: result.text, loadingMessage: "Cải thiện truyện hoàn tất!" });
+
+      // Save improved story to history
+      if (result.text?.trim()) {
+        const title = `Truyện cải thiện - ${new Date().toLocaleString('vi-VN')}`;
+        const analysisContent = `Truyện gốc: ${sourceText.substring(0, 100)}...\n\n` +
+          `=== TRUYỆN ĐÃ CẢI THIỆN ===\n${result.text.trim()}\n\n` +
+          `=== GỢI Ý ĐÃ ÁP DỤNG ===\n${suggestions.trim()}`;
+        
+        const metadata = {
+          analysisType: 'improved_story',
+          improvedStory: result.text.trim(),
+          suggestions: suggestions.trim(),
+          originalText: sourceText.trim()
+        };
+        
+        HistoryStorage.saveToHistory(MODULE_KEYS.ANALYSIS, title, analysisContent, metadata);
+      }
     } catch (e) {
       updateState({ errorImprovement: `Lỗi khi cải thiện truyện: ${(e as Error).message}`, loadingMessage: "Lỗi cải thiện truyện." });
     } finally {
@@ -192,6 +245,21 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
     try {
       const result = await generateText(prompt, undefined, false, apiSettings);
       updateState({ viralOutlineAnalysisResult: result.text, loadingMessage: "Phân tích Dàn Ý Viral hoàn tất!" });
+
+      // Save viral analysis to history
+      if (result.text?.trim()) {
+        const title = `Phân tích Dàn Ý Viral - ${new Date().toLocaleString('vi-VN')}`;
+        const analysisContent = `Phân tích cho: ${sourceText.substring(0, 100)}...\n\n` +
+          `=== PHÂN TÍCH DÀN Ý VIRAL ===\n${result.text.trim()}`;
+        
+        const metadata = {
+          analysisType: 'viral_outline',
+          viralAnalysis: result.text.trim(),
+          originalText: sourceText.trim()
+        };
+        
+        HistoryStorage.saveToHistory(MODULE_KEYS.ANALYSIS, title, analysisContent, metadata);
+      }
     } catch (e) {
       updateState({ errorViralOutline: `Lỗi khi phân tích dàn ý viral: ${(e as Error).message}`, loadingMessage: "Lỗi phân tích Dàn Ý Viral." });
     } finally {
@@ -202,6 +270,47 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
           : prev
         )
       }, 3000);
+    }
+  };
+
+  // Handle selecting item from history
+  const handleSelectHistory = (historyItem: any) => {
+    const metadata = historyItem.metadata || {};
+    
+    // Update source text from original text if available
+    if (metadata.originalText) {
+      updateState({ 
+        sourceText: metadata.originalText,
+        // Clear current results
+        analysisFactors: [],
+        suggestions: '',
+        improvedStory: '',
+        viralOutlineAnalysisResult: '',
+        errorAnalysis: null,
+        errorImprovement: null,
+        errorViralOutline: null
+      });
+    }
+    
+    // Load the appropriate results based on analysis type
+    if (metadata.analysisType === 'standard' && metadata.analysisFactors) {
+      updateState({
+        analysisFactors: metadata.analysisFactors,
+        suggestions: metadata.suggestions || ''
+      });
+    } else if (metadata.analysisType === 'gemini_suggestions' && metadata.suggestions) {
+      updateState({
+        suggestions: metadata.suggestions
+      });
+    } else if (metadata.analysisType === 'improved_story' && metadata.improvedStory) {
+      updateState({
+        improvedStory: metadata.improvedStory,
+        suggestions: metadata.suggestions || ''
+      });
+    } else if (metadata.analysisType === 'viral_outline' && metadata.viralAnalysis) {
+      updateState({
+        viralOutlineAnalysisResult: metadata.viralAnalysis
+      });
     }
   };
   
@@ -305,6 +414,14 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
             </div>
           </div>
         )}
+
+        {/* History Panel */}
+        <div className="mt-8">
+          <HistoryPanel 
+            moduleKey={MODULE_KEYS.ANALYSIS}
+            onSelectHistory={handleSelectHistory}
+          />
+        </div>
       </div>
     </ModuleContainer>
   );
