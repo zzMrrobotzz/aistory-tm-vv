@@ -320,9 +320,12 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       // Build story generation prompt (use full outline, focus on the current section)
       const prompt = `You are an expert storyteller. Generate part ${i + 1} of ${numChunks} of a compelling story based on the provided outline.
 
+**CRITICAL LENGTH REQUIREMENTS:**
+- Target length for THIS SECTION: approximately ${CHUNK_WORD_COUNT} words
+- Total Target Length for ENTIRE STORY: ${targetLength} words
+- WORD COUNT CONTROL IS VERY IMPORTANT. Try to keep this section between ${Math.round(CHUNK_WORD_COUNT * 0.85)} and ${Math.round(CHUNK_WORD_COUNT * 1.15)} words.
+
 **Settings:**
-- Target Length for this section: ~${CHUNK_WORD_COUNT} words
-- Total Target Length: ${targetLength} words  
 - Writing Style: ${writingStyle === 'custom' ? customWritingStyle : writingStyle}
 - Output Language: ${outputLanguage}
 - Reference Style: ${referenceViralStoryForStyle || 'N/A'}
@@ -341,7 +344,7 @@ ${fullGeneratedStory || "This is the beginning of the story."}
 - Continue the story naturally from the previous context
 - ${i === 0 ? 'Start with a compelling opening that hooks the reader' : 'Maintain narrative flow and character consistency'}
 - ${i === numChunks - 1 ? 'Work towards a satisfying conclusion' : 'Advance the plot while leaving room for continuation'}
-- Aim for approximately ${CHUNK_WORD_COUNT} words in this section
+- STRICTLY aim for approximately ${CHUNK_WORD_COUNT} words in this section (no more than ${Math.round(CHUNK_WORD_COUNT * 1.15)}, no less than ${Math.round(CHUNK_WORD_COUNT * 0.85)})
 - Write in ${outputLanguage} language
 - Use vivid descriptions and compelling dialogue
 
@@ -363,11 +366,49 @@ Provide ONLY the story content for this section:`;
       }));
     }
 
-    // Calculate word statistics
-    const finalStory = fullGeneratedStory.trim();
+    // Update progress to show editing phase
+    setModuleState(prev => ({
+      ...prev,
+      storyQueue: prev.storyQueue.map(qItem =>
+        qItem.id === item.id
+          ? { ...qItem, progress: 90 }
+          : qItem
+      ),
+    }));
+
+    // Apply story editing using the same logic as single story mode
+    let finalStory = fullGeneratedStory.trim();
+    if (finalStory) {
+      // Create a temporary abort controller for editing
+      const editAbortCtrl = new AbortController();
+      
+      try {
+        // Use handleEditStory but capture the result for queue item
+        const originalUpdateState = updateState;
+        const originalGeneratedStory = moduleState.generatedStory;
+        
+        // Temporarily update generated story for editing
+        updateState({ generatedStory: finalStory });
+        
+        // Call the existing edit function
+        await handleEditStory(finalStory, item.storyOutline, null, undefined, editAbortCtrl);
+        
+        // Get the edited story from the state
+        finalStory = moduleState.generatedStory || finalStory;
+        
+        // Restore original generated story
+        updateState({ generatedStory: originalGeneratedStory });
+        
+      } catch (error) {
+        console.warn('Queue story editing failed, using original story:', error);
+        // Keep original story if editing fails
+      }
+    }
+
+    // Calculate word statistics for final story
     const wordStats = calculateStoryStats(item.storyOutline, finalStory);
     
-    // Update final result with statistics
+    // Update final result with edited story and statistics
     setModuleState(prev => ({
       ...prev,
       storyQueue: prev.storyQueue.map(qItem =>
@@ -375,13 +416,14 @@ Provide ONLY the story content for this section:`;
           ? { 
               ...qItem, 
               generatedStory: finalStory,
-              wordStats: wordStats
+              wordStats: wordStats,
+              progress: 100
             }
           : qItem
       ),
     }));
 
-    // Log usage statistics
+    // Log usage statistics (editing calls are logged by handleEditStory)
     logApiCall('write-story', numChunks);
     logStoryGenerated('write-story', 1);
   };
@@ -897,7 +939,8 @@ Provide ONLY the numbered hooks, no additional explanations.`;
         \n- Chỉ viết nội dung phần tiếp theo, không lặp lại, không tiêu đề.
         \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
 
-        if (i > 0) await delay(1000, abortCtrl.signal); 
+        // Add rate limiting delay before each API call (including first chunk)
+        await delay(i === 0 ? 500 : 1000, abortCtrl.signal); 
         const result = await generateText(prompt, undefined, undefined, apiSettings);
         if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         let currentChunkText = result.text;
