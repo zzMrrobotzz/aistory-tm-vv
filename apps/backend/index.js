@@ -59,7 +59,12 @@ const allowedOrigins = [
 const corsOptions = {
   origin: (origin, callback) => {
     console.log(`🔒 CORS check for origin: ${origin}`);
+    // Allow Electron desktop apps (no origin or file:// protocol)
     if (!origin) return callback(null, true);
+    
+    // Allow Electron desktop app
+    if (origin.startsWith('file://')) return callback(null, true);
+    
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       console.error(`❌ CORS blocked: ${origin}`);
@@ -547,6 +552,11 @@ app.get('/', (req, res) => {
 // Health check endpoint for Render
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', service: 'ai-story-backend' });
+});
+
+// Health check endpoint with API prefix (for desktop app)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', service: 'ai-story-backend', timestamp: new Date().toISOString() });
 });
 
 // Subscription health check endpoint (admin only)
