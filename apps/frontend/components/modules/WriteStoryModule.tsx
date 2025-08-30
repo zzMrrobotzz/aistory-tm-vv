@@ -939,8 +939,8 @@ Provide ONLY the numbered hooks, no additional explanations.`;
         \n- Chỉ viết nội dung phần tiếp theo, không lặp lại, không tiêu đề.
         \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
 
-        // Add rate limiting delay before each API call (including first chunk)
-        await delay(i === 0 ? 500 : 1000, abortCtrl.signal); 
+        // Add rate limiting delay before each API call (including first chunk) - doubled to prevent 503 errors
+        await delay(i === 0 ? 1000 : 2000, abortCtrl.signal); 
         const result = await generateText(prompt, undefined, undefined, apiSettings);
         if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         let currentChunkText = result.text;
@@ -957,7 +957,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       }
       updateState({ storyLoadingMessage: 'Hoàn thành viết truyện! Chuẩn bị biên tập độ dài.' });
       
-      await delay(1000, abortCtrl.signal); 
+      await delay(2000, abortCtrl.signal); 
       if(fullStory.trim()){
           await handleEditStory(fullStory, storyOutline, capturedKeyElements, undefined, abortCtrl); // Pass abortCtrl
       } else {
