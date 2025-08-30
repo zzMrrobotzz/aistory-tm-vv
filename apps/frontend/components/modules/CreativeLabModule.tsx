@@ -13,8 +13,10 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner'; // Re-add
 import ErrorAlert from '../ErrorAlert';     // Re-add
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService'; // Use the generic text generation service
 import { delay } from '../../utils';
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 
 
 interface CreativeLabModuleProps {
@@ -138,6 +140,19 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     try {
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ quickOutlineResult: result.text, quickOutlineLoading: false, quickOutlineProgressMessage: 'Hoàn thành!' });
+      
+      // Save to history
+      if (result.text) {
+        const title = `Dàn Ý Nhanh - ${quickOutlineTitle.substring(0, 50)} - ${new Date().toLocaleString('vi-VN')}`;
+        const metadata = {
+          outlineType: 'quick',
+          title: quickOutlineTitle,
+          plotStructure: plotStructure,
+          outputLanguage: outputLanguage
+        };
+        HistoryStorage.saveToHistory(MODULE_KEYS.STORY_OUTLINE, title, result.text, metadata);
+      }
+      
       setTimeout(() => setModuleState(prev => prev.quickOutlineProgressMessage === 'Hoàn thành!' ? {...prev, quickOutlineProgressMessage: null} : prev ), 3000);
     } catch (e) {
       updateState({ quickOutlineError: `Lỗi khi tạo dàn ý nhanh: ${(e as Error).message}`, quickOutlineLoading: false, quickOutlineProgressMessage: null });
@@ -206,6 +221,24 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     try {
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ finalOutline: result.text, singleOutlineLoading: false, singleOutlineProgressMessage: 'Hoàn thành!' });
+      
+      // Save to history
+      if (result.text) {
+        const title = `Dàn Ý Chuyên Sâu - ${coreIdea.substring(0, 50)} - ${new Date().toLocaleString('vi-VN')}`;
+        const metadata = {
+          outlineType: 'detailed',
+          coreIdea: coreIdea,
+          secondaryIdea: secondaryIdea,
+          emotionalJourney: emotionalJourney,
+          plotStructure: plotStructure,
+          outlineDetailLevel: outlineDetailLevel,
+          ideaLanguage: ideaLanguage,
+          outputLanguage: outputLanguage,
+          hasReferenceOutline: !!referenceViralOutline.trim()
+        };
+        HistoryStorage.saveToHistory(MODULE_KEYS.STORY_OUTLINE, title, result.text, metadata);
+      }
+      
       setTimeout(() => setModuleState(prev => prev.singleOutlineProgressMessage === 'Hoàn thành!' ? {...prev, singleOutlineProgressMessage: null} : prev ), 3000);
     } catch (e) {
       updateState({ singleOutlineError: `Lỗi khi tạo dàn ý chuyên sâu: ${(e as Error).message}`, singleOutlineLoading: false, singleOutlineProgressMessage: null });
@@ -352,6 +385,29 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       batchOutlineLoading: false,
       batchOutlineProgressMessage: `Hoàn thành tạo ${activeCoreIdeas.length} dàn ý.`
     });
+    
+    // Save batch outlines to history
+    const successfulOutlines = moduleState.generatedBatchOutlines.filter(item => !item.error);
+    if (successfulOutlines.length > 0) {
+      const title = `Dàn Ý Hàng Loạt (${successfulOutlines.length} bộ) - ${new Date().toLocaleString('vi-VN')}`;
+      const historyContent = successfulOutlines.map((item, index) => 
+        `=== DÀN Ý ${index + 1} ===\nÝ tưởng: ${item.coreIdea}\n\n${item.outline}`
+      ).join('\n\n---\n\n');
+      
+      const metadata = {
+        outlineType: 'batch',
+        totalCount: activeCoreIdeas.length,
+        successCount: successfulOutlines.length,
+        plotStructure: plotStructure,
+        outlineDetailLevel: outlineDetailLevel,
+        ideaLanguage: ideaLanguage,
+        outputLanguage: outputLanguage,
+        batchOutlines: successfulOutlines
+      };
+      
+      HistoryStorage.saveToHistory(MODULE_KEYS.STORY_OUTLINE, title, historyContent, metadata);
+    }
+    
     setTimeout(() => setModuleState(prev => prev.batchOutlineProgressMessage && prev.batchOutlineProgressMessage.startsWith('Hoàn thành tạo') ? { ...prev, batchOutlineProgressMessage: null } : prev), 5000);
   };
   
@@ -365,6 +421,63 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
         const originalText = btn.textContent;
         btn.textContent = 'Đã sao chép!';
         setTimeout(() => { btn.textContent = originalText; }, 2000);
+    }
+  };
+
+  // Handle history selection
+  const handleSelectHistory = (historyItem: any) => {
+    if (historyItem.metadata) {
+      const { metadata } = historyItem;
+      
+      if (metadata.outlineType === 'quick') {
+        // Restore quick outline session
+        updateState({
+          quickOutlineTitle: metadata.title || '',
+          plotStructure: metadata.plotStructure || 'three_act',
+          outputLanguage: metadata.outputLanguage || 'vietnamese',
+          quickOutlineResult: historyItem.content,
+          activeCreativeTab: 'quickOutline',
+          quickOutlineError: null,
+          quickOutlineLoading: false
+        });
+      } else if (metadata.outlineType === 'detailed') {
+        // Restore detailed outline session
+        updateState({
+          coreIdea: metadata.coreIdea || '',
+          secondaryIdea: metadata.secondaryIdea || '',
+          emotionalJourney: metadata.emotionalJourney || '',
+          plotStructure: metadata.plotStructure || 'three_act',
+          outlineDetailLevel: metadata.outlineDetailLevel || 'detailed',
+          ideaLanguage: metadata.ideaLanguage || 'vietnamese',
+          outputLanguage: metadata.outputLanguage || 'vietnamese',
+          finalOutline: historyItem.content,
+          activeCreativeTab: 'singleOutline',
+          singleOutlineError: null,
+          singleOutlineLoading: false
+        });
+      } else if (metadata.outlineType === 'batch') {
+        // Restore batch outline session
+        const batchOutlines = metadata.batchOutlines || [];
+        updateState({
+          plotStructure: metadata.plotStructure || 'three_act',
+          outlineDetailLevel: metadata.outlineDetailLevel || 'detailed',
+          ideaLanguage: metadata.ideaLanguage || 'vietnamese',
+          outputLanguage: metadata.outputLanguage || 'vietnamese',
+          batchCoreIdeas: batchOutlines.map((item: any) => item.coreIdea),
+          generatedBatchOutlines: batchOutlines,
+          activeCreativeTab: 'batchOutline',
+          batchOutlineError: null,
+          batchOutlineLoading: false
+        });
+      }
+    } else {
+      // Fallback for older history items without metadata
+      updateState({
+        quickOutlineResult: historyItem.content,
+        activeCreativeTab: 'quickOutline',
+        quickOutlineError: null,
+        quickOutlineLoading: false
+      });
     }
   };
 
@@ -686,6 +799,12 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
             )}
         </div>
       )}
+
+      {/* History Panel */}
+      <HistoryPanel 
+        moduleKey={MODULE_KEYS.STORY_OUTLINE}
+        onSelectHistory={handleSelectHistory}
+      />
     </ModuleContainer>
   );
 };

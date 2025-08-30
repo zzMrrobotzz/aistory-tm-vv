@@ -14,6 +14,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryPanel from '../HistoryPanel';
 import { generateTextWithJsonOutput as geminiGenerateTextWithJsonOutput, generateImage as generateGeminiImage, generateTextFromImageAndText } from '../../services/geminiService';
 import { generateTextWithJsonOutput } from '../../services/textGenerationService';
 import { generateStabilityImage, refineStabilityImage } from '../../services/stabilityAiService';
@@ -22,6 +23,7 @@ import { generateDeepSeekImage, refineDeepSeekImage } from '../../services/deeps
 import { delay, dataUrlToBlob } from '../../utils';
 import { logApiCall, logImageGenerated } from '../../services/usageService';
 import { ApiKeyStorage } from '../../utils/apiKeyStorage';
+import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 
 interface ImageGenerationSuiteModuleProps {
   apiSettings: ApiSettings;
@@ -48,6 +50,7 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     hookText, generatedSingleImages, singleImageOverallError, singleImageProgressMessage,
     promptsInput, generatedBatchImages, batchOverallError, batchProgressMessage,
     hookTextForCtxPrompts, generatedCtxPrompts, ctxPromptsError, ctxPromptsLoadingMessage, // New state for prompt generator
+    promptCount, generatedImagePrompts, generatedAnimationPrompts, // Enhanced dual prompt generation
     settingsError,
     // Refinement state
     showRefinementModal, activeRefinementItem, refinementPrompt, isRefining, refinementError
@@ -299,6 +302,89 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       }, 3000);
     }
   };
+
+  // New function to generate dual prompts (image + animation)
+  const generateDualPrompts = async (inputText: string, count: number, type: 'image' | 'animation'): Promise<string[]> => {
+    try {
+      const styleInfo = PREDEFINED_ART_STYLES.find(s => s.value === selectedArtStyle);
+      const styleDescription = styleInfo ? `${styleInfo.label} (${styleInfo.description})` : 'Default style';
+      
+      const systemInstruction = type === 'image' 
+        ? `You are an AI assistant specialized in creating detailed image prompts for AI image generation tools. Analyze the provided text and generate ${count} distinct, high-quality image prompts in English.`
+        : `You are an AI assistant specialized in creating animation prompts for AI video/motion generation tools. Analyze the provided text and generate ${count} distinct animation/motion prompts in English that describe movement, transitions, and dynamic elements.`;
+
+      const specificInstructions = type === 'image'
+        ? `Create ${count} detailed image generation prompts based on the key visual scenes, characters, and settings in the text. Each prompt should:
+           - Be descriptive and specific for AI image generation
+           - Include visual details, lighting, composition, mood
+           - Be optimized for tools like DALL-E, Midjourney, Stable Diffusion
+           - Apply the art style: ${styleDescription}
+           - Focus on static visual elements and scenes`
+        : `Create ${count} detailed animation/motion prompts based on the dynamic elements in the text. Each prompt should:
+           - Describe movement, transitions, and dynamic actions
+           - Include timing, motion direction, and flow
+           - Be optimized for AI video/animation tools like RunwayML, Pika Labs
+           - Focus on motion, camera movements, and temporal changes
+           - Apply cinematic and motion principles`;
+
+      const prompt = `${systemInstruction}
+
+**INPUT TEXT:**
+${inputText.trim()}
+
+**TASK:**
+${specificInstructions}
+
+**OUTPUT FORMAT:**
+Return exactly ${count} prompts as a JSON array of strings. Each prompt should be a complete, standalone description.
+
+**EXAMPLE FORMAT:**
+["prompt 1 description here", "prompt 2 description here", ...]
+
+Generate exactly ${count} ${type} prompts now:`;
+
+      let response: any;
+      if (geminiUserApiKey) {
+        response = await geminiGenerateTextWithJsonOutput(prompt, geminiUserApiKey, {
+          candidateCount: 1,
+          temperature: 0.8,
+          maxOutputTokens: 2048,
+        });
+      } else {
+        response = await generateTextWithJsonOutput(prompt, undefined, false, apiSettings);
+      }
+
+      console.log(`📝 ${type} prompts raw response:`, response);
+      
+      let prompts: string[] = [];
+      if (response && response.result && Array.isArray(response.result)) {
+        prompts = response.result.slice(0, count);
+      } else if (response && Array.isArray(response)) {
+        prompts = response.slice(0, count);
+      } else if (response && response.text) {
+        // Try to parse JSON from text response
+        try {
+          const parsed = JSON.parse(response.text);
+          if (Array.isArray(parsed)) {
+            prompts = parsed.slice(0, count);
+          }
+        } catch (parseError) {
+          console.warn('Failed to parse JSON, treating as single prompt');
+          prompts = [response.text];
+        }
+      }
+
+      // Ensure we have the right number of prompts
+      while (prompts.length < count) {
+        prompts.push(`${type === 'image' ? 'Visual scene' : 'Animation sequence'} ${prompts.length + 1} based on: ${inputText.substring(0, 100)}...`);
+      }
+
+      return prompts.slice(0, count);
+    } catch (error) {
+      console.error(`❌ Error generating ${type} prompts:`, error);
+      throw error;
+    }
+  };
   
   const handleGenerateIntelligentContextPromptsOnly = async () => {
     console.log('🚀 handleGenerateIntelligentContextPromptsOnly started');
@@ -307,31 +393,56 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       return;
     }
     updateState({ 
-        generatedCtxPrompts: [], 
+        generatedCtxPrompts: [],
+        generatedImagePrompts: [],
+        generatedAnimationPrompts: [],
         ctxPromptsError: null, 
-        ctxPromptsLoadingMessage: 'Đang phân tích nội dung và tạo danh sách prompt (Ngữ cảnh Thông minh)...', 
+        ctxPromptsLoadingMessage: 'Đang phân tích nội dung và tạo prompts (Ảnh + Chuyển động)...', 
     });
     setIsProcessing(true);
 
     try {
-      console.log('📝 About to call generateSubPrompts with:', { hookTextLength: hookTextForCtxPrompts.length, imageCount });
-      let subPrompts = await generateSubPrompts(hookTextForCtxPrompts, true); // true for contextual
-      console.log('✅ generateSubPrompts returned:', subPrompts);
+      console.log('📝 About to generate dual prompts with:', { hookTextLength: hookTextForCtxPrompts.length, promptCount: promptCount || imageCount });
+      const targetCount = promptCount || imageCount;
       
-      // Limit subPrompts to user's imageCount setting
-      if (subPrompts.length > imageCount) {
-        console.log('✂️ Limiting subPrompts from', subPrompts.length, 'to', imageCount);
-        subPrompts = subPrompts.slice(0, imageCount);
-        console.log('✅ After slice:', subPrompts);
-      }
+      // Generate image prompts
+      const imagePromptsPromise = generateDualPrompts(hookTextForCtxPrompts, targetCount, 'image');
       
-      console.log('🔄 About to updateState with subPrompts:', subPrompts.length);
+      // Generate animation prompts
+      const animationPromptsPromise = generateDualPrompts(hookTextForCtxPrompts, targetCount, 'animation');
+      
+      const [imagePrompts, animationPrompts] = await Promise.all([imagePromptsPromise, animationPromptsPromise]);
+      
+      console.log('✅ Generated prompts:', { imagePrompts: imagePrompts.length, animationPrompts: animationPrompts.length });
+      
       updateState({ 
-          generatedCtxPrompts: subPrompts, 
-          ctxPromptsLoadingMessage: `Hoàn thành! Đã tạo ${subPrompts.length} prompt.`,
+          generatedImagePrompts: imagePrompts,
+          generatedAnimationPrompts: animationPrompts,
+          generatedCtxPrompts: [...imagePrompts, ...animationPrompts], // For backward compatibility
+          ctxPromptsLoadingMessage: `Hoàn thành! Đã tạo ${imagePrompts.length} prompt ảnh và ${animationPrompts.length} prompt chuyển động.`,
           ctxPromptsError: null
       });
-      console.log('✅ updateState completed successfully');
+
+      // Save to history
+      if (imagePrompts.length > 0 || animationPrompts.length > 0) {
+        const title = `Prompt AI (${targetCount} bộ) - ${new Date().toLocaleString('vi-VN')}`;
+        const historyContent = `Input: ${hookTextForCtxPrompts.substring(0, 100)}...\n\n` +
+          `=== ${imagePrompts.length} PROMPTS TẠO ẢNH ===\n${imagePrompts.join('\n\n---\n\n')}\n\n` +
+          `=== ${animationPrompts.length} PROMPTS TẠO CHUYỂN ĐỘNG ===\n${animationPrompts.join('\n\n---\n\n')}`;
+        
+        const metadata = {
+          promptType: 'dual_generation',
+          inputText: hookTextForCtxPrompts.trim(),
+          targetCount: targetCount,
+          imagePrompts: imagePrompts,
+          animationPrompts: animationPrompts,
+          artStyle: selectedArtStyle
+        };
+        
+        HistoryStorage.saveToHistory(MODULE_KEYS.IMAGE_PROMPTS, title, historyContent, metadata);
+      }
+      
+      console.log('✅ updateState and history save completed successfully');
     } catch (e) {
       console.error('❌ Error in handleGenerateIntelligentContextPromptsOnly:', e);
       updateState({ 
@@ -584,6 +695,35 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     // You might want a unique button ID strategy if this is called for many items,
     // or simplify to just an alert without changing button text.
     copyToClipboard(textToCopy); 
+  };
+
+  // Handle history selection
+  const handleSelectHistory = (historyItem: any) => {
+    if (historyItem.metadata && historyItem.metadata.promptType === 'dual_generation') {
+      // Restore dual generation session
+      updateState({
+        hookTextForCtxPrompts: historyItem.metadata.inputText || '',
+        promptCount: historyItem.metadata.targetCount || 5,
+        selectedArtStyle: historyItem.metadata.artStyle || 'default',
+        generatedImagePrompts: historyItem.metadata.imagePrompts || [],
+        generatedAnimationPrompts: historyItem.metadata.animationPrompts || [],
+        generatedCtxPrompts: [...(historyItem.metadata.imagePrompts || []), ...(historyItem.metadata.animationPrompts || [])],
+        activeTab: 'intelligentContextPromptGenerator',
+        ctxPromptsError: null,
+        ctxPromptsLoadingMessage: null
+      });
+    } else {
+      // Fallback for older history items
+      updateState({
+        hookTextForCtxPrompts: historyItem.content.split('\n\n')[0] || '',
+        generatedCtxPrompts: historyItem.content.split('\n\n').slice(1) || [],
+        generatedImagePrompts: [],
+        generatedAnimationPrompts: [],
+        activeTab: 'intelligentContextPromptGenerator',
+        ctxPromptsError: null,
+        ctxPromptsLoadingMessage: null
+      });
+    }
   };
 
 
@@ -856,17 +996,36 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
                 <p>Nhập hook hoặc nội dung truyện. AI sẽ phân tích và tạo một danh sách các prompt ảnh (bằng Tiếng Anh) đã bao gồm phong cách nghệ thuật (từ Cài đặt chung) và ngữ cảnh văn hóa (nếu ngôn ngữ đầu vào là Tiếng Việt hoặc Tiếng Hàn). Bạn có thể sao chép các prompt này để sử dụng ở nơi khác.</p>
                 <p className="font-semibold mt-1">Tab này KHÔNG tự động tạo ảnh.</p>
             </InfoBox>
-            <div>
-                <label htmlFor="igsHookTextForCtxPrompts" className="block text-sm font-medium text-gray-700 mb-1">Nhập Hook hoặc Nội dung truyện (AI sẽ phân tích ngôn ngữ để tạo prompt theo ngữ cảnh):</label>
-                <textarea 
-                    id="igsHookTextForCtxPrompts" 
-                    value={hookTextForCtxPrompts} 
-                    onChange={(e) => updateState({ hookTextForCtxPrompts: e.target.value, ctxPromptsError: null })} 
-                    rows={5} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                    placeholder="Dán hook, tóm tắt hoặc toàn bộ truyện của bạn vào đây..."
-                    disabled={isProcessing || isRefining}
-                />
+            <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                    <label htmlFor="igsHookTextForCtxPrompts" className="block text-sm font-medium text-gray-700 mb-1">Nhập Hook hoặc Nội dung truyện (AI sẽ phân tích ngôn ngữ để tạo prompt theo ngữ cảnh):</label>
+                    <textarea 
+                        id="igsHookTextForCtxPrompts" 
+                        value={hookTextForCtxPrompts} 
+                        onChange={(e) => updateState({ hookTextForCtxPrompts: e.target.value, ctxPromptsError: null })} 
+                        rows={5} 
+                        className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                        placeholder="Dán hook, tóm tắt hoặc toàn bộ truyện của bạn vào đây..."
+                        disabled={isProcessing || isRefining}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="igsPromptCount" className="block text-sm font-medium text-gray-700 mb-1">Số lượng Prompts (Ảnh + Chuyển động):</label>
+                    <select 
+                        id="igsPromptCount" 
+                        value={promptCount || 5} 
+                        onChange={(e) => updateState({ promptCount: parseInt(e.target.value) })} 
+                        className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+                        disabled={isProcessing || isRefining}
+                    >
+                        {Array.from({ length: 50 }, (_, i) => i + 1).map(num => (
+                            <option key={num} value={num}>{num} prompts</option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                        AI sẽ tạo ra <strong>{promptCount || 5} prompts cho ảnh</strong> và <strong>{promptCount || 5} prompts cho chuyển động</strong>
+                    </p>
+                </div>
             </div>
              <button 
                 onClick={handleGenerateIntelligentContextPromptsOnly} 
@@ -878,7 +1037,106 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
             {isProcessing && ctxPromptsLoadingMessage && <LoadingSpinner message={ctxPromptsLoadingMessage} />}
             {!isProcessing && ctxPromptsLoadingMessage && <p className="text-center text-green-600 font-medium my-2">{ctxPromptsLoadingMessage}</p>}
             {ctxPromptsError && <ErrorAlert message={ctxPromptsError} />}
-            {generatedCtxPrompts.length > 0 && (
+            
+            {/* Enhanced Dual Prompts Display */}
+            {(generatedImagePrompts.length > 0 || generatedAnimationPrompts.length > 0) && (
+                <div className="mt-6 space-y-6">
+                    {/* Image Prompts Section */}
+                    {generatedImagePrompts.length > 0 && (
+                        <div className="p-4 border-2 border-blue-200 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-lg font-semibold text-blue-700 flex items-center">
+                                    🎨 Prompts Tạo Ảnh ({generatedImagePrompts.length})
+                                </h4>
+                                <button 
+                                    onClick={() => copyToClipboard(generatedImagePrompts.join('\n\n'))} 
+                                    className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors"
+                                    disabled={isProcessing || isRefining}
+                                >
+                                    📋 Copy All
+                                </button>
+                            </div>
+                            <div className="grid gap-3">
+                                {generatedImagePrompts.map((prompt, index) => (
+                                    <div key={`image-${index}`} className="bg-white p-3 rounded-md border border-blue-200 shadow-sm">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                                                Ảnh #{index + 1}
+                                            </span>
+                                            <button 
+                                                onClick={() => copyToClipboard(prompt)} 
+                                                className="text-xs text-blue-500 hover:text-blue-700"
+                                            >
+                                                📋
+                                            </button>
+                                        </div>
+                                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{prompt}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Animation Prompts Section */}
+                    {generatedAnimationPrompts.length > 0 && (
+                        <div className="p-4 border-2 border-green-200 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-lg font-semibold text-green-700 flex items-center">
+                                    🎬 Prompts Tạo Chuyển Động ({generatedAnimationPrompts.length})
+                                </h4>
+                                <button 
+                                    onClick={() => copyToClipboard(generatedAnimationPrompts.join('\n\n'))} 
+                                    className="px-3 py-1 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
+                                    disabled={isProcessing || isRefining}
+                                >
+                                    📋 Copy All
+                                </button>
+                            </div>
+                            <div className="grid gap-3">
+                                {generatedAnimationPrompts.map((prompt, index) => (
+                                    <div key={`animation-${index}`} className="bg-white p-3 rounded-md border border-green-200 shadow-sm">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">
+                                                Chuyển động #{index + 1}
+                                            </span>
+                                            <button 
+                                                onClick={() => copyToClipboard(prompt)} 
+                                                className="text-xs text-green-500 hover:text-green-700"
+                                            >
+                                                📋
+                                            </button>
+                                        </div>
+                                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{prompt}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Combined Copy Button */}
+                    <div className="flex justify-center">
+                        <button 
+                            onClick={() => {
+                                const combined = [
+                                    '=== PROMPTS TẠO ẢNH ===',
+                                    ...generatedImagePrompts.map((p, i) => `${i + 1}. ${p}`),
+                                    '',
+                                    '=== PROMPTS TẠO CHUYỂN ĐỘNG ===',
+                                    ...generatedAnimationPrompts.map((p, i) => `${i + 1}. ${p}`)
+                                ].join('\n');
+                                copyToClipboard(combined);
+                            }}
+                            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity shadow-md"
+                            disabled={isProcessing || isRefining}
+                        >
+                            📋 Sao Chép Tất Cả Prompts (Ảnh + Chuyển Động)
+                        </button>
+                    </div>
+                </div>
+            )}
+            
+            {/* Backward Compatibility - Old Display */}
+            {generatedCtxPrompts.length > 0 && generatedImagePrompts.length === 0 && generatedAnimationPrompts.length === 0 && (
                 <div className="mt-6 p-4 border rounded-lg bg-gray-50">
                     <h4 className="text-lg font-semibold text-gray-700 mb-2">Danh Sách Prompt Đã Tạo (Tiếng Anh):</h4>
                     <textarea 
@@ -1024,6 +1282,12 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
                 </div>
             </div>
         )}
+
+        {/* History Panel */}
+        <HistoryPanel 
+            moduleKey={MODULE_KEYS.IMAGE_PROMPTS}
+            onSelectHistory={handleSelectHistory}
+        />
 
     </ModuleContainer>
   );

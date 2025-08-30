@@ -106,5 +106,7 @@ export const MODULE_KEYS = {
   REWRITE: 'rewrite',
   BATCH_REWRITE: 'batch_rewrite',
   ANALYSIS: 'analysis',
-  EDIT_STORY: 'edit_story'
+  EDIT_STORY: 'edit_story',
+  IMAGE_PROMPTS: 'image_prompts',
+  STORY_OUTLINE: 'story_outline'
 } as const;
