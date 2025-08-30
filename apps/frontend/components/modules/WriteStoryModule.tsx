@@ -17,6 +17,7 @@ import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle, Loader2, X } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logStoryGenerated } from '../../services/usageService';
+import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
 
 interface WriteStoryModuleProps {
   apiSettings: ApiSettings;
@@ -794,6 +795,13 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       updateState({ hookError: 'Vui lòng nhập Nội dung truyện để tạo hook!' });
       return;
     }
+
+    // Check request limit FIRST
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
+      return;
+    }
     
     const abortCtrl = new AbortController();
     setCurrentAbortController(abortCtrl);
@@ -856,6 +864,18 @@ Provide ONLY the numbered hooks, no additional explanations.`;
     if (!storyOutline.trim()) {
       updateState({ storyError: 'Vui lòng nhập dàn ý truyện!' });
       return;
+    }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
+      return;
+    }
+
+    // Show warning if any
+    if (requestCheck.warning) {
+      console.warn('Request limit warning:', requestCheck.warning);
     }
     let currentStoryStyle = writingStyle;
     if (writingStyle === 'custom') {
@@ -1128,6 +1148,13 @@ Provide ONLY the numbered hooks, no additional explanations.`;
   const handleGenerateLesson = async () => {
     if (!storyInputForLesson.trim()) {
       updateState({ lessonError: 'Vui lòng nhập Truyện để đúc kết bài học!' });
+      return;
+    }
+
+    // Check request limit FIRST
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
       return;
     }
     let currentLessonStyle = lessonWritingStyle;

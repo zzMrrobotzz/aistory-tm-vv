@@ -537,6 +537,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution  
 app.use('/api/user', auth, updateUserActivity, require('./routes/userStats')); // User statistics
 app.use('/api/user', auth, updateUserActivity, require('./routes/userUsage')); // User usage info
+app.use('/api/requests', auth, updateUserActivity, require('./routes/requestTracking')); // Simple request tracking
 app.use('/api/admin/rate-limit', require('./routes/rateLimitAdmin')); // Rate limit management (no auth for now)
 
 // --- Root and Server Start ---
