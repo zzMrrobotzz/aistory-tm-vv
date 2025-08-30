@@ -17,6 +17,7 @@ import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService'; // Use the generic text generation service
 import { delay } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
+import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
 
 
 interface CreativeLabModuleProps {
@@ -62,6 +63,13 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       updateState({ errorAnalyzingReferenceOutline: 'Vui lòng nhập "Dàn Ý Viral Tham Khảo" để phân tích.' });
       return;
     }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
+      return;
+    }
     updateState({ 
       isAnalyzingReferenceOutline: true, 
       errorAnalyzingReferenceOutline: null, 
@@ -105,6 +113,13 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
   const handleGenerateQuickOutline = async () => {
     if (!quickOutlineTitle.trim()) {
       updateState({ quickOutlineError: 'Vui lòng nhập Tiêu đề truyện.' });
+      return;
+    }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
       return;
     }
     updateState({ quickOutlineError: null, quickOutlineResult: '', quickOutlineLoading: true, quickOutlineProgressMessage: 'Đang tạo dàn ý nhanh...' });
@@ -162,6 +177,13 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
   const handleGenerateSingleOutlineInDepth = async () => {
     if (!coreIdea.trim()) {
       updateState({ singleOutlineError: 'Vui lòng nhập Ý tưởng Cốt lõi.' });
+      return;
+    }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
       return;
     }
     updateState({ singleOutlineError: null, finalOutline: '', singleOutlineLoading: true, singleOutlineProgressMessage: 'Đang tạo dàn ý chuyên sâu...' });
@@ -339,6 +361,13 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     const activeCoreIdeas = batchCoreIdeas.map(idea => idea.trim()).filter(idea => idea);
     if (activeCoreIdeas.length === 0) {
       updateState({ batchOutlineError: 'Vui lòng nhập ít nhất một Ý tưởng Cốt lõi.' });
+      return;
+    }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
       return;
     }
 

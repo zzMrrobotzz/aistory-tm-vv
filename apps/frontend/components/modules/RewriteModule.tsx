@@ -14,6 +14,7 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
+import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
 
 // Retry logic with exponential backoff for API calls
 const retryApiCall = async (
@@ -414,6 +415,25 @@ Chỉ trả về JSON.`;
 
     // Process individual queue item (extracted from handleSingleRewrite)
     const processQueueItem = async (item: RewriteQueueItem) => {
+        // Check request limit FIRST - before starting any processing
+        const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.BATCH_REWRITE);
+        if (!requestCheck.success) {
+            // Mark current item as blocked due to request limit
+            setModuleState(prev => ({
+                ...prev,
+                queue: prev.queue.map(qItem =>
+                    qItem.id === item.id
+                        ? { 
+                            ...qItem, 
+                            status: 'error' as const, 
+                            error: requestCheck.message
+                        }
+                        : qItem
+                ),
+            }));
+            throw new Error(requestCheck.message);
+        }
+
         const CHUNK_CHAR_COUNT = 4000;
         // Use minimum chunks for better progress visualization
         const numChunks = Math.max(3, Math.ceil(item.originalText.length / CHUNK_CHAR_COUNT)); 
@@ -595,6 +615,14 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             setModuleState(prev => ({ ...prev, error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' }));
             return;
         }
+
+        // Check request limit FIRST - before starting any processing
+        const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.REWRITE);
+        if (!requestCheck.success) {
+            showRequestLimitError(requestCheck);
+            return;
+        }
+
         setModuleState(prev => ({ ...prev, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false }));
         
         abortControllerRef.current = new AbortController();

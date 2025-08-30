@@ -24,6 +24,7 @@ import { delay, dataUrlToBlob } from '../../utils';
 import { logApiCall, logImageGenerated } from '../../services/usageService';
 import { ApiKeyStorage } from '../../utils/apiKeyStorage';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
+import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
 
 interface ImageGenerationSuiteModuleProps {
   apiSettings: ApiSettings;
@@ -177,6 +178,13 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     console.log('🖼️ executeImageGenerationFromHook started', { isContextualImageGeneratorTab, hookTextLength: hookText.length });
     if (!hookText.trim()) {
       updateState({ singleImageOverallError: 'Vui lòng nhập đoạn Hook hoặc Nội dung truyện của bạn.' });
+      return;
+    }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_GEN);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
       return;
     }
     if (imageEngine === 'stability' && !effectiveStabilityKey) {
@@ -392,6 +400,13 @@ Generate exactly ${count} ${type} prompts now:`;
       updateState({ ctxPromptsError: 'Vui lòng nhập đoạn Hook hoặc Nội dung truyện của bạn.' });
       return;
     }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_GEN);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
+      return;
+    }
     updateState({ 
         generatedCtxPrompts: [],
         generatedImagePrompts: [],
@@ -467,6 +482,13 @@ Generate exactly ${count} ${type} prompts now:`;
     const individualPrompts = promptsInput.split('\n').map(p => p.trim()).filter(p => p !== '');
     if (individualPrompts.length === 0) {
       updateState({ batchOverallError: 'Vui lòng nhập ít nhất một prompt (tiếng Anh).', settingsError: null });
+      return;
+    }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_GEN);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
       return;
     }
     if (imageEngine === 'stability' && !effectiveStabilityKey) {

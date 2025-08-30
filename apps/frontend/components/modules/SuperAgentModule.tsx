@@ -8,6 +8,7 @@ import InfoBox from '../InfoBox';
 import { generateImage } from '../../services/geminiService';
 import { generateText } from '@/services/textGenerationService';
 import { delay } from '../../utils'; // Added delay import
+import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
 
 interface SuperAgentModuleProps {
   apiSettings: ApiSettings;
@@ -46,6 +47,13 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
   const handleSubmit = async () => {
     if (!sourceText) {
       updateState({ error: 'Vui lòng nhập Tiêu Đề hoặc Dàn Ý.' });
+      return;
+    }
+
+    // Check request limit FIRST - before starting any processing
+    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.SUPER_AGENT);
+    if (!requestCheck.success) {
+      showRequestLimitError(requestCheck);
       return;
     }
     
