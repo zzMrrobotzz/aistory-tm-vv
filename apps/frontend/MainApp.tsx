@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { onlineService } from './services/onlineService';
+import AnnouncementBanner from './components/AnnouncementBanner';
+import { getAnnouncement } from './services/settingsService';
 import {
   ActiveModule, ApiSettings, ApiProvider,
   SuperAgentModuleState, CreativeLabModuleState, 
@@ -68,6 +70,7 @@ const MainApp: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.Dashboard);
+  const [announcement, setAnnouncement] = useState<string>('');
   // API Settings are now centralized in Settings module
   // Removed elevenLabsApiKeys state
   const [apiSettings, setApiSettings] = useState<ApiSettings>({
@@ -679,6 +682,23 @@ const MainApp: React.FC = () => {
   };
   const [contentSummarizerState, setContentSummarizerState] = useState<AiAssistantModuleState>(initialContentSummarizerState);
 
+  // Load announcement from backend
+  useEffect(() => {
+    const loadAnnouncement = async () => {
+      try {
+        const announcementText = await getAnnouncement();
+        setAnnouncement(announcementText);
+      } catch (error) {
+        console.error('Error loading announcement:', error);
+      }
+    };
+
+    loadAnnouncement();
+    // Reload announcement every 5 minutes in case admin updates it
+    const interval = setInterval(loadAnnouncement, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // The useEffect for loading 'allowUserApiKeys' has been removed to make settings always visible.
 
   // Removed useEffect for elevenLabsApiKeys
@@ -1171,22 +1191,28 @@ const MainApp: React.FC = () => {
   }, [navigate]);
 
   return (
-    <div className="flex bg-gray-100">
-      <Sidebar 
-        activeModule={activeModule} 
-        setActiveModule={setActiveModule} 
-        currentUser={currentUser}
-        onLogout={handleLogout}
+    <div className="bg-gray-100">
+      <AnnouncementBanner 
+        message={announcement}
+        onClose={() => setAnnouncement('')}
       />
-      <div className="flex-1 ml-64">
-        <MainHeader />
+      <div className="flex">
+        <Sidebar 
+          activeModule={activeModule} 
+          setActiveModule={setActiveModule} 
+          currentUser={currentUser}
+          onLogout={handleLogout}
+        />
+        <div className="flex-1 ml-64">
+          <MainHeader />
         <main className="p-8">
           {renderActiveModule()}
         </main>
+        </div>
+        
+        {/* Support Chatbot */}
+        <SupportChatbot apiSettings={apiSettings} />
       </div>
-      
-      {/* Support Chatbot */}
-      <SupportChatbot apiSettings={apiSettings} />
     </div>
   );
 };

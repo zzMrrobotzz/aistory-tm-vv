@@ -11,6 +11,27 @@ const apiClient = axios.create({
     },
 });
 
+// --- Settings API Functions ---
+export const getSystemSettings = async () => {
+    try {
+        const response = await apiClient.get('/settings');
+        return response.data;
+    } catch (error) {
+        console.error('Error getting system settings:', error);
+        throw error;
+    }
+};
+
+export const updateSystemSettings = async (settings: any) => {
+    try {
+        const response = await apiClient.post('/settings', { settings });
+        return response.data;
+    } catch (error) {
+        console.error('Error updating system settings:', error);
+        throw error;
+    }
+};
+
 // --- Mock Data for Fallback ---
 const mockData = {
     dashboardStats: {

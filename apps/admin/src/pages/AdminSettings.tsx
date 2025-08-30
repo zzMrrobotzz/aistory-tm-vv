@@ -1,15 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getSystemSettings, updateSystemSettings } from '../services/keyService';
 
 const AdminSettings: React.FC = () => {
     const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [enableNewFeature, setEnableNewFeature] = useState(true);
     const [announcement, setAnnouncement] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-    const handleSave = () => {
-        // In a real app, this would make an API call to the backend
-        console.log("Saving settings:", { maintenanceMode, enableNewFeature, announcement });
-        alert("Cài đặt đã được lưu (giả lập)!");
+    // Load settings when component mounts
+    useEffect(() => {
+        loadSettings();
+    }, []);
+
+    const loadSettings = async () => {
+        try {
+            setLoading(true);
+            const response = await getSystemSettings();
+            if (response.success) {
+                const settings = response.settings;
+                setMaintenanceMode(settings.maintenanceMode?.value || false);
+                setEnableNewFeature(settings.enableNewFeature?.value || true);
+                setAnnouncement(settings.announcement?.value || '');
+            }
+        } catch (error) {
+            console.error('Error loading settings:', error);
+            alert('Lỗi khi tải cài đặt!');
+        } finally {
+            setLoading(false);
+        }
     };
+
+    const handleSave = async () => {
+        try {
+            setSaving(true);
+            const settings = {
+                maintenanceMode: {
+                    value: maintenanceMode,
+                    type: 'boolean',
+                    description: 'Enable maintenance mode'
+                },
+                enableNewFeature: {
+                    value: enableNewFeature,
+                    type: 'boolean', 
+                    description: 'Enable new features'
+                },
+                announcement: {
+                    value: announcement,
+                    type: 'string',
+                    description: 'Global announcement banner'
+                }
+            };
+
+            const response = await updateSystemSettings(settings);
+            if (response.success) {
+                alert("✅ Cài đặt đã được lưu thành công!");
+            } else {
+                throw new Error(response.error || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            alert("❌ Lỗi khi lưu cài đặt!");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-fadeIn max-w-4xl">
@@ -69,9 +132,10 @@ const AdminSettings: React.FC = () => {
             <div className="flex justify-end">
                 <button
                     onClick={handleSave}
-                    className="bg-sky-600 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:bg-sky-700 transition-colors"
+                    disabled={saving}
+                    className="bg-sky-600 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Lưu Thay Đổi
+                    {saving ? 'Đang lưu...' : 'Lưu Thay Đổi'}
                 </button>
             </div>
         </div>
