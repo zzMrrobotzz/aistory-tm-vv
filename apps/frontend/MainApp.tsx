@@ -1194,7 +1194,6 @@ const MainApp: React.FC = () => {
     <div className="bg-gray-100">
       <AnnouncementBanner 
         messages={announcements}
-        onClose={() => setAnnouncements([])}
       />
       <div className="flex">
         <Sidebar 
