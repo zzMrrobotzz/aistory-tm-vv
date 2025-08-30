@@ -4,7 +4,13 @@ import { getSystemSettings, updateSystemSettings } from '../services/keyService'
 const AdminSettings: React.FC = () => {
     const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [enableNewFeature, setEnableNewFeature] = useState(true);
-    const [announcement, setAnnouncement] = useState('');
+    const [announcements, setAnnouncements] = useState({
+        announcement1: '',
+        announcement2: '',
+        announcement3: '',
+        announcement4: '',
+        announcement5: ''
+    });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -21,7 +27,13 @@ const AdminSettings: React.FC = () => {
                 const settings = response.settings;
                 setMaintenanceMode(settings.maintenanceMode?.value || false);
                 setEnableNewFeature(settings.enableNewFeature?.value || true);
-                setAnnouncement(settings.announcement?.value || '');
+                setAnnouncements({
+                    announcement1: settings.announcement1?.value || '',
+                    announcement2: settings.announcement2?.value || '',
+                    announcement3: settings.announcement3?.value || '',
+                    announcement4: settings.announcement4?.value || '',
+                    announcement5: settings.announcement5?.value || ''
+                });
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -45,10 +57,30 @@ const AdminSettings: React.FC = () => {
                     type: 'boolean', 
                     description: 'Enable new features'
                 },
-                announcement: {
-                    value: announcement,
+                announcement1: {
+                    value: announcements.announcement1,
                     type: 'string',
-                    description: 'Global announcement banner'
+                    description: 'Global announcement banner 1'
+                },
+                announcement2: {
+                    value: announcements.announcement2,
+                    type: 'string',
+                    description: 'Global announcement banner 2'
+                },
+                announcement3: {
+                    value: announcements.announcement3,
+                    type: 'string',
+                    description: 'Global announcement banner 3'
+                },
+                announcement4: {
+                    value: announcements.announcement4,
+                    type: 'string',
+                    description: 'Global announcement banner 4'
+                },
+                announcement5: {
+                    value: announcements.announcement5,
+                    type: 'string',
+                    description: 'Global announcement banner 5'
                 }
             };
 
@@ -94,18 +126,67 @@ const AdminSettings: React.FC = () => {
                         </label>
                     </div>
 
-                    {/* Announcement Banner */}
+                    {/* Announcement Banners */}
                     <div>
-                        <label htmlFor="announcement" className="block font-medium text-gray-800 mb-1">Thông báo Toàn cục</label>
-                         <p className="text-sm text-gray-500 mb-2">Nhập một tin nhắn để hiển thị dưới dạng banner cho tất cả người dùng. Để trống để không hiển thị.</p>
-                        <input
-                            type="text"
-                            id="announcement"
-                            value={announcement}
-                            onChange={(e) => setAnnouncement(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
-                            placeholder="Ví dụ: Nâng cấp hệ thống vào lúc 2h sáng."
-                        />
+                        <label className="block font-medium text-gray-800 mb-1">Thông báo Toàn cục</label>
+                         <p className="text-sm text-gray-500 mb-4">Nhập thông báo để hiển thị dưới dạng banner. Các thông báo sẽ hiển thị lần lượt. Để trống để không hiển thị.</p>
+                        
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-sm text-gray-600 mb-1 block">Thông báo 1:</label>
+                                <input
+                                    type="text"
+                                    value={announcements.announcement1}
+                                    onChange={(e) => setAnnouncements({...announcements, announcement1: e.target.value})}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                                    placeholder="Ví dụ: Nguyễn Đại đang ăn cơm"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="text-sm text-gray-600 mb-1 block">Thông báo 2:</label>
+                                <input
+                                    type="text"
+                                    value={announcements.announcement2}
+                                    onChange={(e) => setAnnouncements({...announcements, announcement2: e.target.value})}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                                    placeholder="Ví dụ: Đại đang đi chơi"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="text-sm text-gray-600 mb-1 block">Thông báo 3:</label>
+                                <input
+                                    type="text"
+                                    value={announcements.announcement3}
+                                    onChange={(e) => setAnnouncements({...announcements, announcement3: e.target.value})}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                                    placeholder="Thông báo thứ 3"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="text-sm text-gray-600 mb-1 block">Thông báo 4:</label>
+                                <input
+                                    type="text"
+                                    value={announcements.announcement4}
+                                    onChange={(e) => setAnnouncements({...announcements, announcement4: e.target.value})}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                                    placeholder="Thông báo thứ 4"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="text-sm text-gray-600 mb-1 block">Thông báo 5:</label>
+                                <input
+                                    type="text"
+                                    value={announcements.announcement5}
+                                    onChange={(e) => setAnnouncements({...announcements, announcement5: e.target.value})}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                                    placeholder="Thông báo thứ 5"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { onlineService } from './services/onlineService';
 import AnnouncementBanner from './components/AnnouncementBanner';
-import { getAnnouncement } from './services/settingsService';
+import { getAnnouncements } from './services/settingsService';
 import {
   ActiveModule, ApiSettings, ApiProvider,
   SuperAgentModuleState, CreativeLabModuleState, 
@@ -70,7 +70,7 @@ const MainApp: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.Dashboard);
-  const [announcement, setAnnouncement] = useState<string>('');
+  const [announcements, setAnnouncements] = useState<string[]>([]);
   // API Settings are now centralized in Settings module
   // Removed elevenLabsApiKeys state
   const [apiSettings, setApiSettings] = useState<ApiSettings>({
@@ -682,20 +682,20 @@ const MainApp: React.FC = () => {
   };
   const [contentSummarizerState, setContentSummarizerState] = useState<AiAssistantModuleState>(initialContentSummarizerState);
 
-  // Load announcement from backend
+  // Load announcements from backend
   useEffect(() => {
-    const loadAnnouncement = async () => {
+    const loadAnnouncements = async () => {
       try {
-        const announcementText = await getAnnouncement();
-        setAnnouncement(announcementText);
+        const announcementTexts = await getAnnouncements();
+        setAnnouncements(announcementTexts);
       } catch (error) {
-        console.error('Error loading announcement:', error);
+        console.error('Error loading announcements:', error);
       }
     };
 
-    loadAnnouncement();
-    // Reload announcement every 5 minutes in case admin updates it
-    const interval = setInterval(loadAnnouncement, 5 * 60 * 1000);
+    loadAnnouncements();
+    // Reload announcements every 5 minutes in case admin updates them
+    const interval = setInterval(loadAnnouncements, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1193,8 +1193,8 @@ const MainApp: React.FC = () => {
   return (
     <div className="bg-gray-100">
       <AnnouncementBanner 
-        message={announcement}
-        onClose={() => setAnnouncement('')}
+        messages={announcements}
+        onClose={() => setAnnouncements([])}
       />
       <div className="flex">
         <Sidebar 
