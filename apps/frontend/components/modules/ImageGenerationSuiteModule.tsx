@@ -356,13 +356,9 @@ Generate exactly ${count} ${type} prompts now:`;
 
       let response: any;
       if (geminiUserApiKey) {
-        response = await geminiGenerateTextWithJsonOutput(prompt, geminiUserApiKey, {
-          candidateCount: 1,
-          temperature: 0.8,
-          maxOutputTokens: 2048,
-        });
+        response = await geminiGenerateTextWithJsonOutput(prompt, undefined, geminiUserApiKey);
       } else {
-        response = await generateTextWithJsonOutput(prompt, undefined, false, apiSettings);
+        response = await generateTextWithJsonOutput(prompt, undefined, apiSettings);
       }
 
       console.log(`📝 ${type} prompts raw response:`, response);
