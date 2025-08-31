@@ -24,7 +24,7 @@ import { delay, dataUrlToBlob } from '../../utils';
 import { logApiCall, logImageGenerated } from '../../services/usageService';
 import { ApiKeyStorage } from '../../utils/apiKeyStorage';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
-import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
+import { canMakeRequest, incrementRequestCount, getUsageStats } from '../../services/localRequestCounter';
 
 interface ImageGenerationSuiteModuleProps {
   apiSettings: ApiSettings;
@@ -181,12 +181,15 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_GEN);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
+    // Check local request limit FIRST - before starting any processing
+    if (!canMakeRequest()) {
+      const stats = getUsageStats();
+      updateState({ singleImageOverallError: `Đã đạt giới hạn ${stats.limit} requests/ngày. Hãy chờ đến ngày mai để sử dụng lại.` });
       return;
     }
+
+    // Increment counter immediately when user starts
+    incrementRequestCount();
     if (imageEngine === 'stability' && !effectiveStabilityKey) {
       updateState({ settingsError: 'Vui lòng cấu hình API Key cho Stability AI trong module Cài đặt → Quản Lý API Keys.', singleImageOverallError: null });
       return;
@@ -401,12 +404,15 @@ Generate exactly ${count} ${type} prompts now:`;
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_GEN);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
+    // Check local request limit FIRST - before starting any processing
+    if (!canMakeRequest()) {
+      const stats = getUsageStats();
+      updateState({ ctxPromptsError: `Đã đạt giới hạn ${stats.limit} requests/ngày. Hãy chờ đến ngày mai để sử dụng lại.` });
       return;
     }
+
+    // Increment counter immediately when user starts
+    incrementRequestCount();
     updateState({ 
         generatedCtxPrompts: [],
         generatedImagePrompts: [],
@@ -485,12 +491,15 @@ Generate exactly ${count} ${type} prompts now:`;
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_GEN);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
+    // Check local request limit FIRST - before starting any processing
+    if (!canMakeRequest()) {
+      const stats = getUsageStats();
+      updateState({ batchOverallError: `Đã đạt giới hạn ${stats.limit} requests/ngày. Hãy chờ đến ngày mai để sử dụng lại.` });
       return;
     }
+
+    // Increment counter immediately when user starts
+    incrementRequestCount();
     if (imageEngine === 'stability' && !effectiveStabilityKey) {
       updateState({ settingsError: 'Vui lòng cấu hình API Key cho Stability AI trong module Cài đặt → Quản Lý API Keys.', batchOverallError: null });
       return;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Activity, Clock, TrendingUp } from 'lucide-react';
-import { getUserUsageStatus } from '../services/rateLimitService';
+import { getUsageStats, getTimeUntilReset } from '../services/localRequestCounter';
 
 interface UsageStatus {
   canProceed: boolean;
@@ -45,8 +45,8 @@ const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({
 
   useEffect(() => {
     loadUsageStatus();
-    // Refresh every 5 minutes
-    const interval = setInterval(loadUsageStatus, 5 * 60 * 1000);
+    // Refresh every minute to handle midnight reset  
+    const interval = setInterval(loadUsageStatus, 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -68,7 +68,27 @@ const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const status = await getUserUsageStatus();
+      
+      // Get local usage stats
+      const localStats = getUsageStats();
+      const timeLeft = getTimeUntilReset();
+      
+      // Convert to expected format
+      const status: UsageStatus = {
+        canProceed: localStats.canUse,
+        totalUsage: localStats.current,
+        usageLimit: localStats.limit,
+        remainingRequests: localStats.remaining,
+        percentage: localStats.percentage,
+        subscription: 'local', // Not used in local mode
+        moduleBreakdown: [], // Not available in local mode
+        resetTime: `${timeLeft.hours}h ${timeLeft.minutes}m`,
+        warning: localStats.percentage >= 90 ? {
+          type: 'approaching_limit',
+          message: `Cảnh báo: Đã sử dụng ${localStats.percentage}% quota hôm nay`
+        } : undefined
+      };
+      
       setUsageStatus(status);
     } catch (err) {
       console.error('Failed to load usage status:', err);
