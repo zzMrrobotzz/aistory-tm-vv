@@ -351,7 +351,7 @@ ${fullGeneratedStory || "This is the beginning of the story."}
 
 Provide ONLY the story content for this section:`;
       
-      await delay(500);
+      await delay(1000); // Doubled from 500ms to prevent 503 errors
       const result = await generateText(prompt, undefined, false, apiSettings, 'write-story');
       fullGeneratedStory += (fullGeneratedStory ? '\n\n' : '') + (result?.text || '').trim();
       
@@ -649,7 +649,7 @@ Provide ONLY the story content for this section:`;
       ),
     }));
 
-    await delay(300); // Small delay to show progress
+    await delay(600); // Doubled from 300ms to prevent 503 errors
 
     // Update progress to show generation phase
     setModuleState(prev => ({
@@ -697,7 +697,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       ),
     }));
 
-    await delay(500);
+    await delay(1000); // Doubled from 500ms to prevent 503 errors
     const result = await generateText(prompt, undefined, false, apiSettings);
     fullGeneratedHooks = (result?.text || '').trim();
 
@@ -711,7 +711,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       ),
     }));
 
-    await delay(200); // Small delay to show progress
+    await delay(400); // Doubled from 200ms to prevent 503 errors
 
     // Update progress to 100%
     setModuleState(prev => ({
@@ -960,7 +960,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
         \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
 
         // Add rate limiting delay before each API call (including first chunk) - doubled to prevent 503 errors
-        await delay(i === 0 ? 1000 : 2000, abortCtrl.signal); 
+        await delay(i === 0 ? 2000 : 4000, abortCtrl.signal); // Doubled to prevent 503 errors 
         const result = await generateText(prompt, undefined, undefined, apiSettings);
         if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         let currentChunkText = result.text;
@@ -977,7 +977,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       }
       updateState({ storyLoadingMessage: 'Hoàn thành viết truyện! Chuẩn bị biên tập độ dài.' });
       
-      await delay(2000, abortCtrl.signal); 
+      await delay(4000, abortCtrl.signal); // Doubled from 2000ms to prevent 503 errors 
       if(fullStory.trim()){
           await handleEditStory(fullStory, storyOutline, capturedKeyElements, undefined, abortCtrl); // Pass abortCtrl
       } else {

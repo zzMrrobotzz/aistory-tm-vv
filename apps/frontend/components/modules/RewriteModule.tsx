@@ -515,8 +515,8 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
             
-            // Longer delay for queue mode to prevent rate limiting
-            await delay(1500);
+            // Longer delay for queue mode to prevent rate limiting - doubled to prevent 503
+            await delay(3000);
             const result = await retryApiCall(
                 () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
                 3,
@@ -708,7 +708,7 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
                 
-                await delay(500);
+                await delay(1000); // Doubled from 500ms to prevent 503 errors
                 const result = await retryApiCall(
                     () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
                     3,
