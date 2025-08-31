@@ -38,13 +38,25 @@ const retryApiCall = async (
                            error?.message?.includes('ServerError') ||
                            error?.status === 500 ||
                            error?.code === 500;
+                           
+      const is503Error = error?.message?.includes('503') ||
+                         error?.message?.includes('Service Unavailable') ||
+                         error?.status === 503 ||
+                         error?.code === 503;
       
-      if (isServerError && i < maxRetries - 1) {
-        // Exponential backoff: 2s, 4s, 8s for normal mode
-        // Longer delays for queue mode: 6s, 12s, 24s (doubled to prevent 503)
-        const baseDelay = isQueueMode ? 6000 : 4000;
-        const backoffDelay = baseDelay * Math.pow(2, i);
-        console.warn(`🔄 RETRY: API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms... [Queue mode: ${isQueueMode}]`);
+      if ((isServerError || is503Error) && i < maxRetries - 1) {
+        // Special handling for 503 errors - longer delays (1min, 2min, 4min)
+        let backoffDelay;
+        if (is503Error) {
+          const baseDelay503 = 60000; // 1 minute base delay for 503
+          backoffDelay = baseDelay503 * Math.pow(2, i);
+          console.warn(`🚨 503 SERVICE UNAVAILABLE: Extended retry (attempt ${i + 1}/${maxRetries}), waiting ${Math.round(backoffDelay/1000)}s... [Queue mode: ${isQueueMode}]`);
+        } else {
+          // Regular 500 errors - shorter delays
+          const baseDelay = isQueueMode ? 6000 : 4000;
+          backoffDelay = baseDelay * Math.pow(2, i);
+          console.warn(`🔄 RETRY: API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms... [Queue mode: ${isQueueMode}]`);
+        }
         await delay(backoffDelay);
         continue;
       }
@@ -61,6 +73,47 @@ interface RewriteModuleProps {
   setModuleState: React.Dispatch<React.SetStateAction<RewriteModuleState>>;
   currentUser: UserProfile | null;
 }
+
+// Progress persistence for auto-resume functionality
+const PROGRESS_STORAGE_KEY = 'rewrite-module-progress';
+
+const saveProgress = (queueState: any, currentContent: string) => {
+  const progressData = {
+    queue: queueState,
+    content: currentContent,
+    timestamp: Date.now(),
+    version: '1.0'
+  };
+  try {
+    localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(progressData));
+  } catch (e) {
+    console.warn('Failed to save progress:', e);
+  }
+};
+
+const loadProgress = (): any => {
+  try {
+    const saved = localStorage.getItem(PROGRESS_STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      // Only load if saved within last 24 hours
+      if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+        return data;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load progress:', e);
+  }
+  return null;
+};
+
+const clearProgress = () => {
+  try {
+    localStorage.removeItem(PROGRESS_STORAGE_KEY);
+  } catch (e) {
+    console.warn('Failed to clear progress:', e);
+  }
+};
 
 const RewriteModule: React.FC<RewriteModuleProps> = ({ 
   apiSettings, 
@@ -325,6 +378,9 @@ Chỉ trả về JSON.`;
                             },
                             // Don't update queue here - it's already updated in processQueueItem
                         };
+                        
+                        // Save progress after successful completion
+                        saveProgress(updatedState.queue, updatedState.outputText);
 
                         // Check if there are more waiting items
                         const hasWaitingItems = updatedState.queue.filter(item => item.status === 'waiting').length > 0;
@@ -343,16 +399,77 @@ Chỉ trả về JSON.`;
                                 setTimeout(() => processQueue(), 1000);
                             }, 6000); // Doubled from 3000ms to 6000ms to prevent 503
                         } else {
-                            // No more items - stop processing
+                            // No more items - stop processing and clear progress
                             updatedState.queueSystem.isProcessing = false;
                             updatedState.queueSystem.currentItem = null;
+                            clearProgress(); // Clear saved progress when queue completes
+                            console.log('✅ Queue completed successfully, progress cleared');
                         }
 
                         return updatedState;
                     });
 
                 } catch (error) {
-                    // Mark current item as error and continue with next
+                    const errorMessage = (error as Error).message;
+                    const is503Error = errorMessage.includes('503') || errorMessage.includes('Service Unavailable');
+                    const isRetryableError = errorMessage.includes('500') || errorMessage.includes('ServerError') || is503Error;
+                    
+                    // Save progress before handling error
+                    const currentQueue = moduleState.queue;
+                    const currentContent = moduleState.outputText;
+                    saveProgress(currentQueue, currentContent);
+                    
+                    if (is503Error) {
+                        // 503 errors get special treatment - mark as retry instead of error
+                        console.warn(`🚨 503 Error detected for item ${currentItem.id}, will retry automatically`);
+                        setModuleState(prev => {
+                            const updatedState = {
+                                ...prev,
+                                queue: prev.queue.map(item =>
+                                    item.id === currentItem.id
+                                        ? { 
+                                            ...item, 
+                                            status: 'processing' as const, // Keep as processing during retry wait
+                                            error: '🚨 Lỗi 503: Đang chờ 1 phút để thử lại tự động...' 
+                                        }
+                                        : item
+                                ),
+                                queueSystem: {
+                                    ...prev.queueSystem,
+                                    isProcessing: true, // Keep processing flag
+                                    currentItem: currentItem.id,
+                                }
+                            };
+
+                            // Auto-retry after 1 minute for 503 errors
+                            setTimeout(() => {
+                                console.log(`🔄 Auto-resuming after 503 error for item ${currentItem.id}`);
+                                setModuleState(nextState => ({
+                                    ...nextState,
+                                    queue: nextState.queue.map(item =>
+                                        item.id === currentItem.id
+                                            ? { 
+                                                ...item, 
+                                                status: 'waiting' as const, // Reset to waiting for retry
+                                                error: undefined // Clear retry message
+                                            }
+                                            : item
+                                    ),
+                                    queueSystem: {
+                                        ...nextState.queueSystem,
+                                        isProcessing: false,
+                                        currentItem: null,
+                                    }
+                                }));
+                                setTimeout(() => processQueue(), 1000);
+                            }, 60000); // 1 minute delay
+                            
+                            return updatedState;
+                        });
+                        return; // Exit early for 503 retry
+                    }
+                    
+                    // Handle other errors normally
                     setModuleState(prev => {
                         const updatedState = {
                             ...prev,
@@ -361,9 +478,9 @@ Chỉ trả về JSON.`;
                                     ? { 
                                         ...item, 
                                         status: 'error' as const, 
-                                        error: (error as Error).message.includes('500') || (error as Error).message.includes('ServerError')
+                                        error: isRetryableError
                                             ? 'Lỗi server tạm thời. API đã thử lại nhưng vẫn thất bại. Vui lòng thử lại sau.'
-                                            : (error as Error).message
+                                            : errorMessage
                                     }
                                     : item
                             ),
@@ -386,9 +503,11 @@ Chỉ trả về JSON.`;
                                 setTimeout(() => processQueue(), 1000);
                             }, 6000); // Doubled from 3000ms to 6000ms to prevent 503
                         } else {
-                            // No more items - stop processing
+                            // No more items - stop processing and clear progress
                             updatedState.queueSystem.isProcessing = false;
                             updatedState.queueSystem.currentItem = null;
+                            clearProgress(); // Clear saved progress when queue completes
+                            console.log('✅ Queue completed successfully, progress cleared');
                         }
 
                         return updatedState;
