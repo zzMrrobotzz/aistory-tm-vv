@@ -59,6 +59,12 @@ export const generateText = async (
 
     const response: GenerateContentResponse = await aiInstance.models.generateContent(request);
     
+    // Safety check for response.text
+    if (!response.text || typeof response.text !== 'string') {
+      console.error("Gemini response.text is not a valid string:", response);
+      throw new Error("Gemini API returned invalid response format - text property is missing or not a string");
+    }
+    
     const text = response.text;
     let groundingChunks: GroundingChunk[] | undefined = undefined;
 
@@ -204,6 +210,13 @@ export const generateTextFromImageAndText = async (
     }
     
     const response: GenerateContentResponse = await aiInstance.models.generateContent(request);
+    
+    // Safety check for response.text
+    if (!response.text || typeof response.text !== 'string') {
+      console.error("Gemini response.text is not a valid string:", response);
+      throw new Error("Gemini API returned invalid response format - text property is missing or not a string");
+    }
+    
     return response.text;
 
   } catch (error) {
