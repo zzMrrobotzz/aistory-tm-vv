@@ -49,7 +49,6 @@ export const NAVIGATION_GROUPS = [
     title: "Hỗ Trợ & Hướng Dẫn",
     icon: "🆘",
     subItems: [
-       { id: ActiveModule.SuperAgent, label: "Siêu Trợ Lý AI", icon: "🚀" },
        { id: ActiveModule.Support, label: "Hỗ Trợ & Liên Hệ", icon: "📞" },
        { id: ActiveModule.Tutorials, label: "Hướng Dẫn Sử Dụng", icon: "📚" },
        { id: ActiveModule.Pricing, label: "Gói Cước & Giá", icon: "💸" },
@@ -259,11 +258,6 @@ export const PLOT_STRUCTURE_OPTIONS = [
     },
 ];
 
-export const SUPER_AGENT_WORD_COUNT_OPTIONS = [
-    { value: "1000", label: "Truyện ngắn (~1,000 từ)" },
-    { value: "2000", label: "Truyện vừa (~2,000 từ)" },
-    { value: "5000", label: "Tiểu thuyết ngắn (~5,000 từ)" },
-];
 
 export const ASPECT_RATIO_OPTIONS = [
     { value: "16:9", label: "Ngang (16:9)" },

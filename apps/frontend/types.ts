@@ -2,7 +2,6 @@
 
 export enum ActiveModule {
   Dashboard = "dashboard", // Added for user dashboard
-  SuperAgent = "super-agent",
   CreativeLab = "creative-lab",
   // HookGenerator = "hook-generator", // Removed
   WriteStory = "write",
@@ -113,16 +112,6 @@ export interface OpenAiTtsVoice {
 
 // --- Module State Interfaces ---
 
-export interface SuperAgentModuleState {
-  sourceText: string;
-  wordCount: string;
-  imageCount: number;
-  aspectRatio: string;
-  generatedStory: string;
-  generatedImages: string[]; // base64 image strings
-  error: string | null; 
-  // loadingMessage is already part of SuperAgentModule via its own state management if needed or can be added similarly
-}
 
 export type CreativeLabActiveTab = 'quickOutline' | 'singleOutline' | 'batchOutline'; // Added 'quickOutline'
 export interface GeneratedBatchOutlineItem {

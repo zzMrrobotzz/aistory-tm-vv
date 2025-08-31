@@ -4,7 +4,7 @@ import AnnouncementBanner from './components/AnnouncementBanner';
 import { getAnnouncements } from './services/settingsService';
 import {
   ActiveModule, ApiSettings, ApiProvider,
-  SuperAgentModuleState, CreativeLabModuleState, 
+  CreativeLabModuleState, 
   WriteStoryModuleState, RewriteModuleState, AnalysisModuleState, TtsModuleState,
   TranslateModuleState, // Added
   YoutubeSeoModuleState, /* ImageByHookModuleState, */ // Removed
@@ -26,7 +26,7 @@ import {
 import { 
     DEFAULT_API_PROVIDER, HOOK_LANGUAGE_OPTIONS, 
     WRITING_STYLE_OPTIONS, REWRITE_STYLE_OPTIONS, ASPECT_RATIO_OPTIONS, 
-    SUPER_AGENT_WORD_COUNT_OPTIONS, PLOT_STRUCTURE_OPTIONS, 
+    PLOT_STRUCTURE_OPTIONS, 
     OUTLINE_DETAIL_LEVEL_OPTIONS, STABILITY_STYLE_PRESETS, IMAGE_GENERATION_ENGINE_OPTIONS, 
     HOOK_STYLE_OPTIONS, HOOK_LENGTH_OPTIONS, STORY_LENGTH_OPTIONS,
     LESSON_LENGTH_OPTIONS, LESSON_WRITING_STYLE_OPTIONS, PREDEFINED_ART_STYLES,
@@ -37,7 +37,6 @@ import Sidebar from './components/Sidebar';
 import MainHeader from './components/MainHeader';
 import Settings from './components/pages/Settings';
 import Dashboard from './components/pages/Dashboard'; // Added for Dashboard
-import SuperAgentModule from './components/modules/SuperAgentModule';
 import CreativeLabModule from './components/modules/CreativeLabModule';
 import WriteStoryModule from './components/modules/WriteStoryModule';
 import RewriteModule from './components/modules/RewriteModule';
@@ -81,13 +80,6 @@ const MainApp: React.FC = () => {
   });
 
   const [storyOutlineForWriteModule, setStoryOutlineForWriteModule] = useState<string>('');
-  const [outlineForSuperAgent, setOutlineForSuperAgent] = useState<string>('');
-
-  const initialSuperAgentState: SuperAgentModuleState = {
-    sourceText: '', wordCount: SUPER_AGENT_WORD_COUNT_OPTIONS[0].value, imageCount: 3, aspectRatio: ASPECT_RATIO_OPTIONS[0].value,
-    generatedStory: '', generatedImages: [], error: null,
-  };
-  const [superAgentState, setSuperAgentState] = useState<SuperAgentModuleState>(initialSuperAgentState);
 
 
   const initialCreativeLabState: CreativeLabModuleState = {
@@ -1033,13 +1025,6 @@ const MainApp: React.FC = () => {
     }
   }, [currentUser]);
 
-  useEffect(() => {
-     if(outlineForSuperAgent){
-        setSuperAgentState(prev => ({...prev, sourceText: outlineForSuperAgent}));
-        // Optional: clear it after transferring if it's a one-time transfer
-        // setOutlineForSuperAgent(''); 
-     }
-  }, [outlineForSuperAgent]);
 
   useEffect(() => {
     if(storyOutlineForWriteModule) {
@@ -1087,7 +1072,6 @@ const MainApp: React.FC = () => {
                   setActiveModule={setActiveModule}
                   setStoryOutlineForWriteModule={setStoryOutlineForWriteModule} 
                   // onSendBatchOutlinesToStoryModule removed
-                  setOutlineForSuperAgent={setOutlineForSuperAgent}
                   moduleState={creativeLabState}
                   setModuleState={setCreativeLabState}
                   currentUser={currentUser} // Pass user profile
