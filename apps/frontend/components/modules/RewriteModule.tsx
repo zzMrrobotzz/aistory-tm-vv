@@ -14,7 +14,7 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
-import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
+import { canMakeRequest, incrementRequestCount, getUsageStats, getTimeUntilReset } from '../../services/localRequestCounter';
 
 // Retry logic with exponential backoff for API calls
 const retryApiCall = async (
@@ -123,6 +123,18 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
 }) => {
   const hasActiveSubscription = isSubscribed(currentUser);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Local request tracking state
+  const [usageStats, setUsageStats] = useState(getUsageStats());
+  
+  // Update usage stats every minute to handle midnight reset
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUsageStats(getUsageStats());
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(interval);
+  }, []);
 
     const {
         rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,
@@ -534,15 +546,15 @@ Chỉ trả về JSON.`;
 
     // Process individual queue item (extracted from handleSingleRewrite)
     const processQueueItem = async (item: RewriteQueueItem) => {
-        // Check request limit FIRST - before starting any processing
-        console.log('🔍 Queue: Checking request limit for item:', item.id);
-        console.log('🔍 Queue: User token exists:', !!localStorage.getItem('userToken'));
+        // Check local request limit FIRST
+        console.log('🔍 Queue: Checking local request limit for item:', item.id);
         
-        const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.BATCH_REWRITE);
-        console.log('📊 Queue: Request check result:', JSON.stringify(requestCheck, null, 2));
-        
-        if (!requestCheck.success) {
-            console.log('❌ Queue: Request blocked for item:', item.id, 'Reason:', requestCheck.message);
+        if (!canMakeRequest()) {
+            const stats = getUsageStats();
+            const timeLeft = getTimeUntilReset();
+            const errorMessage = `Giới hạn đạt ${stats.limit}/${stats.limit}. Reset sau ${timeLeft.hours}h ${timeLeft.minutes}m`;
+            
+            console.log('❌ Queue: Request blocked for item:', item.id, '- limit reached');
             
             // Mark current item as blocked due to request limit
             setModuleState(prev => ({
@@ -552,13 +564,18 @@ Chỉ trả về JSON.`;
                         ? { 
                             ...qItem, 
                             status: 'error' as const, 
-                            error: `Request Limit: ${requestCheck.message}`
+                            error: errorMessage
                         }
                         : qItem
                 ),
             }));
-            throw new Error(requestCheck.message);
+            throw new Error(errorMessage);
         }
+        
+        // Increment counter immediately for each queue item
+        const newStats = incrementRequestCount();
+        setUsageStats(newStats); // Update UI immediately
+        console.log(`✅ Queue: Request counted for item ${item.id} (${newStats.count}/${newStats.limit})`);
 
         const CHUNK_CHAR_COUNT = 4000;
         // Use minimum chunks for better progress visualization
@@ -742,27 +759,27 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             return;
         }
 
-        // Check request limit FIRST - before starting any processing
-        console.log('🔍 RewriteModule: Calling checkAndTrackRequest for REWRITE action');
-        console.log('🔍 RewriteModule: User token exists:', !!localStorage.getItem('userToken'));
+        // Check local request limit FIRST
+        console.log('🔍 RewriteModule: Checking local request limit');
         
-        const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.REWRITE);
-        console.log('📊 RewriteModule: Request check result:', JSON.stringify(requestCheck, null, 2));
-        
-        if (!requestCheck.success) {
-            console.log('❌ RewriteModule: Request blocked:', requestCheck.message);
-            console.log('❌ RewriteModule: Blocked reason - Success:', requestCheck.success, 'Blocked:', requestCheck.blocked);
-            showRequestLimitError(requestCheck);
+        if (!canMakeRequest()) {
+            const stats = getUsageStats();
+            const timeLeft = getTimeUntilReset();
+            const errorMessage = `Đã đạt giới hạn ${stats.limit} requests/ngày. Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
             
-            // Also show visual feedback in UI
+            console.log('❌ RewriteModule: Request blocked - limit reached');
             setModuleState(prev => ({ 
                 ...prev, 
-                error: `Request Limit: ${requestCheck.message}`,
+                error: errorMessage,
                 isProcessing: false 
             }));
             return;
         }
-        console.log('✅ RewriteModule: Request allowed, proceeding with rewrite');
+        
+        // Increment counter immediately when user starts
+        const newStats = incrementRequestCount();
+        setUsageStats(newStats); // Update UI immediately
+        console.log(`✅ RewriteModule: Request counted (${newStats.count}/${newStats.limit}), proceeding with rewrite`);
 
         setModuleState(prev => ({ ...prev, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false }));
         
@@ -1059,6 +1076,41 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                     <strong>🆕 Chế độ Hàng Chờ:</strong> Bật chế độ này để nhập liên tục nhiều bài và để tool tự động xử lý từng bài một theo thứ tự.
                 </InfoBox>
 
+                {/* Daily Usage Counter */}
+                <div className={`p-4 rounded-lg border ${usageStats.isBlocked ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <span className={`text-2xl mr-2 ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                                {usageStats.isBlocked ? '🚫' : '📊'}
+                            </span>
+                            <div>
+                                <h3 className={`font-semibold ${usageStats.isBlocked ? 'text-red-800' : 'text-green-800'}`}>
+                                    Sử dụng hôm nay: {usageStats.current}/{usageStats.limit}
+                                </h3>
+                                <p className={`text-sm ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                                    {usageStats.isBlocked 
+                                        ? `Đã đạt giới hạn! Reset vào 00:00 ngày mai.`
+                                        : `Còn lại ${usageStats.remaining} requests (${usageStats.percentage}% đã dùng)`
+                                    }
+                                </p>
+                            </div>
+                        </div>
+                        <div className={`text-2xl font-bold ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                            {usageStats.percentage}%
+                        </div>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                                usageStats.percentage >= 90 ? 'bg-red-500' : 
+                                usageStats.percentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(100, usageStats.percentage)}%` }}
+                        ></div>
+                    </div>
+                </div>
+
                 {!hasActiveSubscription && <UpgradePrompt />}
 
                 {/* Queue Mode Toggle */}
@@ -1110,10 +1162,14 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                                             pauseResumeQueue();
                                         }
                                     }}
-                                    disabled={moduleState.queue.filter(item => item.status === 'waiting').length === 0}
+                                    disabled={moduleState.queue.filter(item => item.status === 'waiting').length === 0 || usageStats.isBlocked}
                                     className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {moduleState.queueSystem.isProcessing ? (
+                                    {usageStats.isBlocked ? (
+                                        <>
+                                            🚫 Đã đạt giới hạn
+                                        </>
+                                    ) : moduleState.queueSystem.isProcessing ? (
                                         moduleState.queueSystem.isPaused ? (
                                             <>
                                                 <Play className="w-4 h-4 mr-2" />
@@ -1251,10 +1307,11 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                     ) : (
                         <button
                             onClick={handleSingleRewrite}
-                            disabled={!hasActiveSubscription || !originalText.trim() || progress > 0}
+                            disabled={!hasActiveSubscription || !originalText.trim() || progress > 0 || usageStats.isBlocked}
                             className="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
-                            {progress > 0 ? `Đang viết lại... (${progress}%)` : '✍️ Viết lại nội dung'}
+                            {usageStats.isBlocked ? '🚫 Đã đạt giới hạn' : 
+                             progress > 0 ? `Đang viết lại... (${progress}%)` : '✍️ Viết lại nội dung'}
                         </button>
                     )}
                     {progress > 0 && (
