@@ -617,11 +617,15 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         }
 
         // Check request limit FIRST - before starting any processing
+        console.log('🔍 RewriteModule: Calling checkAndTrackRequest for REWRITE action');
         const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.REWRITE);
+        console.log('📊 RewriteModule: Request check result:', requestCheck);
         if (!requestCheck.success) {
+            console.log('❌ RewriteModule: Request blocked, showing error');
             showRequestLimitError(requestCheck);
             return;
         }
+        console.log('✅ RewriteModule: Request allowed, proceeding with rewrite');
 
         setModuleState(prev => ({ ...prev, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false }));
         

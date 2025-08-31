@@ -24,7 +24,9 @@ export interface RequestCheckResult {
  */
 export const checkAndTrackRequest = async (action: string): Promise<RequestCheckResult> => {
   try {
+    console.log('🔍 RequestTrackingService: Checking request for action:', action);
     const token = localStorage.getItem('userToken');
+    console.log('🔑 RequestTrackingService: Token exists:', !!token);
     
     if (!token) {
       return {
@@ -40,6 +42,7 @@ export const checkAndTrackRequest = async (action: string): Promise<RequestCheck
       };
     }
 
+    console.log('📡 RequestTrackingService: Making API call to:', `${API_URL}/requests/check-and-track`);
     const response = await axios.post(`${API_URL}/requests/check-and-track`, 
       { action }, 
       {
@@ -49,6 +52,7 @@ export const checkAndTrackRequest = async (action: string): Promise<RequestCheck
         }
       }
     );
+    console.log('📊 RequestTrackingService: API response:', response.data);
 
     return {
       success: true,
