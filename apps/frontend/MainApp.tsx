@@ -491,6 +491,9 @@ const MainApp: React.FC = () => {
     batchProgressMessage: null,
     hookTextForCtxPrompts: '',
     generatedCtxPrompts: [],
+    generatedImagePrompts: [],
+    generatedAnimationPrompts: [],
+    promptCount: 5,
     ctxPromptsError: null,
     ctxPromptsLoadingMessage: null,
     settingsError: null,
@@ -539,7 +542,9 @@ const MainApp: React.FC = () => {
                   singleImageProgressMessage: null,
                   batchOverallError: null,
                   batchProgressMessage: null,
-                  generatedCtxPrompts: [], // Clear new output
+                  generatedCtxPrompts: [], // Clear old output
+                  generatedImagePrompts: [], // Clear new outputs
+                  generatedAnimationPrompts: [], // Clear new outputs
                   ctxPromptsError: null,
                   ctxPromptsLoadingMessage: null,
                   settingsError: null,
@@ -893,6 +898,8 @@ const MainApp: React.FC = () => {
     delete stateToSave.batchOverallError;
     delete stateToSave.batchProgressMessage;
     delete stateToSave.generatedCtxPrompts;
+    delete stateToSave.generatedImagePrompts;
+    delete stateToSave.generatedAnimationPrompts;
     delete stateToSave.ctxPromptsError;
     delete stateToSave.ctxPromptsLoadingMessage;
     delete stateToSave.settingsError;

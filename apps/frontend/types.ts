@@ -596,6 +596,9 @@ export interface ImageGenerationSuiteModuleState {
   // Intelligent Context Prompt Generator specific - 'intelligentContextPromptGenerator' tab
   hookTextForCtxPrompts: string;
   generatedCtxPrompts: string[];
+  generatedImagePrompts: string[];
+  generatedAnimationPrompts: string[];
+  promptCount?: number; // Number of prompts to generate
   ctxPromptsError: string | null;
   ctxPromptsLoadingMessage: string | null;
   
