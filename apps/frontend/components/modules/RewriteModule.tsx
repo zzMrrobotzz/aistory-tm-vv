@@ -41,8 +41,8 @@ const retryApiCall = async (
       
       if (isServerError && i < maxRetries - 1) {
         // Exponential backoff: 2s, 4s, 8s for normal mode
-        // Longer delays for queue mode: 3s, 6s, 12s
-        const baseDelay = isQueueMode ? 3000 : 2000;
+        // Longer delays for queue mode: 6s, 12s, 24s (doubled to prevent 503)
+        const baseDelay = isQueueMode ? 6000 : 4000;
         const backoffDelay = baseDelay * Math.pow(2, i);
         console.warn(`🔄 RETRY: API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms... [Queue mode: ${isQueueMode}]`);
         await delay(backoffDelay);
@@ -340,8 +340,8 @@ Chỉ trả về JSON.`;
                                         currentItem: null,
                                     }
                                 }));
-                                setTimeout(() => processQueue(), 500);
-                            }, 3000); // Increased from 1000ms to 3000ms
+                                setTimeout(() => processQueue(), 1000);
+                            }, 6000); // Doubled from 3000ms to 6000ms to prevent 503
                         } else {
                             // No more items - stop processing
                             updatedState.queueSystem.isProcessing = false;
@@ -383,8 +383,8 @@ Chỉ trả về JSON.`;
                                         currentItem: null,
                                     }
                                 }));
-                                setTimeout(() => processQueue(), 500);
-                            }, 3000); // Increased from 1000ms to 3000ms
+                                setTimeout(() => processQueue(), 1000);
+                            }, 6000); // Doubled from 3000ms to 6000ms to prevent 503
                         } else {
                             // No more items - stop processing
                             updatedState.queueSystem.isProcessing = false;
@@ -515,8 +515,8 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
             
-            // Longer delay for queue mode to prevent rate limiting - doubled to prevent 503
-            await delay(3000);
+            // Longer delay for queue mode to prevent rate limiting - doubled again to prevent 503
+            await delay(6000);
             const result = await retryApiCall(
                 () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
                 3,
@@ -708,7 +708,7 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
                 
-                await delay(1000); // Doubled from 500ms to prevent 503 errors
+                await delay(2000); // Doubled again from 1000ms to prevent 503 errors
                 const result = await retryApiCall(
                     () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
                     3,
@@ -847,7 +847,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
             setModuleState(prev => ({ ...prev, editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' }));
             return textToEdit; // Return original text on error
         } finally {
-             setTimeout(() => setModuleState(prev => ({ ...prev, editLoadingMessage: null })), 3000);
+             setTimeout(() => setModuleState(prev => ({ ...prev, editLoadingMessage: null })), 6000);
         }
     };
     
