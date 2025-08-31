@@ -119,7 +119,7 @@ const ImageEditorModule: React.FC<ImageEditorModuleProps> = ({ apiSettings, modu
         }
 
         // Check request limit FIRST - before starting any processing
-        const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_GEN);
+        const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_EDIT);
         if (!requestCheck.success) {
             showRequestLimitError(requestCheck);
             return;
@@ -157,10 +157,10 @@ Your task is to execute the user's instruction below by taking elements from the
 2. Use the element(s) from the source image(s) and apply them to the base image as described in the user's instruction.
 3. The user's prompt will specify how to use the elements from the source images. Follow it carefully.`;
                 
-                editedImageB64 = await editImageWithMultipleImagesAndText(allImages, finalPrompt);
+                editedImageB64 = await editImageWithMultipleImagesAndText(allImages, finalPrompt, apiSettings.geminiApiKey);
             } else {
                 const finalPrompt = `${prompt.trim()} The output image MUST maintain the same aspect ratio as the original input image.`;
-                editedImageB64 = await editImageWithText(baseImageParsed.base64, baseImageParsed.mimeType, finalPrompt);
+                editedImageB64 = await editImageWithText(baseImageParsed.base64, baseImageParsed.mimeType, finalPrompt, apiSettings.geminiApiKey);
             }
             
             const newEditedImage = `data:image/png;base64,${editedImageB64}`;
