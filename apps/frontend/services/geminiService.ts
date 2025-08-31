@@ -104,6 +104,13 @@ export const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstr
     }
 
     const response: GenerateContentResponse = await aiInstance.models.generateContent(request);
+    
+    // Safety check for response.text
+    if (!response.text || typeof response.text !== 'string') {
+      console.error("Gemini response.text is not a valid string:", response);
+      throw new Error("Gemini API returned invalid response format - text property is missing or not a string");
+    }
+    
     let jsonStr = response.text.trim();
 
     const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
