@@ -288,6 +288,17 @@ Your task is to execute the user's instruction below by taking elements from the
                 </h1>
             </header>
             
+            {/* API Payment Notice */}
+            <div className="mx-4 mb-4 p-4 bg-yellow-900/50 border border-yellow-500/50 rounded-lg">
+                <div className="flex items-center">
+                    <span className="text-yellow-400 text-lg mr-2">⚠️</span>
+                    <div>
+                        <p className="text-yellow-100 font-semibold">Quan trọng:</p>
+                        <p className="text-yellow-200 text-sm mt-1">Module này cần API trả phí của Google. API free trong Google Studio hiện tại không thể tạo và chỉnh sửa ảnh.</p>
+                    </div>
+                </div>
+            </div>
+            
             <main className="flex-1 flex flex-col lg:flex-row items-start justify-center p-4 gap-8">
                 {/* Left/Main Column: Editor */}
                 <div className="flex-1 w-full max-w-5xl flex flex-col items-center">

@@ -777,6 +777,10 @@ Generate exactly ${count} ${type} prompts now:`;
           <strong>Lưu ý về API:</strong>
           {' Chức năng này có thể sử dụng API của Google Imagen, Stability AI, ChatGPT (DALL-E), hoặc DeepSeek. Hãy đảm bảo bạn có API Key hợp lệ và đủ credit cho dịch vụ bạn chọn.'}
         </p>
+        <p className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <strong>⚠️ Quan trọng:</strong>
+          {' Module này cần API trả phí của Google. API free trong Google Studio hiện tại không thể tạo và chỉnh sửa ảnh.'}
+        </p>
       </InfoBox>
       
       {/* Common Settings */}
