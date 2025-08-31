@@ -52,6 +52,8 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     promptsInput, generatedBatchImages, batchOverallError, batchProgressMessage,
     hookTextForCtxPrompts, generatedCtxPrompts, ctxPromptsError, ctxPromptsLoadingMessage, // New state for prompt generator
     promptCount, generatedImagePrompts, generatedAnimationPrompts, // Enhanced dual prompt generation
+    // UI state for prompt display optimization
+    promptViewMode, promptsPerPage, currentPromptPage, currentAnimationPage, showImagePrompts, showAnimationPrompts,
     settingsError,
     // Refinement state
     showRefinementModal, activeRefinementItem, refinementPrompt, isRefining, refinementError
