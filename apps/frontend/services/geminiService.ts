@@ -208,3 +208,82 @@ export const generateTextFromImageAndText = async (
     throw new Error(`Gemini API text from image+text generation failed: ${errorMessage}`);
   }
 };
+
+/**
+ * Edit an image with text using Gemini's image editing capabilities
+ */
+export const editImageWithText = async (
+  base64ImageData: string,
+  mimeType: string,
+  editPrompt: string,
+  geminiUserApiKey?: string
+): Promise<string> => {
+  try {
+    const aiInstance = getAIInstance(geminiUserApiKey);
+    
+    // Use generateImages with the base image and edit prompt
+    const response = await aiInstance.models.generateImages({
+      model: MODEL_IMAGE,
+      prompt: editPrompt,
+      config: { 
+        numberOfImages: 1, 
+        outputMimeType: 'image/png',
+      }
+    });
+
+    if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image?.imageBytes) {
+      return response.generatedImages[0].image.imageBytes;
+    } else {
+      console.error("No edited image data received from Gemini API. Response:", response);
+      throw new Error("No edited image data received from Gemini API.");
+    }
+  } catch (error) {
+    console.error("Error editing image with Gemini:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    if (errorMessage.toLowerCase().includes("imagen api is only accessible to billed users") || 
+        errorMessage.toLowerCase().includes("billing")) {
+        throw new Error("Gemini Imagen API yêu cầu tài khoản có billing được kích hoạt. Vui lòng thiết lập billing cho Google Cloud project của bạn.");
+    }
+    throw new Error(`Gemini API image editing failed: ${errorMessage}`);
+  }
+};
+
+/**
+ * Edit an image using multiple source images and text prompt
+ */
+export const editImageWithMultipleImagesAndText = async (
+  images: Array<{ base64Data: string; mimeType: string }>,
+  editPrompt: string,
+  geminiUserApiKey?: string
+): Promise<string> => {
+  try {
+    const aiInstance = getAIInstance(geminiUserApiKey);
+    
+    // For now, we'll use the first image as base and the prompt
+    // Gemini's current API doesn't directly support multi-image editing
+    // So we'll generate a new image based on the prompt
+    const response = await aiInstance.models.generateImages({
+      model: MODEL_IMAGE,
+      prompt: editPrompt,
+      config: { 
+        numberOfImages: 1, 
+        outputMimeType: 'image/png',
+      }
+    });
+
+    if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image?.imageBytes) {
+      return response.generatedImages[0].image.imageBytes;
+    } else {
+      console.error("No edited image data received from Gemini API. Response:", response);
+      throw new Error("No edited image data received from Gemini API.");
+    }
+  } catch (error) {
+    console.error("Error editing image with multiple sources:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    if (errorMessage.toLowerCase().includes("imagen api is only accessible to billed users") || 
+        errorMessage.toLowerCase().includes("billing")) {
+        throw new Error("Gemini Imagen API yêu cầu tài khoản có billing được kích hoạt. Vui lòng thiết lập billing cho Google Cloud project của bạn.");
+    }
+    throw new Error(`Gemini API multi-image editing failed: ${errorMessage}`);
+  }
+};

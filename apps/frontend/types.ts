@@ -22,6 +22,7 @@ export enum ActiveModule {
   Dream100CompetitorAnalysis = "dream-100-competitor-analysis", // Added
   CharacterStudio = "character-studio", // Added for Character Locking Prompts
   ContentSummarizer = "content-summarizer", // Added for Content Summarization
+  ImageEditor = "image-editor", // Added for AI Image Editor
   Support = "support", // Added
   Settings = "settings", // Added for API key management
   Tutorials = "tutorials", // Added for tutorial videos
@@ -886,4 +887,26 @@ export interface ChatbotWidgetState {
     chatHistory: ChatMessage[];
     isLoading: boolean;
     error: string | null;
+}
+
+// --- Image Editor Module ---
+export interface ImageEditorResultHistoryItem {
+    id: string;
+    timestamp: string;
+    resultImage: string;
+    prompt: string;
+    originalImage: string;
+    sourceImages: string[];
+}
+
+export interface ImageEditorModuleState {
+    originalImage: string | null;
+    sourceImages: string[];
+    prompt: string;
+    editedImage: string | null;
+    isLoading: boolean;
+    error: string | null;
+    editHistory: string[];
+    historyIndex: number;
+    resultHistory: ImageEditorResultHistoryItem[];
 }

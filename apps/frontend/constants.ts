@@ -40,6 +40,7 @@ export const NAVIGATION_GROUPS = [
     icon: "🤖",
     subItems: [
       { id: ActiveModule.ImageGenerationSuite, label: "Xưởng Tạo Ảnh AI", icon: "🎨" },
+      { id: ActiveModule.ImageEditor, label: "Chỉnh Sửa Ảnh AI", icon: "🖼️" },
       { id: ActiveModule.CharacterStudio, label: "Xưởng Nhân Vật AI", icon: "👤" },
       { id: ActiveModule.TTS, label: "Đọc Truyện AI", icon: "🎙️" },
     ]

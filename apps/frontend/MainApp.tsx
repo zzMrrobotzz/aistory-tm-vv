@@ -21,6 +21,7 @@ import {
   // QuickRewriteState removed as it's merged into RewriteModuleState
   UserProfile, // Add UserProfile
   AiAssistantModuleState, // Added for Content Summarizer
+  ImageEditorModuleState, // Added for Image Editor
 } from './types';
 import { 
     DEFAULT_API_PROVIDER, HOOK_LANGUAGE_OPTIONS, 
@@ -48,6 +49,7 @@ import YoutubeSeoModule from './components/modules/YoutubeSeoModule';
 import ContentStrategyModule from './components/modules/ViralTitleGeneratorModule'; // Renamed import for clarity, file is the same
 // import BatchImageGeneratorModule from './components/modules/BatchImageGeneratorModule'; // Removed
 import ImageGenerationSuiteModule from '@/components/modules/ImageGenerationSuiteModule'; // Updated path
+import ImageEditorModule from './components/modules/ImageEditorModule'; // Added for Image Editor
 import EditStoryModule from './components/modules/EditStoryModule'; // Added
 import BatchStoryWritingModule from './components/modules/BatchStoryWritingModule'; // Added
 import BatchRewriteModule from './components/modules/BatchRewriteModule'; // Added
@@ -498,6 +500,19 @@ const MainApp: React.FC = () => {
     isRefining: false,
     refinementError: null,
   };
+  const initialImageEditorState: ImageEditorModuleState = {
+    originalImage: null,
+    sourceImages: [],
+    prompt: '',
+    editedImage: null,
+    isLoading: false,
+    error: null,
+    editHistory: [],
+    historyIndex: -1,
+    resultHistory: []
+  };
+  const [imageEditorState, setImageEditorState] = useState<ImageEditorModuleState>(initialImageEditorState);
+
   const [imageGenerationSuiteState, setImageGenerationSuiteState] = useState<ImageGenerationSuiteModuleState>(() => {
       const savedState = localStorage.getItem('imageGenerationSuiteState_v1');
       if (savedState) {
@@ -1153,6 +1168,12 @@ const MainApp: React.FC = () => {
                   moduleState={imageGenerationSuiteState}
                   setModuleState={setImageGenerationSuiteState}
                   currentUser={currentUser} // Pass user profile
+                />;
+      case ActiveModule.ImageEditor:
+        return <ImageEditorModule
+                  apiSettings={apiSettings}
+                  moduleState={imageEditorState}
+                  setModuleState={setImageEditorState}
                 />;
       case ActiveModule.EditStory:
         return <EditStoryModule
