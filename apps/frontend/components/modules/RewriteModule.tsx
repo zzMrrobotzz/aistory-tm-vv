@@ -535,8 +535,15 @@ Chỉ trả về JSON.`;
     // Process individual queue item (extracted from handleSingleRewrite)
     const processQueueItem = async (item: RewriteQueueItem) => {
         // Check request limit FIRST - before starting any processing
+        console.log('🔍 Queue: Checking request limit for item:', item.id);
+        console.log('🔍 Queue: User token exists:', !!localStorage.getItem('userToken'));
+        
         const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.BATCH_REWRITE);
+        console.log('📊 Queue: Request check result:', JSON.stringify(requestCheck, null, 2));
+        
         if (!requestCheck.success) {
+            console.log('❌ Queue: Request blocked for item:', item.id, 'Reason:', requestCheck.message);
+            
             // Mark current item as blocked due to request limit
             setModuleState(prev => ({
                 ...prev,
@@ -545,7 +552,7 @@ Chỉ trả về JSON.`;
                         ? { 
                             ...qItem, 
                             status: 'error' as const, 
-                            error: requestCheck.message
+                            error: `Request Limit: ${requestCheck.message}`
                         }
                         : qItem
                 ),
@@ -737,11 +744,22 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
 
         // Check request limit FIRST - before starting any processing
         console.log('🔍 RewriteModule: Calling checkAndTrackRequest for REWRITE action');
+        console.log('🔍 RewriteModule: User token exists:', !!localStorage.getItem('userToken'));
+        
         const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.REWRITE);
-        console.log('📊 RewriteModule: Request check result:', requestCheck);
+        console.log('📊 RewriteModule: Request check result:', JSON.stringify(requestCheck, null, 2));
+        
         if (!requestCheck.success) {
-            console.log('❌ RewriteModule: Request blocked, showing error');
+            console.log('❌ RewriteModule: Request blocked:', requestCheck.message);
+            console.log('❌ RewriteModule: Blocked reason - Success:', requestCheck.success, 'Blocked:', requestCheck.blocked);
             showRequestLimitError(requestCheck);
+            
+            // Also show visual feedback in UI
+            setModuleState(prev => ({ 
+                ...prev, 
+                error: `Request Limit: ${requestCheck.message}`,
+                isProcessing: false 
+            }));
             return;
         }
         console.log('✅ RewriteModule: Request allowed, proceeding with rewrite');
