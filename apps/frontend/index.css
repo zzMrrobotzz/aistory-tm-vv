@@ -35,6 +35,14 @@ html, body {
   border-color: #10b981;
 }
 
+/* Line clamp utilities for text truncation */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* Marquee animation for announcement banner */
 @keyframes marquee {
   0% {

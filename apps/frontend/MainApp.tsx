@@ -486,6 +486,13 @@ const MainApp: React.FC = () => {
     generatedImagePrompts: [],
     generatedAnimationPrompts: [],
     promptCount: 5,
+    // UI state defaults for optimized prompt display
+    promptViewMode: 'cards',
+    promptsPerPage: 10,
+    currentPromptPage: 1,
+    currentAnimationPage: 1,
+    showImagePrompts: true,
+    showAnimationPrompts: true,
     ctxPromptsError: null,
     ctxPromptsLoadingMessage: null,
     settingsError: null,
@@ -537,6 +544,9 @@ const MainApp: React.FC = () => {
                   generatedCtxPrompts: [], // Clear old output
                   generatedImagePrompts: [], // Clear new outputs
                   generatedAnimationPrompts: [], // Clear new outputs
+                  // Reset UI state to defaults
+                  currentPromptPage: 1,
+                  currentAnimationPage: 1,
                   ctxPromptsError: null,
                   ctxPromptsLoadingMessage: null,
                   settingsError: null,
@@ -894,6 +904,13 @@ const MainApp: React.FC = () => {
     delete stateToSave.generatedAnimationPrompts;
     delete stateToSave.ctxPromptsError;
     delete stateToSave.ctxPromptsLoadingMessage;
+    // Don't save UI state to localStorage
+    delete stateToSave.promptViewMode;
+    delete stateToSave.promptsPerPage;
+    delete stateToSave.currentPromptPage;
+    delete stateToSave.currentAnimationPage;
+    delete stateToSave.showImagePrompts;
+    delete stateToSave.showAnimationPrompts;
     delete stateToSave.settingsError;
     delete stateToSave.showRefinementModal;
     delete stateToSave.activeRefinementItem;

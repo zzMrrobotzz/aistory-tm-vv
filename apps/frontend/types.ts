@@ -588,6 +588,13 @@ export interface ImageGenerationSuiteModuleState {
   generatedImagePrompts: string[];
   generatedAnimationPrompts: string[];
   promptCount?: number; // Number of prompts to generate
+  // UI state for prompt display optimization
+  promptViewMode?: 'cards' | 'compact' | 'list';
+  promptsPerPage?: number | 'all';
+  currentPromptPage?: number;
+  currentAnimationPage?: number;
+  showImagePrompts?: boolean;
+  showAnimationPrompts?: boolean;
   ctxPromptsError: string | null;
   ctxPromptsLoadingMessage: string | null;
   

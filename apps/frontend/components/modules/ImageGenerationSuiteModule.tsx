@@ -1069,78 +1069,285 @@ Generate exactly ${count} ${type} prompts now:`;
             {!isProcessing && ctxPromptsLoadingMessage && <p className="text-center text-green-600 font-medium my-2">{ctxPromptsLoadingMessage}</p>}
             {ctxPromptsError && <ErrorAlert message={ctxPromptsError} />}
             
-            {/* Enhanced Dual Prompts Display */}
+            {/* Enhanced Dual Prompts Display with Smart View Options */}
             {(generatedImagePrompts.length > 0 || generatedAnimationPrompts.length > 0) && (
-                <div className="mt-6 space-y-6">
+                <div className="mt-6 space-y-4">
+                    {/* View Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-gray-50 rounded-lg border">
+                        <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium text-gray-700">Hiển thị:</span>
+                                <select 
+                                    value={promptViewMode || 'cards'}
+                                    onChange={(e) => updateState({ promptViewMode: e.target.value as 'cards' | 'compact' | 'list' })}
+                                    className="text-sm p-1 border border-gray-300 rounded"
+                                >
+                                    <option value="cards">Cards chi tiết</option>
+                                    <option value="compact">Gọn gàng</option>
+                                    <option value="list">Danh sách</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium text-gray-700">Mỗi trang:</span>
+                                <select 
+                                    value={promptsPerPage || 10}
+                                    onChange={(e) => updateState({ promptsPerPage: parseInt(e.target.value), currentPromptPage: 1 })}
+                                    className="text-sm p-1 border border-gray-300 rounded"
+                                >
+                                    <option value="5">5</option>
+                                    <option value="10">10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="all">Tất cả</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">
+                                Tổng: {generatedImagePrompts.length} ảnh + {generatedAnimationPrompts.length} video
+                            </span>
+                        </div>
+                    </div>
+
                     {/* Image Prompts Section */}
                     {generatedImagePrompts.length > 0 && (
-                        <div className="p-4 border-2 border-blue-200 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
-                            <div className="flex items-center justify-between mb-3">
+                        <div className="border-2 border-blue-200 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <div className="flex items-center justify-between p-4 border-b border-blue-200">
                                 <h4 className="text-lg font-semibold text-blue-700 flex items-center">
                                     🎨 Prompts Tạo Ảnh ({generatedImagePrompts.length})
                                 </h4>
-                                <button 
-                                    onClick={() => copyToClipboard(generatedImagePrompts.join('\n\n'))} 
-                                    className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors"
-                                    disabled={isProcessing || isRefining}
-                                >
-                                    📋 Copy All
-                                </button>
+                                <div className="flex space-x-2">
+                                    <button 
+                                        onClick={() => updateState({ showImagePrompts: !showImagePrompts })} 
+                                        className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 transition-colors"
+                                    >
+                                        {showImagePrompts ? '▼ Thu gọn' : '▶ Mở rộng'}
+                                    </button>
+                                    <button 
+                                        onClick={() => copyToClipboard(generatedImagePrompts.join('\n\n'))} 
+                                        className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors"
+                                        disabled={isProcessing || isRefining}
+                                    >
+                                        📋 Copy All
+                                    </button>
+                                </div>
                             </div>
-                            <div className="grid gap-3">
-                                {generatedImagePrompts.map((prompt, index) => (
-                                    <div key={`image-${index}`} className="bg-white p-3 rounded-md border border-blue-200 shadow-sm">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                                                Ảnh #{index + 1}
+                            {(showImagePrompts !== false) && (
+                                <div className="p-4">
+                                    {/* Render based on view mode */}
+                                    {(promptViewMode || 'cards') === 'cards' && (
+                                        <div className="grid gap-3">
+                                            {(() => {
+                                                const itemsPerPage = promptsPerPage === 'all' ? generatedImagePrompts.length : (promptsPerPage || 10);
+                                                const startIndex = ((currentPromptPage || 1) - 1) * itemsPerPage;
+                                                const endIndex = startIndex + itemsPerPage;
+                                                const currentItems = generatedImagePrompts.slice(startIndex, endIndex);
+                                                
+                                                return currentItems.map((prompt, index) => (
+                                                    <div key={`image-${startIndex + index}`} className="bg-white p-3 rounded-md border border-blue-200 shadow-sm">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                                                                Ảnh #{startIndex + index + 1}
+                                                            </span>
+                                                            <button 
+                                                                onClick={() => copyToClipboard(prompt)} 
+                                                                className="text-xs text-blue-500 hover:text-blue-700"
+                                                            >
+                                                                📋
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{prompt}</p>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    )}
+                                    
+                                    {(promptViewMode || 'cards') === 'compact' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            {(() => {
+                                                const itemsPerPage = promptsPerPage === 'all' ? generatedImagePrompts.length : (promptsPerPage || 10);
+                                                const startIndex = ((currentPromptPage || 1) - 1) * itemsPerPage;
+                                                const endIndex = startIndex + itemsPerPage;
+                                                const currentItems = generatedImagePrompts.slice(startIndex, endIndex);
+                                                
+                                                return currentItems.map((prompt, index) => (
+                                                    <div key={`image-compact-${startIndex + index}`} className="bg-white p-2 rounded border border-blue-200 hover:shadow-sm transition-shadow">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-xs font-bold text-blue-600">#{startIndex + index + 1}</span>
+                                                            <button onClick={() => copyToClipboard(prompt)} className="text-xs text-blue-500 hover:text-blue-700">📋</button>
+                                                        </div>
+                                                        <p className="text-xs text-gray-700 line-clamp-3">{prompt}</p>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    )}
+                                    
+                                    {(promptViewMode || 'cards') === 'list' && (
+                                        <div className="bg-white rounded border border-blue-200">
+                                            {(() => {
+                                                const itemsPerPage = promptsPerPage === 'all' ? generatedImagePrompts.length : (promptsPerPage || 10);
+                                                const startIndex = ((currentPromptPage || 1) - 1) * itemsPerPage;
+                                                const endIndex = startIndex + itemsPerPage;
+                                                const currentItems = generatedImagePrompts.slice(startIndex, endIndex);
+                                                
+                                                return currentItems.map((prompt, index) => (
+                                                    <div key={`image-list-${startIndex + index}`} className="flex items-start p-2 border-b border-gray-100 last:border-b-0 hover:bg-blue-50">
+                                                        <span className="text-xs font-bold text-blue-600 mr-3 mt-1 min-w-[30px]">#{startIndex + index + 1}</span>
+                                                        <p className="text-sm text-gray-800 flex-1">{prompt}</p>
+                                                        <button onClick={() => copyToClipboard(prompt)} className="text-xs text-blue-500 hover:text-blue-700 ml-2">📋</button>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Pagination for Image Prompts */}
+                                    {promptsPerPage !== 'all' && generatedImagePrompts.length > (promptsPerPage || 10) && (
+                                        <div className="flex justify-center items-center space-x-2 mt-4 pt-3 border-t border-blue-200">
+                                            <button 
+                                                onClick={() => updateState({ currentPromptPage: Math.max(1, (currentPromptPage || 1) - 1) })}
+                                                disabled={(currentPromptPage || 1) <= 1}
+                                                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded disabled:opacity-50 hover:bg-blue-200"
+                                            >
+                                                ◀ Trước
+                                            </button>
+                                            <span className="text-xs text-blue-600">
+                                                Trang {currentPromptPage || 1} / {Math.ceil(generatedImagePrompts.length / (promptsPerPage || 10))}
                                             </span>
                                             <button 
-                                                onClick={() => copyToClipboard(prompt)} 
-                                                className="text-xs text-blue-500 hover:text-blue-700"
+                                                onClick={() => updateState({ currentPromptPage: Math.min(Math.ceil(generatedImagePrompts.length / (promptsPerPage || 10)), (currentPromptPage || 1) + 1) })}
+                                                disabled={(currentPromptPage || 1) >= Math.ceil(generatedImagePrompts.length / (promptsPerPage || 10))}
+                                                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded disabled:opacity-50 hover:bg-blue-200"
                                             >
-                                                📋
+                                                Sau ▶
                                             </button>
                                         </div>
-                                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{prompt}</p>
-                                    </div>
-                                ))}
-                            </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {/* Animation Prompts Section */}
                     {generatedAnimationPrompts.length > 0 && (
-                        <div className="p-4 border-2 border-green-200 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50">
-                            <div className="flex items-center justify-between mb-3">
+                        <div className="border-2 border-green-200 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50">
+                            <div className="flex items-center justify-between p-4 border-b border-green-200">
                                 <h4 className="text-lg font-semibold text-green-700 flex items-center">
                                     🎬 Prompts Tạo Chuyển Động ({generatedAnimationPrompts.length})
                                 </h4>
-                                <button 
-                                    onClick={() => copyToClipboard(generatedAnimationPrompts.join('\n\n'))} 
-                                    className="px-3 py-1 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
-                                    disabled={isProcessing || isRefining}
-                                >
-                                    📋 Copy All
-                                </button>
+                                <div className="flex space-x-2">
+                                    <button 
+                                        onClick={() => updateState({ showAnimationPrompts: !showAnimationPrompts })} 
+                                        className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded hover:bg-green-200 transition-colors"
+                                    >
+                                        {showAnimationPrompts ? '▼ Thu gọn' : '▶ Mở rộng'}
+                                    </button>
+                                    <button 
+                                        onClick={() => copyToClipboard(generatedAnimationPrompts.join('\n\n'))} 
+                                        className="px-3 py-1 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
+                                        disabled={isProcessing || isRefining}
+                                    >
+                                        📋 Copy All
+                                    </button>
+                                </div>
                             </div>
-                            <div className="grid gap-3">
-                                {generatedAnimationPrompts.map((prompt, index) => (
-                                    <div key={`animation-${index}`} className="bg-white p-3 rounded-md border border-green-200 shadow-sm">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">
-                                                Chuyển động #{index + 1}
+                            {(showAnimationPrompts !== false) && (
+                                <div className="p-4">
+                                    {/* Render Animation Prompts similar to Image Prompts */}
+                                    {(promptViewMode || 'cards') === 'cards' && (
+                                        <div className="grid gap-3">
+                                            {(() => {
+                                                const itemsPerPage = promptsPerPage === 'all' ? generatedAnimationPrompts.length : (promptsPerPage || 10);
+                                                const startIndex = ((currentAnimationPage || 1) - 1) * itemsPerPage;
+                                                const endIndex = startIndex + itemsPerPage;
+                                                const currentItems = generatedAnimationPrompts.slice(startIndex, endIndex);
+                                                
+                                                return currentItems.map((prompt, index) => (
+                                                    <div key={`animation-${startIndex + index}`} className="bg-white p-3 rounded-md border border-green-200 shadow-sm">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">
+                                                                Chuyển động #{startIndex + index + 1}
+                                                            </span>
+                                                            <button 
+                                                                onClick={() => copyToClipboard(prompt)} 
+                                                                className="text-xs text-green-500 hover:text-green-700"
+                                                            >
+                                                                📋
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{prompt}</p>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    )}
+                                    
+                                    {(promptViewMode || 'cards') === 'compact' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            {(() => {
+                                                const itemsPerPage = promptsPerPage === 'all' ? generatedAnimationPrompts.length : (promptsPerPage || 10);
+                                                const startIndex = ((currentAnimationPage || 1) - 1) * itemsPerPage;
+                                                const endIndex = startIndex + itemsPerPage;
+                                                const currentItems = generatedAnimationPrompts.slice(startIndex, endIndex);
+                                                
+                                                return currentItems.map((prompt, index) => (
+                                                    <div key={`animation-compact-${startIndex + index}`} className="bg-white p-2 rounded border border-green-200 hover:shadow-sm transition-shadow">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-xs font-bold text-green-600">#{startIndex + index + 1}</span>
+                                                            <button onClick={() => copyToClipboard(prompt)} className="text-xs text-green-500 hover:text-green-700">📋</button>
+                                                        </div>
+                                                        <p className="text-xs text-gray-700 line-clamp-3">{prompt}</p>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    )}
+                                    
+                                    {(promptViewMode || 'cards') === 'list' && (
+                                        <div className="bg-white rounded border border-green-200">
+                                            {(() => {
+                                                const itemsPerPage = promptsPerPage === 'all' ? generatedAnimationPrompts.length : (promptsPerPage || 10);
+                                                const startIndex = ((currentAnimationPage || 1) - 1) * itemsPerPage;
+                                                const endIndex = startIndex + itemsPerPage;
+                                                const currentItems = generatedAnimationPrompts.slice(startIndex, endIndex);
+                                                
+                                                return currentItems.map((prompt, index) => (
+                                                    <div key={`animation-list-${startIndex + index}`} className="flex items-start p-2 border-b border-gray-100 last:border-b-0 hover:bg-green-50">
+                                                        <span className="text-xs font-bold text-green-600 mr-3 mt-1 min-w-[30px]">#{startIndex + index + 1}</span>
+                                                        <p className="text-sm text-gray-800 flex-1">{prompt}</p>
+                                                        <button onClick={() => copyToClipboard(prompt)} className="text-xs text-green-500 hover:text-green-700 ml-2">📋</button>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Pagination for Animation Prompts */}
+                                    {promptsPerPage !== 'all' && generatedAnimationPrompts.length > (promptsPerPage || 10) && (
+                                        <div className="flex justify-center items-center space-x-2 mt-4 pt-3 border-t border-green-200">
+                                            <button 
+                                                onClick={() => updateState({ currentAnimationPage: Math.max(1, (currentAnimationPage || 1) - 1) })}
+                                                disabled={(currentAnimationPage || 1) <= 1}
+                                                className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded disabled:opacity-50 hover:bg-green-200"
+                                            >
+                                                ◀ Trước
+                                            </button>
+                                            <span className="text-xs text-green-600">
+                                                Trang {currentAnimationPage || 1} / {Math.ceil(generatedAnimationPrompts.length / (promptsPerPage || 10))}
                                             </span>
                                             <button 
-                                                onClick={() => copyToClipboard(prompt)} 
-                                                className="text-xs text-green-500 hover:text-green-700"
+                                                onClick={() => updateState({ currentAnimationPage: Math.min(Math.ceil(generatedAnimationPrompts.length / (promptsPerPage || 10)), (currentAnimationPage || 1) + 1) })}
+                                                disabled={(currentAnimationPage || 1) >= Math.ceil(generatedAnimationPrompts.length / (promptsPerPage || 10))}
+                                                className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded disabled:opacity-50 hover:bg-green-200"
                                             >
-                                                📋
+                                                Sau ▶
                                             </button>
                                         </div>
-                                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{prompt}</p>
-                                    </div>
-                                ))}
-                            </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
