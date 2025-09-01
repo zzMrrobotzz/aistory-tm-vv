@@ -270,7 +270,9 @@ DailyUsageLimitSchema.methods.addWarning = function(percentage, message) {
 
 // Static method to get or create daily usage for user
 DailyUsageLimitSchema.statics.getOrCreateDaily = async function(userId, userInfo, dailyLimit) {
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  // Use Vietnam timezone instead of UTC
+  const { getVietnamDate } = require('../utils/timezone');
+  const today = getVietnamDate();
   
   let usage = await this.findOne({ userId, date: today });
   

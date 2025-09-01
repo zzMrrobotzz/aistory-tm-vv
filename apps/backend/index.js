@@ -34,10 +34,12 @@ const settingsRouter = require('./routes/settings');
 // Import new routes
 const adminStatsRouter = require('./routes/adminStats');
 const aiProxyRouter = require('./routes/aiProxy');
+const dailyResetAdminRouter = require('./routes/dailyResetAdmin');
 
 // --- Import Services ---
 const proxyManager = require('./services/proxyManager');
 const ApiKeyManager = require('./services/apiKeyManager');
+const dailyResetService = require('./services/dailyResetService');
 
 // --- Import Middleware ---
 const auth = require('./middleware/auth');
@@ -539,6 +541,7 @@ app.use('/api/user', auth, updateUserActivity, require('./routes/userStats')); /
 app.use('/api/user', auth, updateUserActivity, require('./routes/userUsage')); // User usage info
 app.use('/api/requests', auth, updateUserActivity, require('./routes/requestTracking')); // Simple request tracking
 app.use('/api/admin/rate-limit', require('./routes/rateLimitAdmin')); // Rate limit management (no auth for now)
+app.use('/api/admin/daily-reset', dailyResetAdminRouter); // Daily reset service management
 
 // --- Root and Server Start ---
 app.get('/', (req, res) => {
@@ -607,6 +610,11 @@ async function startServer() {
         const server = app.listen(PORT, () => {
             console.log(`✅ Server is successfully running on port ${PORT}`);
             console.log(`🌐 CORS enabled for origins: ${allowedOrigins.join(', ')}`);
+            
+            // Start Daily Reset Service for automatic limit reset
+            console.log('🔄 Starting Daily Reset Service...');
+            dailyResetService.startCronJob();
+            console.log('✅ Daily Reset Service started - limits will reset at midnight Vietnam time');
         });
 
         // Increase server timeout for long AI requests (5 minutes)

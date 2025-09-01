@@ -198,7 +198,9 @@ const createModuleRateLimit = (moduleId, moduleName) => {
 const getUserUsageStatus = async (userId) => {
   try {
     const config = await RateLimitConfig.getDefault();
-    const today = new Date().toISOString().split('T')[0];
+    // Use Vietnam timezone instead of UTC
+    const { getVietnamDate } = require('../utils/timezone');
+    const today = getVietnamDate();
     
     const dailyUsage = await DailyUsageLimit.findOne({ userId, date: today });
     

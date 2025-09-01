@@ -73,7 +73,9 @@ RequestTrackingSchema.methods.addRequest = function(action) {
 
 // Static methods
 RequestTrackingSchema.statics.getTodayRecord = async function(userId) {
-  const today = new Date().toISOString().split('T')[0];
+  // Use Vietnam timezone instead of UTC
+  const { getVietnamDate } = require('../utils/timezone');
+  const today = getVietnamDate();
   
   let record = await this.findOne({ userId, date: today });
   
