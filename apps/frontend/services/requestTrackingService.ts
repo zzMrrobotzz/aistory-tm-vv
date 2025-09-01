@@ -3,9 +3,13 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com';
 
 export const REQUEST_ACTIONS = {
+  // Limited modules (count usage)
   WRITE_STORY: 'write-story',
-  BATCH_STORY: 'batch-story-writing', 
+  QUICK_STORY: 'quick-story', 
   REWRITE: 'rewrite',
+  
+  // Unlimited modules (no usage count)
+  BATCH_STORY: 'batch-story-writing', 
   BATCH_REWRITE: 'batch-rewrite',
   IMAGE_GEN: 'image-generation',
   IMAGE_EDIT: 'image-edit',
@@ -49,8 +53,8 @@ export interface UsageStatusResponse {
   };
 }
 
-// Kiểm tra và ghi nhận request
-export const checkAndTrackRequest = async (action: string): Promise<RequestTrackingResponse> => {
+// Kiểm tra và ghi nhận request với số lượng items
+export const checkAndTrackRequest = async (action: string, itemCount: number = 1): Promise<RequestTrackingResponse> => {
   try {
     const token = localStorage.getItem('userToken');
     if (!token) {
@@ -60,11 +64,11 @@ export const checkAndTrackRequest = async (action: string): Promise<RequestTrack
       };
     }
 
-    console.log(`Checking and tracking request for action: ${action}`);
+    console.log(`Checking and tracking request for action: ${action}, itemCount: ${itemCount}`);
 
     const response = await axios.post(
       `${API_URL}/api/requests/check-and-track`,
-      { action },
+      { action, itemCount },
       {
         headers: {
           'Content-Type': 'application/json',
@@ -127,8 +131,8 @@ export const getUserUsageStatus = async (): Promise<UsageStatusResponse> => {
   }
 };
 
-// Ghi nhận usage (đơn giản hóa)
-export const recordUsage = async (moduleId: string, action?: string): Promise<any> => {
+// Ghi nhận usage với số lượng items
+export const recordUsage = async (moduleId: string, action?: string, itemCount: number = 1): Promise<any> => {
   try {
     const token = localStorage.getItem('userToken');
     if (!token) {
@@ -137,7 +141,7 @@ export const recordUsage = async (moduleId: string, action?: string): Promise<an
 
     const response = await axios.post(
       `${API_URL}/api/user/record-usage`,
-      { moduleId, action: action || 'generate' },
+      { moduleId, action: action || 'generate', itemCount },
       {
         headers: {
           'Content-Type': 'application/json',

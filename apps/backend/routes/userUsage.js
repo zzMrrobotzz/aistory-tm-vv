@@ -123,10 +123,10 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
 router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
-    const { moduleId, action } = req.body;
+    const { moduleId, action, itemCount = 1 } = req.body;
     const today = getVietnamDate();
     
-    console.log(`Recording usage for user ${userId}, module: ${moduleId}, action: ${action}`);
+    console.log(`Recording usage for user ${userId}, module: ${moduleId}, action: ${action}, itemCount: ${itemCount}`);
     
     // Tìm hoặc tạo record cho hôm nay
     let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });
@@ -156,21 +156,21 @@ router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId
       });
     }
     
-    // Tăng usage count
-    usageRecord.totalUsage += 1;
+    // Tăng usage count theo số lượng items
+    usageRecord.totalUsage += itemCount;
     
     // Cập nhật module usage
     const moduleIndex = usageRecord.moduleUsage.findIndex(m => m.moduleId === moduleId);
     if (moduleIndex >= 0) {
       usageRecord.moduleUsage[moduleIndex].requestCount += 1;
-      usageRecord.moduleUsage[moduleIndex].weightedUsage += 1;
+      usageRecord.moduleUsage[moduleIndex].weightedUsage += itemCount;
       usageRecord.moduleUsage[moduleIndex].lastUsed = new Date();
     } else {
       usageRecord.moduleUsage.push({
         moduleId,
         moduleName: moduleId, // Use moduleId as moduleName for now
         requestCount: 1,
-        weightedUsage: 1,
+        weightedUsage: itemCount,
         lastUsed: new Date()
       });
     }
@@ -179,7 +179,7 @@ router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId
     usageRecord.requestHistory.push({
       timestamp: new Date(),
       moduleId,
-      weight: 1
+      weight: itemCount
     });
     
     // Giữ chỉ 100 records gần nhất

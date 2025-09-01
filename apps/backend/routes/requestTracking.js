@@ -32,10 +32,30 @@ const extractUserId = (req, res, next) => {
 router.post('/check-and-track', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
-    const { action } = req.body;
+    const { action, itemCount = 1 } = req.body;
     const today = getVietnamDate();
     
-    console.log(`Checking and tracking request for user ${userId}, action: ${action}`);
+    console.log(`Checking and tracking request for user ${userId}, action: ${action}, itemCount: ${itemCount}`);
+    
+    // Chỉ track usage cho các modules được giới hạn
+    const limitedModules = ['write-story', 'quick-story', 'rewrite'];
+    const isLimitedModule = limitedModules.includes(action);
+    
+    if (!isLimitedModule) {
+      // Module không bị giới hạn, cho phép sử dụng
+      return res.json({
+        success: true,
+        blocked: false,
+        message: 'Module không bị giới hạn - sử dụng tự do',
+        usage: {
+          current: 0,
+          limit: 200,
+          remaining: 200,
+          percentage: 0,
+          isBlocked: false
+        }
+      });
+    }
     
     // Tìm hoặc tạo record cho hôm nay
     let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });
@@ -68,38 +88,42 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
       console.log(`Created new usage record for user ${userId}`);
     }
     
-    // Kiểm tra xem có bị block không
-    if (usageRecord.totalUsage >= usageRecord.dailyLimit) {
+    // Kiểm tra xem có bị block không (bao gồm itemCount sắp thêm vào)
+    const newTotalUsage = usageRecord.totalUsage + itemCount;
+    if (newTotalUsage > usageRecord.dailyLimit) {
+      const remainingSlots = Math.max(0, usageRecord.dailyLimit - usageRecord.totalUsage);
       return res.status(429).json({
         success: false,
         blocked: true,
-        message: 'Bạn đã đạt giới hạn request hôm nay. Vui lòng thử lại vào ngày mai.',
+        message: `Bạn chỉ còn ${remainingSlots} lần sử dụng, không đủ cho ${itemCount} bài viết. Vui lòng thử lại vào ngày mai hoặc giảm số lượng.`,
         usage: {
           current: usageRecord.totalUsage,
           limit: usageRecord.dailyLimit,
-          remaining: 0,
+          remaining: remainingSlots,
           percentage: 100,
-          isBlocked: true
+          isBlocked: true,
+          requestedItems: itemCount,
+          availableSlots: remainingSlots
         }
       });
     }
     
-    // Tăng usage count
-    usageRecord.totalUsage += 1;
+    // Tăng usage count theo số lượng items được process
+    usageRecord.totalUsage += itemCount;
     
     // Cập nhật module usage dựa trên action
     const moduleId = action || 'unknown';
     const moduleIndex = usageRecord.moduleUsage.findIndex(m => m.moduleId === moduleId);
     if (moduleIndex >= 0) {
       usageRecord.moduleUsage[moduleIndex].requestCount += 1;
-      usageRecord.moduleUsage[moduleIndex].weightedUsage += 1;
+      usageRecord.moduleUsage[moduleIndex].weightedUsage += itemCount;
       usageRecord.moduleUsage[moduleIndex].lastUsed = new Date();
     } else {
       usageRecord.moduleUsage.push({
         moduleId,
         moduleName: moduleId, // Use moduleId as moduleName for now
         requestCount: 1,
-        weightedUsage: 1,
+        weightedUsage: itemCount,
         lastUsed: new Date()
       });
     }
@@ -108,7 +132,7 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
     usageRecord.requestHistory.push({
       timestamp: new Date(),
       moduleId,
-      weight: 1
+      weight: itemCount
     });
     
     // Giữ chỉ 100 records gần nhất
@@ -118,7 +142,7 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
     
     await usageRecord.save();
     
-    console.log(`Request tracked for user ${userId}: ${usageRecord.totalUsage}/${usageRecord.dailyLimit}`);
+    console.log(`Request tracked for user ${userId}: ${usageRecord.totalUsage}/${usageRecord.dailyLimit} (added ${itemCount} items)`);
     
     res.json({
       success: true,

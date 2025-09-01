@@ -122,9 +122,9 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     };
 
     // Helper: check & track usage with backend and sync local counter box
-    const checkAndTrackQuickRequest = async (action: string) => {
+    const checkAndTrackQuickRequest = async (action: string, itemCount: number = 1) => {
         try {
-            const result = await checkAndTrackRequest(action);
+            const result = await checkAndTrackRequest(action, itemCount);
             // Sync UI usage box with backend numbers
             if (result?.usage) {
                 setUsageStats({
@@ -285,7 +285,7 @@ Chỉ trả về JSON.`;
     
         // Step 1: Generate Outline (count usage)
         {
-            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
             if (requestCheck && (requestCheck as any).allowed === false) {
                 throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
             }
@@ -321,7 +321,7 @@ Chỉ trả về JSON.`;
         for (let i = 0; i < numChunks; i++) {
             // Count each chunk as a request for fair tracking
             {
-                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
                 if (requestCheck && (requestCheck as any).allowed === false) {
                     throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
                 }
@@ -348,7 +348,7 @@ ${context || "Đây là phần đầu tiên."}
     
         // Step 3: Post-Edit (count usage)
         {
-            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
             if (requestCheck && (requestCheck as any).allowed === false) {
                 throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
             }
@@ -375,7 +375,7 @@ ${context || "Đây là phần đầu tiên."}
         if (enableQualityAnalysis && finalStory.length > 500) {
             // Count analysis as a usage as well
             {
-                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
                 if (requestCheck && (requestCheck as any).allowed === false) {
                     throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
                 }

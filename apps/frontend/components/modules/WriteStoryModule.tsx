@@ -32,9 +32,9 @@ interface WriteStoryModuleProps {
 const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis, currentUser }) => {
   
   // Helper function to check and track request with backend
-  const checkAndTrackStoryRequest = async (action: string): Promise<{ allowed: boolean; stats: any; message?: string }> => {
+  const checkAndTrackStoryRequest = async (action: string, itemCount: number = 1): Promise<{ allowed: boolean; stats: any; message?: string }> => {
     try {
-      const result: RequestCheckResult = await checkAndTrackRequest(action);
+      const result: RequestCheckResult = await checkAndTrackRequest(action, itemCount);
       
       if (result.blocked) {
         return {
