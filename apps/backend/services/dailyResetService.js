@@ -1,6 +1,5 @@
 const cron = require('node-cron');
 const DailyUsageLimit = require('../models/DailyUsageLimit');
-const RequestTracking = require('./requestTracking');
 const RateLimitConfig = require('../models/RateLimitConfig');
 
 /**
@@ -56,15 +55,8 @@ class DailyResetService {
       const cleanupResult = await DailyUsageLimit.cleanupOldRecords(retentionDays);
       console.log(`[Daily Reset] Cleaned up ${cleanupResult.deletedCount} old usage records`);
 
-      // 2. Clean up old RequestTracking records
-      const oldDate = new Date();
-      oldDate.setDate(oldDate.getDate() - retentionDays);
-      const oldDateStr = oldDate.toISOString().split('T')[0];
-      
-      const cleanupTracking = await RequestTracking.deleteMany({ 
-        date: { $lt: oldDateStr } 
-      });
-      console.log(`[Daily Reset] Cleaned up ${cleanupTracking.deletedCount} old tracking records`);
+      // 2. Clean up old RequestTracking records (removed - no longer needed)
+      console.log(`[Daily Reset] Skipping old tracking cleanup - using simplified system`);
 
       // 3. Reset any leftover usage for today (in case of timezone issues)
       const todayResetCount = await DailyUsageLimit.updateMany(
@@ -87,20 +79,8 @@ class DailyResetService {
       );
       console.log(`[Daily Reset] Reset ${todayResetCount.modifiedCount} today's usage records`);
 
-      // 4. Reset RequestTracking for today
-      const trackingResetCount = await RequestTracking.updateMany(
-        { date: currentDate },
-        { 
-          $set: { 
-            requestCount: 0,
-            lastRequestAt: new Date()
-          },
-          $pull: {
-            requests: { $exists: true }
-          }
-        }
-      );
-      console.log(`[Daily Reset] Reset ${trackingResetCount.modifiedCount} today's tracking records`);
+      // 4. Reset RequestTracking for today (removed - using simplified system)
+      console.log(`[Daily Reset] Skipping tracking reset - using simplified system`);
 
       // Update last reset date
       this.lastResetDate = currentDate;
@@ -112,9 +92,9 @@ class DailyResetService {
         timezone: 'Asia/Ho_Chi_Minh',
         statistics: {
           oldRecordsCleanedUp: cleanupResult.deletedCount,
-          oldTrackingCleaned: cleanupTracking.deletedCount,
+          oldTrackingCleaned: 0, // Removed - using simplified system
           todayUsageReset: todayResetCount.modifiedCount,
-          todayTrackingReset: trackingResetCount.modifiedCount
+          todayTrackingReset: 0 // Removed - using simplified system
         }
       };
 
