@@ -83,6 +83,8 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
       remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.totalUsage),
       percentage: Math.min(100, (usageRecord.totalUsage / usageRecord.dailyLimit) * 100),
       isBlocked: usageRecord.totalUsage >= usageRecord.dailyLimit,
+      moduleUsage: usageRecord.moduleUsage || [],
+      lastActivity: usageRecord.lastActivity ? usageRecord.lastActivity.toISOString() : new Date().toISOString(),
       resetTime: timeUntilReset
     };
     
@@ -93,7 +95,16 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
       data: {
         usage: usageData,
         config: {
-          resetTime: timeUntilReset
+          isEnabled: true,
+          dailyLimit: usageRecord.dailyLimit,
+          restrictedModules: [
+            { id: 'write-story', name: 'Viết Truyện Đơn', weight: 1 },
+            { id: 'batch-story-writing', name: 'Viết Truyện Hàng Loạt', weight: 2 },
+            { id: 'rewrite', name: 'Viết Lại Đơn', weight: 1 },
+            { id: 'batch-rewrite', name: 'Viết Lại Hàng Loạt', weight: 2 }
+          ],
+          resetTime: '00:00',
+          timezone: 'Asia/Ho_Chi_Minh'
         }
       }
     });

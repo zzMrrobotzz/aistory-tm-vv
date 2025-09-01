@@ -229,11 +229,11 @@ export const recordUsage = async (moduleId: string): Promise<boolean> => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-auth-token': token
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         moduleId: backendModuleId,
-        moduleName: moduleName
+        action: moduleName
       })
     });
 
@@ -262,7 +262,7 @@ export const getUserUsageHistory = async (days: number = 7) => {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'x-auth-token': token
+        'Authorization': `Bearer ${token}`
       }
     });
 
