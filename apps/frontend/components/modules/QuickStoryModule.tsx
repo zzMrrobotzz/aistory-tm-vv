@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ApiSettings, QuickStoryModuleState, QuickStoryTask, QuickStoryActiveTab, ActiveModule, SequelStoryResult, UserProfile, QuickStoryWordStats, QuickStoryQualityStats } from '../../types';
 import { STORY_LENGTH_OPTIONS, WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
-import { delay } from '../../utils';
+import { delay, isSubscribed } from '../../utils';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
+import { getTimeUntilReset, getUsageStats } from '../../services/localRequestCounter';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import UpgradePrompt from '../UpgradePrompt';
 import { Trash2, PlusCircle, Square, Play, Trash, Clipboard, ClipboardCheck, ChevronsRight, BookCopy, Zap, Save, Download, Loader2 } from 'lucide-react';
 
 // Advanced retry logic with exponential backoff for API calls (from RewriteModule)
@@ -66,10 +68,11 @@ interface QuickStoryModuleProps {
   moduleState: QuickStoryModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<QuickStoryModuleState>>;
   addHistoryItem: (itemData: any) => void;
+  currentUser: UserProfile | null;
 }
 
 const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
-    apiSettings, moduleState, setModuleState, addHistoryItem
+    apiSettings, moduleState, setModuleState, addHistoryItem, currentUser
 }) => {
     const {
         activeTab, targetLength, writingStyle, customWritingStyle, outputLanguage,
@@ -89,6 +92,21 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     
     // Quality analysis toggle - default ON for accurate full-text analysis
     const [enableQualityAnalysis, setEnableQualityAnalysis] = useState<boolean>(true);
+    
+    // Subscription check
+    const hasActiveSubscription = isSubscribed(currentUser);
+    
+    // Local request tracking state
+    const [usageStats, setUsageStats] = useState(getUsageStats());
+    
+    // Update usage stats every minute to handle midnight reset
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setUsageStats(getUsageStats());
+        }, 60000); // Check every minute
+        
+        return () => clearInterval(interval);
+    }, []);
 
     const updateState = (updates: Partial<QuickStoryModuleState>) => {
         setModuleState(prev => ({ ...prev, ...updates }));
@@ -375,6 +393,14 @@ ${context || "Đây là phần đầu tiên."}
     }, [tasks, isProcessingQueue, activeTab]);
 
     const handleAddTask = () => {
+        if (!hasActiveSubscription) {
+            alert('Cần nâng cấp gói đăng ký để sử dụng tính năng này.');
+            return;
+        }
+        if (usageStats.isBlocked) {
+            alert('Đã đạt giới hạn sử dụng hôm nay. Vui lòng thử lại vào ngày mai.');
+            return;
+        }
         if (!title.trim()) {
             alert('Vui lòng nhập Tiêu đề truyện.');
             return;
@@ -510,6 +536,14 @@ ${context || "Đây là phần đầu tiên."}
 
 
     const handleGenerateTitles = async () => {
+        if (!hasActiveSubscription) {
+            updateState({ sequelError: "Cần nâng cấp gói đăng ký để sử dụng tính năng này." });
+            return;
+        }
+        if (usageStats.isBlocked) {
+            updateState({ sequelError: "Đã đạt giới hạn sử dụng hôm nay. Vui lòng thử lại vào ngày mai." });
+            return;
+        }
         if (!sequelInputStories.trim()) {
             updateState({ sequelError: "Vui lòng dán các truyện mẫu vào." });
             return;
@@ -799,7 +833,7 @@ ${context || "Đây là phần đầu tiên."}
             className={`flex items-center space-x-2 px-4 py-3 font-medium rounded-t-lg text-base transition-colors ${
                 activeTab === tabId ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
-            disabled={isProcessingQueue || sequelIsGeneratingTitles || sequelIsGeneratingStories}
+            disabled={!hasActiveSubscription || isProcessingQueue || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}
         >
             <Icon size={18} />
             <span>{label}</span>
@@ -812,6 +846,43 @@ ${context || "Đây là phần đầu tiên."}
                 <p><strong>Tạo Hàng Loạt Nhanh:</strong> Thêm hàng loạt truyện vào danh sách, sau đó nhấn "Play" cho từng truyện hoặc "Xếp hàng Tất cả" để AI tự động xử lý tuần tự.</p>
                 <p className="mt-2"><strong>Sáng tạo Truyện Kế Tiếp:</strong> Cung cấp các truyện mẫu cùng chủ đề để AI học "ADN viral", sau đó gợi ý tiêu đề mới và viết một câu chuyện tiếp theo với văn phong đồng nhất.</p>
             </InfoBox>
+            
+            {/* Daily Usage Counter */}
+            <div className={`p-4 rounded-lg border ${usageStats.isBlocked ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                        <span className={`text-2xl mr-2 ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                            {usageStats.isBlocked ? '🚫' : '📊'}
+                        </span>
+                        <div>
+                            <h3 className={`font-semibold ${usageStats.isBlocked ? 'text-red-800' : 'text-green-800'}`}>
+                                Sử dụng hôm nay: {usageStats.current}/{usageStats.limit}
+                            </h3>
+                            <p className={`text-sm ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                                {usageStats.isBlocked 
+                                    ? `Đã đạt giới hạn! Reset vào 00:00 ngày mai.`
+                                    : `Còn lại ${usageStats.remaining} requests (${usageStats.percentage}% đã dùng)`
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    <div className={`text-2xl font-bold ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                        {usageStats.percentage}%
+                    </div>
+                </div>
+                {/* Progress Bar */}
+                <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                            usageStats.percentage >= 90 ? 'bg-red-500' : 
+                            usageStats.percentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(100, usageStats.percentage)}%` }}
+                    ></div>
+                </div>
+            </div>
+            
+            {!hasActiveSubscription && <UpgradePrompt />}
 
             <div className="my-6 flex flex-wrap gap-1 border-b-2 border-gray-300">
                 <TabButton tabId="quickBatch" label="Tạo Hàng Loạt Nhanh" icon={Zap} />
@@ -824,23 +895,23 @@ ${context || "Đây là phần đầu tiên."}
                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Mục tiêu số từ: <span className="font-semibold text-indigo-600">{parseInt(targetLength).toLocaleString()} từ</span></label>
-                        <input type="range" min={STORY_LENGTH_OPTIONS[0].value} max={STORY_LENGTH_OPTIONS[STORY_LENGTH_OPTIONS.length - 1].value} step="500" value={targetLength} onChange={(e) => updateState({ targetLength: e.target.value })} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories}/>
+                        <input type="range" min={STORY_LENGTH_OPTIONS[0].value} max={STORY_LENGTH_OPTIONS[STORY_LENGTH_OPTIONS.length - 1].value} step="500" value={targetLength} onChange={(e) => updateState({ targetLength: e.target.value })} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}/>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Phong cách viết:</label>
-                        <select value={writingStyle} onChange={(e) => updateState({ writingStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories}>
+                        <select value={writingStyle} onChange={(e) => updateState({ writingStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}>
                             {WRITING_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ truyện:</label>
-                        <select value={outputLanguage} onChange={(e) => updateState({ outputLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories}>
+                        <select value={outputLanguage} onChange={(e) => updateState({ outputLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}>
                             {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>
                  </div>
                  {writingStyle === 'custom' && (
-                     <input type="text" value={customWritingStyle} onChange={(e) => updateState({ customWritingStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập phong cách viết tùy chỉnh..." disabled={isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories}/>
+                     <input type="text" value={customWritingStyle} onChange={(e) => updateState({ customWritingStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập phong cách viết tùy chỉnh..." disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}/>
                 )}
                 
                 {/* Quality Analysis Toggle */}
@@ -851,7 +922,7 @@ ${context || "Đây là phần đầu tiên."}
                             checked={enableQualityAnalysis}
                             onChange={(e) => setEnableQualityAnalysis(e.target.checked)}
                             className="mr-3 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                            disabled={isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories}
+                            disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}
                         />
                         <div>
                             <span className="text-sm font-medium text-gray-700">
@@ -875,14 +946,20 @@ ${context || "Đây là phần đầu tiên."}
                     <h3 className="text-xl font-semibold text-gray-800">Thêm Nhiệm vụ Mới</h3>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề Truyện:</label>
-                        <textarea value={title} onChange={(e) => updateState({ title: e.target.value })} placeholder="Nhập tiêu đề cho truyện mới..." rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={isAnyTaskQueuedOrProcessing}/>
+                        <textarea value={title} onChange={(e) => updateState({ title: e.target.value })} placeholder="Nhập tiêu đề cho truyện mới..." rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || usageStats.isBlocked}/>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Văn Phong Viral Tham Khảo (Tùy chọn):</label>
-                        <textarea value={referenceViralStoryForStyle} onChange={(e) => updateState({ referenceViralStoryForStyle: e.target.value })} rows={4} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Dán 1 hoặc nhiều kịch bản/truyện viral vào đây..." disabled={isAnyTaskQueuedOrProcessing}></textarea>
+                        <textarea value={referenceViralStoryForStyle} onChange={(e) => updateState({ referenceViralStoryForStyle: e.target.value })} rows={4} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Dán 1 hoặc nhiều kịch bản/truyện viral vào đây..." disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || usageStats.isBlocked}></textarea>
                     </div>
-                    <button onClick={handleAddTask} disabled={isAnyTaskQueuedOrProcessing || !title.trim()} className="w-full flex items-center justify-center bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400">
-                        <PlusCircle className="mr-2"/> Thêm vào Danh sách
+                    <button onClick={handleAddTask} disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || !title.trim() || usageStats.isBlocked} className="w-full flex items-center justify-center bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400">
+                        {!hasActiveSubscription ? (
+                            <>🔒 Cần Nâng cấp Gói</>
+                        ) : usageStats.isBlocked ? (
+                            <>🚫 Đã đạt giới hạn</>
+                        ) : (
+                            <><PlusCircle className="mr-2"/> Thêm vào Danh sách</>
+                        )}
                     </button>
                 </div>
 
@@ -892,7 +969,15 @@ ${context || "Đây là phần đầu tiên."}
                         <h3 className="text-xl font-semibold text-gray-800">Hàng chờ & Kết quả ({tasks.length} nhiệm vụ)</h3>
                         <div className="flex gap-2">
                             {!isProcessingQueue ? (
-                                <button onClick={handleQueueAll} disabled={tasks.filter(t => t.status === 'pending' || t.status === 'canceled' || t.status === 'error').length === 0} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg shadow hover:bg-green-700 disabled:opacity-50 flex items-center"><ChevronsRight className="mr-1" size={16}/> Xếp hàng Tất cả</button>
+                                <button onClick={handleQueueAll} disabled={!hasActiveSubscription || tasks.filter(t => t.status === 'pending' || t.status === 'canceled' || t.status === 'error').length === 0 || usageStats.isBlocked} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg shadow hover:bg-green-700 disabled:opacity-50 flex items-center">
+                                    {!hasActiveSubscription ? (
+                                        <>🔒 Cần Nâng cấp</>
+                                    ) : usageStats.isBlocked ? (
+                                        <>🚫 Đã đạt giới hạn</>
+                                    ) : (
+                                        <><ChevronsRight className="mr-1" size={16}/> Xếp hàng Tất cả</>
+                                    )}
+                                </button>
                             ) : (
                                 <button onClick={handleStopQueue} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg shadow hover:bg-red-700 flex items-center"><Square className="mr-1" size={16}/> Dừng</button>
                             )}
@@ -908,7 +993,16 @@ ${context || "Đây là phần đầu tiên."}
                                     <summary className="font-semibold text-gray-800 cursor-pointer flex justify-between items-center">
                                         <div className="flex items-center gap-3 flex-wrap">
                                             {(task.status === 'pending' || task.status === 'canceled' || task.status === 'error') && (
-                                                <button onClick={(e) => { e.preventDefault(); handlePlayTask(task.id); }} className="p-2 bg-green-100 text-green-600 rounded-full hover:bg-green-200" title="Bắt đầu xử lý nhiệm vụ này">
+                                                <button 
+                                                    onClick={(e) => { e.preventDefault(); handlePlayTask(task.id); }} 
+                                                    disabled={!hasActiveSubscription || usageStats.isBlocked}
+                                                    className={`p-2 rounded-full ${
+                                                        !hasActiveSubscription || usageStats.isBlocked 
+                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                                            : 'bg-green-100 text-green-600 hover:bg-green-200'
+                                                    }`} 
+                                                    title={!hasActiveSubscription ? 'Cần nâng cấp gói đăng ký' : usageStats.isBlocked ? 'Đã đạt giới hạn hôm nay' : 'Bắt đầu xử lý nhiệm vụ này'}
+                                                >
                                                     <Play size={16}/>
                                                 </button>
                                             )}
@@ -1067,7 +1161,7 @@ ${context || "Đây là phần đầu tiên."}
                      <div className="p-6 border-2 border-gray-200 rounded-lg bg-white shadow">
                         <h3 className="text-xl font-semibold text-gray-800">Bước 1: Cung cấp Truyện Mẫu (ADN)</h3>
                         <label htmlFor="sequel-input" className="block text-sm font-medium text-gray-700 my-2">Dán 5-10 truyện mẫu vào đây, phân tách mỗi truyện bằng dấu `---` trên một dòng riêng:</label>
-                        <textarea id="sequel-input" value={sequelInputStories} onChange={e => updateState({ sequelInputStories: e.target.value })} rows={10} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Tiêu đề: Truyện mẫu 1&#10;Nội dung truyện 1...&#10;---&#10;Tiêu đề: Truyện mẫu 2&#10;Nội dung truyện 2..." disabled={sequelIsGeneratingTitles || sequelIsGeneratingStories}/>
+                        <textarea id="sequel-input" value={sequelInputStories} onChange={e => updateState({ sequelInputStories: e.target.value })} rows={10} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Tiêu đề: Truyện mẫu 1&#10;Nội dung truyện 1...&#10;---&#10;Tiêu đề: Truyện mẫu 2&#10;Nội dung truyện 2..." disabled={!hasActiveSubscription || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}/>
                         
                         <div className="mt-4 pt-4 border-t border-dashed border-gray-400">
                             <h4 className="text-md font-semibold text-gray-700 mb-2">Quản lý Bộ ADN (Lưu & Tải Nhanh)</h4>
@@ -1079,7 +1173,7 @@ ${context || "Đây là phần đầu tiên."}
                                     placeholder="Đặt tên cho bộ ADN này..."
                                     className="flex-grow p-2 border border-gray-300 rounded-md"
                                 />
-                                <button onClick={handleSaveAdnSet} disabled={!adnSetName.trim() || !sequelInputStories.trim()} className="flex items-center justify-center px-4 py-2 bg-teal-600 text-white font-semibold rounded-md hover:bg-teal-700 disabled:bg-gray-400">
+                                <button onClick={handleSaveAdnSet} disabled={!hasActiveSubscription || !adnSetName.trim() || !sequelInputStories.trim() || usageStats.isBlocked} className="flex items-center justify-center px-4 py-2 bg-teal-600 text-white font-semibold rounded-md hover:bg-teal-700 disabled:bg-gray-400">
                                     <Save size={16} className="mr-2"/> Lưu Bộ ADN
                                 </button>
                             </div>
@@ -1088,10 +1182,10 @@ ${context || "Đây là phần đầu tiên."}
                                     <option value="">-- Chọn bộ ADN đã lưu --</option>
                                     {savedAdnSets.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                                 </select>
-                                <button onClick={handleLoadAdnSet} disabled={!selectedAdnSetName} className="flex items-center justify-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400">
+                                <button onClick={handleLoadAdnSet} disabled={!hasActiveSubscription || !selectedAdnSetName || usageStats.isBlocked} className="flex items-center justify-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400">
                                     <Download size={16} className="mr-2"/> Tải
                                 </button>
-                                <button onClick={handleDeleteAdnSet} disabled={!selectedAdnSetName} className="flex items-center justify-center px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:bg-gray-400">
+                                <button onClick={handleDeleteAdnSet} disabled={!hasActiveSubscription || !selectedAdnSetName || usageStats.isBlocked} className="flex items-center justify-center px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:bg-gray-400">
                                     <Trash size={16} className="mr-2"/> Xóa
                                 </button>
                             </div>
@@ -1100,11 +1194,15 @@ ${context || "Đây là phần đầu tiên."}
                         <div className="flex items-end gap-4 mt-4 pt-4 border-t border-dashed border-gray-400">
                             <div className="flex-1">
                                 <label htmlFor="sequel-num-titles" className="block text-sm font-medium text-gray-700 mb-1">Số lượng Tiêu đề Gợi ý (1-20):</label>
-                                <input type="number" id="sequel-num-titles" value={sequelNumTitlesToSuggest} onChange={e => updateState({ sequelNumTitlesToSuggest: parseInt(e.target.value)})} min="1" max="20" className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={sequelIsGeneratingTitles || sequelIsGeneratingStories}/>
+                                <input type="number" id="sequel-num-titles" value={sequelNumTitlesToSuggest} onChange={e => updateState({ sequelNumTitlesToSuggest: parseInt(e.target.value)})} min="1" max="20" className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={!hasActiveSubscription || sequelIsGeneratingTitles || sequelIsGeneratingStories || usageStats.isBlocked}/>
                             </div>
                             <div className="flex-1">
-                                <button onClick={handleGenerateTitles} disabled={sequelIsGeneratingTitles || sequelIsGeneratingStories || !sequelInputStories.trim()} className="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center h-[52px]">
-                                    {sequelIsGeneratingTitles ? (
+                                <button onClick={handleGenerateTitles} disabled={!hasActiveSubscription || sequelIsGeneratingTitles || sequelIsGeneratingStories || !sequelInputStories.trim() || usageStats.isBlocked} className="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center h-[52px]">
+                                    {!hasActiveSubscription ? (
+                                        <>🔒 Cần Nâng cấp Gói</>
+                                    ) : usageStats.isBlocked ? (
+                                        <>🚫 Đã đạt giới hạn</>
+                                    ) : sequelIsGeneratingTitles ? (
                                         <>
                                             <Loader2 className="animate-spin mr-2"/>
                                             <span>Đang Phân Tích...</span>
@@ -1134,8 +1232,14 @@ ${context || "Đây là phần đầu tiên."}
                                         ))}
                                     </div>
                                     <div className="pt-4 flex gap-4">
-                                        <button onClick={handleGenerateSequelStoriesBatch} disabled={sequelIsGeneratingStories || sequelSelectedTitles.length === 0} className="flex-1 bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 disabled:bg-gray-400">
-                                            Viết {sequelSelectedTitles.length > 0 ? sequelSelectedTitles.length : ''} Truyện Đã chọn
+                                        <button onClick={handleGenerateSequelStoriesBatch} disabled={!hasActiveSubscription || sequelIsGeneratingStories || sequelSelectedTitles.length === 0 || usageStats.isBlocked} className="flex-1 bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 disabled:bg-gray-400">
+                                            {!hasActiveSubscription ? (
+                                                <>🔒 Cần Nâng cấp Gói</>
+                                            ) : usageStats.isBlocked ? (
+                                                <>🚫 Đã đạt giới hạn</>
+                                            ) : (
+                                                <>Viết {sequelSelectedTitles.length > 0 ? sequelSelectedTitles.length : ''} Truyện Đã chọn</>
+                                            )}
                                         </button>
                                         {sequelIsGeneratingStories && <button onClick={handleStopSequel} className="px-4 py-2 bg-red-600 text-white rounded-lg shadow hover:bg-red-700"><Square size={16}/></button>}
                                     </div>

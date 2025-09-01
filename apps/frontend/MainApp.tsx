@@ -11,8 +11,8 @@ import {
   ContentStrategyModuleState, /* ImageByHookEngine, */ // Removed
   /* BatchImageGeneratorModuleState, */ // Removed
   ImageGenerationSuiteModuleState, ImageGenerationEngine, GeneratedImageItem, // BatchOutlineItem removed from here as it's not directly used by App
-  EditStoryModuleState, EditStoryAnalysisReport, BatchStoryWritingModuleState, BatchStoryInputItem,
-  BatchRewriteModuleState, BatchRewriteInputItem, EditStoryActiveTab, BatchEditStoryInputItem, // Added BatchRewrite types
+  EditStoryModuleState, EditStoryAnalysisReport,
+  EditStoryActiveTab, BatchEditStoryInputItem
   NicheThemeAnalysisResult, // Kept for ContentStrategyModule
   Dream100CompetitorAnalysisModuleState, Dream100ChannelResult, GroundingChunk, // Added for Dream 100
   CharacterStudioModuleState, // Added for Character Studio
@@ -51,8 +51,6 @@ import ContentStrategyModule from './components/modules/ViralTitleGeneratorModul
 import ImageGenerationSuiteModule from '@/components/modules/ImageGenerationSuiteModule'; // Updated path
 import ImageEditorModule from './components/modules/ImageEditorModule'; // Added for Image Editor
 import EditStoryModule from './components/modules/EditStoryModule'; // Added
-import BatchStoryWritingModule from './components/modules/BatchStoryWritingModule'; // Added
-import BatchRewriteModule from './components/modules/BatchRewriteModule'; // Added
 import Dream100CompetitorAnalysisModule from './components/modules/Dream100CompetitorAnalysisModule'; // Added
 import CharacterStudioModule from './components/modules/CharacterStudioModule'; // Added
 import ContentSummarizerModule from './components/modules/ContentSummarizerModule'; // Added for Content Summarizer
@@ -616,36 +614,7 @@ const MainApp: React.FC = () => {
     return initialEditStoryState;
   });
 
-  const initialBatchStoryWritingState: BatchStoryWritingModuleState = {
-    inputItems: [{ id: Date.now().toString(), outline: '', specificTargetLength: null, specificWritingStyle: null, specificCustomWritingStyle: null }],
-    results: [],
-    globalTargetLength: STORY_LENGTH_OPTIONS[1].value,
-    globalWritingStyle: WRITING_STYLE_OPTIONS[0].value,
-    globalCustomWritingStyle: '',
-    outputLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
-    referenceViralStoryForStyle: '',
-    isProcessingBatch: false,
-    batchProgressMessage: null,
-    batchError: null,
-    concurrencyLimit: 3,
-  };
-  const [batchStoryWritingState, setBatchStoryWritingState] = useState<BatchStoryWritingModuleState>(initialBatchStoryWritingState);
 
-  const initialBatchRewriteState: BatchRewriteModuleState = {
-    inputItems: [{ id: Date.now().toString(), originalText: '' }],
-    results: [],
-    globalRewriteLevel: 50,
-    globalSourceLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
-    globalTargetLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
-    globalRewriteStyle: REWRITE_STYLE_OPTIONS[0].value,
-    globalCustomRewriteStyle: '',
-    globalAdaptContext: false,
-    isProcessingBatch: false,
-    batchProgressMessage: null,
-    batchError: null,
-    concurrencyLimit: 3, // Added
-  };
-  const [batchRewriteState, setBatchRewriteState] = useState<BatchRewriteModuleState>(initialBatchRewriteState);
 
   const initialDream100State: Dream100CompetitorAnalysisModuleState = {
     inputChannelUrl: '',
@@ -807,25 +776,7 @@ const MainApp: React.FC = () => {
     localStorage.setItem('translateModuleState_v1', JSON.stringify(stateToSave));
   }, [translateState]);
 
-   useEffect(() => {
-    const stateToSave: Partial<BatchStoryWritingModuleState> = { ...batchStoryWritingState };
-    delete stateToSave.results;
-    delete stateToSave.isProcessingBatch;
-    delete stateToSave.batchProgressMessage;
-    delete stateToSave.batchError;
-    localStorage.setItem('batchStoryWritingModuleState_v1', JSON.stringify(stateToSave));
-  }, [batchStoryWritingState]);
 
-  useEffect(() => {
-    const stateToSave: Partial<BatchRewriteModuleState> = { ...batchRewriteState };
-    delete stateToSave.results;
-    delete stateToSave.isProcessingBatch;
-    delete stateToSave.batchProgressMessage;
-    delete stateToSave.batchError;
-    // Input items are settings, so they can be saved
-    // delete stateToSave.inputItems; // No, keep input items
-    localStorage.setItem('batchRewriteModuleState_v1', JSON.stringify(stateToSave));
-  }, [batchRewriteState]);
 
   useEffect(() => {
     const stateToSave: Partial<EditStoryModuleState> = { ...editStoryState };
@@ -1158,13 +1109,6 @@ const MainApp: React.FC = () => {
                   retrievedViralOutlineFromAnalysis={analysisState.viralOutlineAnalysisResult}
                   currentUser={currentUser} // Pass user profile
                 />;
-      case ActiveModule.BatchStoryWriting: // Added
-        return <BatchStoryWritingModule 
-                  apiSettings={apiSettings}
-                  moduleState={batchStoryWritingState}
-                  setModuleState={setBatchStoryWritingState}
-                  currentUser={currentUser} // Pass user profile
-                />;
       case ActiveModule.Rewrite:
         return <RewriteModule 
                   apiSettings={apiSettings} 
@@ -1177,13 +1121,6 @@ const MainApp: React.FC = () => {
                   apiSettings={apiSettings} 
                   moduleState={translateState}
                   setModuleState={setTranslateState}
-                  currentUser={currentUser} // Pass user profile
-                />;
-      case ActiveModule.BatchRewrite: // Added
-        return <BatchRewriteModule 
-                  apiSettings={apiSettings} 
-                  moduleState={batchRewriteState}
-                  setModuleState={setBatchRewriteState}
                   currentUser={currentUser} // Pass user profile
                 />;
       case ActiveModule.Analysis:

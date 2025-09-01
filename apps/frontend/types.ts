@@ -15,8 +15,6 @@ export enum ActiveModule {
   // BatchImageGenerator = "batch-image-generator", // Removed
   ImageGenerationSuite = "image-generation-suite", // Added
   EditStory = "edit-story", // Added for the new module
-  BatchStoryWriting = "batch-story-writing", // Added for new Batch Story Writing module
-  BatchRewrite = "batch-rewrite", // Added for new Batch Rewrite module
   // NicheThemeExplorer = "niche-theme-explorer", // Removed and merged into ViralTitleGenerator
   Dream100CompetitorAnalysis = "dream-100-competitor-analysis", // Added
   CharacterStudio = "character-studio", // Added for Character Locking Prompts
@@ -172,7 +170,6 @@ export interface BatchOutlineItem {
   specificCustomWritingStyle: string; // Used if specificWritingStyle is 'custom'
 }
 
-// GeneratedBatchStoryItem is removed as it was specific to the batch story writing feature in WriteStoryModule.
 
 export type WriteStoryActiveTab = 'singleStory' | 'hookGenerator' | 'lessonGenerator'; // Removed 'batchStory'
 
@@ -234,7 +231,6 @@ export interface WriteStoryModuleState {
 
   // --- Batch Story Writing fields REMOVED ---
   // batchOutlineItems: BatchOutlineItem[]; 
-  // generatedBatchStories: GeneratedBatchStoryItem[];
   // batchStoryError: string | null;
   // batchStoryProgressMessage: string |null;
   // batchStoryLoading: boolean;
@@ -671,79 +667,7 @@ export interface GeneratedBatchEditStoryOutputItem {
 }
 
 
-// --- Batch Story Writing Module ---
-export interface BatchStoryInputItem {
-  id: string; // unique identifier for React keys
-  outline: string; // the full story outline
-  specificTargetLength: string | null; // optional, overrides global if set, e.g., "2000"
-  specificWritingStyle: string | null; // optional, overrides global, e.g., 'descriptive', 'custom'
-  specificCustomWritingStyle: string | null; // optional, used if specificWritingStyle is 'custom'
-}
 
-export interface GeneratedBatchStoryOutputItem {
-  id: string; // corresponds to BatchStoryInputItem.id
-  originalOutline: string;
-  generatedStory: string | null; // the final, edited story
-  postEditAnalysis: EditStoryAnalysisReport | null; // analysis after editing
-  status: 'pending' | 'writing' | 'editing' | 'analyzing' | 'completed' | 'error';
-  progressMessage: string | null; // e.g., "Writing chunk 1/3...", "Editing story...", "Analyzing final output..."
-  error: string | null;
-}
-
-export interface BatchStoryWritingModuleState {
-  inputItems: BatchStoryInputItem[]; // list of outlines and their specific settings
-  results: GeneratedBatchStoryOutputItem[]; // list of generated stories and their statuses
-  globalTargetLength: string; // e.g., STORY_LENGTH_OPTIONS[1].value
-  globalWritingStyle: string; // e.g., WRITING_STYLE_OPTIONS[0].value
-  globalCustomWritingStyle: string;
-  outputLanguage: string; // e.g., HOOK_LANGUAGE_OPTIONS[0].value
-  referenceViralStoryForStyle: string; // for learning writing style
-  isProcessingBatch: boolean; // true if the overall batch process is running
-  batchProgressMessage: string | null; // overall progress, e.g., "Processing story 2 of 5..."
-  batchError: string | null; // for errors not specific to an item, e.g., setup errors
-  concurrencyLimit: number; // Added for concurrent processing
-}
-
-// --- Batch Rewrite Module ---
-export interface BatchRewriteInputItem {
-  id: string; // unique identifier for React keys
-  originalText: string; // the original text to rewrite
-  // Optional overrides for global settings
-  specificRewriteLevel?: number | null;
-  specificSourceLanguage?: string | null;
-  specificTargetLanguage?: string | null;
-  specificRewriteStyle?: string | null;
-  specificCustomRewriteStyle?: string | null;
-  specificAdaptContext?: boolean | null;
-}
-
-export interface GeneratedBatchRewriteOutputItem {
-  id: string; // corresponds to BatchRewriteInputItem.id
-  originalText: string;
-  rewrittenText: string | null;
-  status: 'pending' | 'rewriting' | 'editing' | 'completed' | 'error';
-  progressMessage: string | null; // e.g., "Rewriting chunk 1/3...", "Editing text..."
-  error: string | null;
-  characterMap?: string | null; // Character map from initial rewrite if level >= 75%
-  hasBeenEdited?: boolean; // Flag to indicate if post-rewrite edit was successful for this item
-}
-
-export interface BatchRewriteModuleState {
-  inputItems: BatchRewriteInputItem[];
-  results: GeneratedBatchRewriteOutputItem[];
-  // Global settings
-  globalRewriteLevel: number;
-  globalSourceLanguage: string;
-  globalTargetLanguage: string;
-  globalRewriteStyle: string;
-  globalCustomRewriteStyle: string;
-  globalAdaptContext: boolean;
-  // Batch processing state
-  isProcessingBatch: boolean;
-  batchProgressMessage: string | null; // Overall progress, e.g., "Processing item 2 of 5..."
-  batchError: string | null; // For errors not specific to an item
-  concurrencyLimit: number; // Added for concurrent processing
-}
 
 // --- Niche Theme Explorer Module State is REMOVED ---
 

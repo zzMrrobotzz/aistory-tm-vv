@@ -104,7 +104,6 @@ export const mockModuleCosts: ModuleCost[] = [
     { module_id: ActiveModule.CreativeLab, module_name: "Xây Dựng Truyện", credit_type: 'WRITING', cost: 1, is_active: true },
     { module_id: ActiveModule.ImageGenerationSuite, module_name: "Xưởng Tạo Ảnh AI", credit_type: 'IMAGE', cost: 2, is_active: true },
     { module_id: ActiveModule.WriteStory, module_name: "Viết Truyện & Hook", credit_type: 'WRITING', cost: 1, is_active: true },
-    { module_id: ActiveModule.BatchStoryWriting, module_name: "Viết Truyện Hàng Loạt", credit_type: 'WRITING', cost: 1, is_active: true },
     { module_id: ActiveModule.Rewrite, module_name: "Viết Lại", credit_type: 'WRITING', cost: 0.5, is_active: true },
     { module_id: ActiveModule.TTS, module_name: "Đọc Truyện AI", credit_type: 'TTS', cost: 1, is_active: true },
     { module_id: ActiveModule.Analysis, module_name: "Phân Tích Truyện", credit_type: 'ANALYSIS', cost: 2, is_active: false },
