@@ -1209,6 +1209,7 @@ const MainApp: React.FC = () => {
                   moduleState={quickStoryState}
                   setModuleState={setQuickStoryState}
                   addHistoryItem={addHistoryItem}
+                  currentUser={currentUser}
                 />;
       default:
         return <Dashboard currentUser={currentUser} setActiveModule={setActiveModule} />;
