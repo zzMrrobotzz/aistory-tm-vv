@@ -88,7 +88,7 @@ export const checkRateLimit = async (moduleId: string): Promise<RateLimitCheckRe
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'x-auth-token': token
+        'Authorization': `Bearer ${token}`
       }
     });
 
@@ -327,7 +327,7 @@ export const getUserUsageStatus = async () => {
 
   const response = await fetch(`${API_URL}/user/usage-status`, {
     headers: {
-      'x-auth-token': token,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     }
   });
