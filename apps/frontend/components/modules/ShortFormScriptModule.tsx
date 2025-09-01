@@ -8,7 +8,7 @@ import {
     SCRIPT_STRUCTURE_OPTIONS
 } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
-import { getUsageStats, incrementRequestCount } from '../../services/localRequestCounter';
+import { checkAndTrackRequest, REQUEST_ACTIONS } from '../../services/requestTrackingService';
 import { isSubscribed } from '../../utils';
 import UpgradePrompt from '../UpgradePrompt';
 import ModuleContainer from '../ModuleContainer';
@@ -45,8 +45,17 @@ const ShortFormScriptModule: React.FC<ShortFormScriptModuleProps> = ({
     useEffect(() => {
         const fetchUsage = async () => {
             try {
-                const stats = getUsageStats();
-                setUsageStats(stats);
+                const result = await checkAndTrackRequest('module-access');
+                if (result?.usage) {
+                    setUsageStats({
+                        current: result.usage.current,
+                        limit: result.usage.limit,
+                        remaining: result.usage.remaining,
+                        percentage: result.usage.percentage,
+                        canUse: result.usage.current < result.usage.limit,
+                        isBlocked: !!result.blocked
+                    });
+                }
             } catch (error) {
                 console.warn('Error loading usage stats:', error);
             }
@@ -96,10 +105,25 @@ const ShortFormScriptModule: React.FC<ShortFormScriptModuleProps> = ({
             return;
         }
         
-        // Check usage limit
-        if (usageStats.isBlocked) {
-            updateState({ error: 'Đã đạt giới hạn sử dụng hôm nay. Vui lòng thử lại vào ngày mai.' });
+        // Check and track request with backend
+        const rateLimitCheck = await checkAndTrackRequest(REQUEST_ACTIONS.SHORT_FORM_SCRIPT);
+        if (!rateLimitCheck.success) {
+            updateState({ 
+                error: rateLimitCheck.message || 'Đã vượt quá giới hạn sử dụng hôm nay. Vui lòng nâng cấp gói hoặc thử lại vào ngày mai.'
+            });
             return;
+        }
+        
+        // Update UI with latest usage stats from backend
+        if (rateLimitCheck?.usage) {
+            setUsageStats({
+                current: rateLimitCheck.usage.current,
+                limit: rateLimitCheck.usage.limit,
+                remaining: rateLimitCheck.usage.remaining,
+                percentage: rateLimitCheck.usage.percentage,
+                canUse: rateLimitCheck.usage.current < rateLimitCheck.usage.limit,
+                isBlocked: !!rateLimitCheck.blocked
+            });
         }
 
         updateState({ isLoading: true, error: null, progressMessage: 'Đang chuẩn bị...', generatedScript: '', groundingSources: [] });
@@ -167,10 +191,6 @@ Now, generate the complete script.
                 isLoading: false,
                 progressMessage: 'Tạo kịch bản thành công!',
             });
-
-            // Increment request count and update usage stats
-            const newData = incrementRequestCount();
-            setUsageStats(newData);
 
             // Add to history
             addHistoryItem({
