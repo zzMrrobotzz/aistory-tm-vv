@@ -21,6 +21,7 @@ export const NAVIGATION_GROUPS = [
       { id: ActiveModule.EditStory, label: "Biên Tập Truyện", icon: "✂️" },
       { id: ActiveModule.Rewrite, label: "Viết Lại", icon: "🔄" },
       { id: ActiveModule.Translate, label: "Dịch Thuật AI", icon: "🌐" },
+      { id: ActiveModule.ShortFormScript, label: "Kịch Bản Video Ngắn", icon: "🎬" },
     ]
   },
   {
@@ -316,4 +317,47 @@ export const VARIATION_GOAL_OPTIONS = [
     { value: "create_warning_urgent", label: "Tạo phiên bản 'Cảnh báo/Tin Khẩn'" },
     { value: "question_format", label: "Chuyển thành dạng Câu hỏi Gợi mở" },
     { value: "before_after_transformation", label: "Nhấn mạnh Yếu tố 'Trước & Sau' / 'Biến đổi'" },
+];
+
+// Short Form Script Module Constants
+export const SCRIPT_PLATFORM_OPTIONS = [
+    { value: "tiktok", label: "TikTok" },
+    { value: "youtube-shorts", label: "YouTube Shorts" },
+    { value: "instagram-reels", label: "Instagram Reels" },
+    { value: "facebook-reels", label: "Facebook Reels" },
+    { value: "snapchat", label: "Snapchat" },
+    { value: "twitter", label: "Twitter/X" },
+    { value: "linkedin", label: "LinkedIn" },
+    { value: "pinterest", label: "Pinterest" },
+];
+
+export const SCRIPT_VIDEO_STYLE_OPTIONS = [
+    { value: "storytelling", label: "Kể chuyện" },
+    { value: "educational", label: "Giáo dục" },
+    { value: "entertainment", label: "Giải trí" },
+    { value: "lifestyle", label: "Lối sống" },
+    { value: "comedy", label: "Hài hước" },
+    { value: "drama", label: "Kịch tính" },
+    { value: "inspirational", label: "Truyền cảm hứng" },
+    { value: "news", label: "Tin tức" },
+    { value: "custom", label: "Tùy chỉnh..." },
+];
+
+export const SCRIPT_TARGET_DURATION_OPTIONS = [
+    { value: "15-30", label: "15-30 giây" },
+    { value: "30-60", label: "30-60 giây" },
+    { value: "60-90", label: "1-1.5 phút" },
+    { value: "90-120", label: "1.5-2 phút" },
+    { value: "120-180", label: "2-3 phút" },
+];
+
+export const SCRIPT_STRUCTURE_OPTIONS = [
+    { value: "hook-problem-solution", label: "Hook - Vấn đề - Giải pháp" },
+    { value: "story-arc", label: "Cung cấu truyện hoàn chỉnh" },
+    { value: "before-after-bridge", label: "Trước - Sau - Cầu nối" },
+    { value: "question-answer", label: "Câu hỏi - Trả lời" },
+    { value: "list-format", label: "Định dạng danh sách" },
+    { value: "tutorial-step", label: "Hướng dẫn từng bước" },
+    { value: "comparison", label: "So sánh đối chiếu" },
+    { value: "custom", label: "Tùy chỉnh..." },
 ];

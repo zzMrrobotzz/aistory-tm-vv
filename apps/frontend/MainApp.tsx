@@ -23,6 +23,7 @@ import {
   AiAssistantModuleState, // Added for Content Summarizer
   ImageEditorModuleState, // Added for Image Editor
   QuickStoryModuleState, // Added for Quick Story Generator
+  ShortFormScriptModuleState, // Added for Short Form Script Generator
 } from './types';
 import { 
     DEFAULT_API_PROVIDER, HOOK_LANGUAGE_OPTIONS, 
@@ -32,7 +33,8 @@ import {
     HOOK_STYLE_OPTIONS, HOOK_LENGTH_OPTIONS, STORY_LENGTH_OPTIONS,
     LESSON_LENGTH_OPTIONS, LESSON_WRITING_STYLE_OPTIONS, PREDEFINED_ART_STYLES,
     HOOK_STRUCTURE_OPTIONS, VARIATION_GOAL_OPTIONS, OPENAI_TTS_MODELS, ELEVENLABS_MODELS,
-    TRANSLATE_LANGUAGE_OPTIONS, TRANSLATE_STYLE_OPTIONS // Added
+    TRANSLATE_LANGUAGE_OPTIONS, TRANSLATE_STYLE_OPTIONS, // Added
+    SCRIPT_PLATFORM_OPTIONS, SCRIPT_VIDEO_STYLE_OPTIONS, SCRIPT_TARGET_DURATION_OPTIONS, SCRIPT_STRUCTURE_OPTIONS // Added for Short Form Script
 } from './constants';
 import Sidebar from './components/Sidebar';
 import MainHeader from './components/MainHeader';
@@ -59,6 +61,7 @@ import TutorialComponent from './components/TutorialComponent'; // Added for tut
 import SupportChatbot from './components/SupportChatbot'; // Added for chatbot
 import UsageStatsModule from './components/modules/UsageStatsModule'; // Added for usage statistics
 import QuickStoryModule from './components/modules/QuickStoryModule'; // Added for Quick Story Generator
+import ShortFormScriptModule from './components/modules/ShortFormScriptModule'; // Added for Short Form Script Generator
 import { getUserProfile, refreshUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
@@ -711,6 +714,37 @@ const MainApp: React.FC = () => {
     return initialQuickStoryState;
   });
 
+  // Short Form Script Module State
+  const initialShortFormScriptState: ShortFormScriptModuleState = {
+    activeInputTab: 'idea',
+    ideaInput: '',
+    youtubeLinkInput: '',
+    storyInput: '',
+    platform: 'tiktok',
+    videoStyle: 'storytelling',
+    customVideoStyle: '',
+    targetDuration: '30-60',
+    structure: 'hook-problem-solution',
+    outputLanguage: 'Vietnamese',
+    generatedScript: '',
+    groundingSources: [],
+    isLoading: false,
+    progressMessage: null,
+    error: null,
+  };
+  const [shortFormScriptState, setShortFormScriptState] = useState<ShortFormScriptModuleState>(() => {
+    const savedState = localStorage.getItem('shortFormScriptModuleState_v1');
+    if (savedState) {
+      try {
+        return { ...initialShortFormScriptState, ...JSON.parse(savedState) };
+      } catch (error) {
+        console.warn('Failed to parse saved short form script state:', error);
+        return initialShortFormScriptState;
+      }
+    }
+    return initialShortFormScriptState;
+  });
+
   // Load announcements from backend
   useEffect(() => {
     const loadAnnouncements = async () => {
@@ -961,6 +995,19 @@ const MainApp: React.FC = () => {
     localStorage.setItem('quickStoryModuleState_v1', JSON.stringify(stateToSave));
   }, [quickStoryState]);
 
+  // Save ShortFormScript module state to localStorage
+  useEffect(() => {
+    const stateToSave: Partial<ShortFormScriptModuleState> = { ...shortFormScriptState };
+    // Remove output fields and processing state from localStorage
+    delete stateToSave.generatedScript;
+    delete stateToSave.groundingSources;
+    delete stateToSave.isLoading;
+    delete stateToSave.progressMessage;
+    delete stateToSave.error;
+    
+    localStorage.setItem('shortFormScriptModuleState_v1', JSON.stringify(stateToSave));
+  }, [shortFormScriptState]);
+
   // Load API keys from localStorage on app initialization
   useEffect(() => {
     loadApiKeysFromStorage();
@@ -1208,6 +1255,14 @@ const MainApp: React.FC = () => {
                   apiSettings={apiSettings}
                   moduleState={quickStoryState}
                   setModuleState={setQuickStoryState}
+                  addHistoryItem={addHistoryItem}
+                  currentUser={currentUser}
+                />;
+      case ActiveModule.ShortFormScript:
+        return <ShortFormScriptModule 
+                  apiSettings={apiSettings}
+                  moduleState={shortFormScriptState}
+                  setModuleState={setShortFormScriptState}
                   addHistoryItem={addHistoryItem}
                   currentUser={currentUser}
                 />;

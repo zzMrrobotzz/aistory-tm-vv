@@ -40,15 +40,30 @@ export const checkAndTrackRequest = async (action: string): Promise<RequestCheck
       };
     }
 
-    const response = await axios.post(`${API_URL}/requests/check-and-track`, 
-      { action }, 
+    const response = await axios.post(
+      `${API_URL}/requests/check-and-track`,
+      { action },
       {
         headers: {
           'Content-Type': 'application/json',
           'x-auth-token': token
-        }
+        },
+        // Avoid cached 500s and make errors visible
+        validateStatus: () => true
       }
     );
+
+    if (response.status >= 400) {
+      // Normalize error from backend
+      const data = response.data || {};
+      return {
+        success: false,
+        blocked: response.status === 429,
+        message: data.message || `HTTP ${response.status}`,
+        usage: data.usage || { current: 0, limit: 200, remaining: 200, percentage: 0 },
+        warning: data.warning
+      } as RequestCheckResult;
+    }
 
     return {
       success: true,
@@ -196,7 +211,8 @@ export const REQUEST_ACTIONS = {
   CREATIVE_LAB: 'creative-lab',
   SUPER_AGENT: 'super-agent',
   EDIT_STORY: 'edit-story',
-  STORY_OUTLINE: 'story-outline'
+  STORY_OUTLINE: 'story-outline',
+  SHORT_FORM_SCRIPT: 'short-form-script'
 } as const;
 
 export type RequestAction = typeof REQUEST_ACTIONS[keyof typeof REQUEST_ACTIONS];

@@ -15,6 +15,7 @@ export enum ActiveModule {
   // BatchImageGenerator = "batch-image-generator", // Removed
   ImageGenerationSuite = "image-generation-suite", // Added
   EditStory = "edit-story", // Added for the new module
+  ShortFormScript = "short-form-script", // Added for Short Form Script Generator
   // NicheThemeExplorer = "niche-theme-explorer", // Removed and merged into ViralTitleGenerator
   Dream100CompetitorAnalysis = "dream-100-competitor-analysis", // Added
   CharacterStudio = "character-studio", // Added for Character Locking Prompts
@@ -920,4 +921,33 @@ export interface QuickStoryModuleState {
     // ADN Management
     adnSetName: string;
     savedAdnSets: AdnSet[];
+}
+
+// --- Short Form Script Module Types ---
+export type ShortFormScriptInputType = 'idea' | 'youtubeLink' | 'story';
+
+export interface ShortFormScriptModuleState {
+    activeInputTab: ShortFormScriptInputType;
+    
+    // Input fields
+    ideaInput: string;
+    youtubeLinkInput: string;
+    storyInput: string;
+    
+    // Settings
+    platform: string;
+    videoStyle: string;
+    customVideoStyle: string;
+    targetDuration: string;
+    structure: string;
+    outputLanguage: string;
+    
+    // Output
+    generatedScript: string;
+    groundingSources: GroundingChunk[];
+    
+    // UI state
+    isLoading: boolean;
+    progressMessage: string | null;
+    error: string | null;
 }
