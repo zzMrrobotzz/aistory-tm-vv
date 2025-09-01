@@ -84,6 +84,8 @@ export const checkRateLimit = async (moduleId: string): Promise<RateLimitCheckRe
       };
     }
 
+    console.log('🔍 Rate limit check with token:', token?.substring(0, 20) + '...');
+
     const response = await fetch(`${API_URL}/user/usage-status`, {
       method: 'GET',
       headers: {
@@ -324,6 +326,8 @@ export const getUserUsageStatus = async () => {
   if (!token) {
     throw new Error('No authentication token found');
   }
+
+  console.log('📊 Fetching usage status with token:', token?.substring(0, 20) + '...');
 
   const response = await fetch(`${API_URL}/user/usage-status`, {
     headers: {
