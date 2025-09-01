@@ -15,7 +15,8 @@ import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
 // Keep local counter as fallback for time until reset
-import { getTimeUntilReset, getUsageStats } from '../../services/localRequestCounter';
+import { getTimeUntilReset } from '../../services/localRequestCounter';
+import { getUserUsageStatus } from '../../services/rateLimitService';
 
 // Retry logic with exponential backoff for API calls
 const retryApiCall = async (
@@ -127,15 +128,27 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
   const hasActiveSubscription = isSubscribed(currentUser);
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Local request tracking state
-  const [usageStats, setUsageStats] = useState(getUsageStats());
+  // Usage tracking state from backend
+  const [usageStats, setUsageStats] = useState({ current: 0, limit: 200, remaining: 200, percentage: 0, isBlocked: false } as any);
   
-  // Update usage stats every minute to handle midnight reset
+  // Fetch usage from backend and poll every minute (reset at midnight handled by backend)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setUsageStats(getUsageStats());
-    }, 60000); // Check every minute
-    
+    const fetchUsage = async () => {
+      try {
+        const data = await getUserUsageStatus();
+        setUsageStats({
+          current: data.totalUsage,
+          limit: data.usageLimit,
+          remaining: data.remainingRequests,
+          percentage: data.percentage,
+          isBlocked: !data.canProceed
+        });
+      } catch (e) {
+        // keep previous usage on error
+      }
+    };
+    fetchUsage();
+    const interval = setInterval(fetchUsage, 60000);
     return () => clearInterval(interval);
   }, []);
 

@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ApiSettings, QuickStoryModuleState, QuickStoryTask, QuickStoryActiveTab, ActiveModule, SequelStoryResult, UserProfile, QuickStoryWordStats, QuickStoryQualityStats } from '../../types';
 import { STORY_LENGTH_OPTIONS, WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
+import { checkAndTrackRequest, REQUEST_ACTIONS, RequestCheckResult } from '../../services/requestTrackingService';
 import { delay, isSubscribed } from '../../utils';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
-import { getTimeUntilReset, getUsageStats } from '../../services/localRequestCounter';
+import { getTimeUntilReset } from '../../services/localRequestCounter';
+import { getUserUsageStatus } from '../../services/rateLimitService';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -96,20 +98,64 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     // Subscription check
     const hasActiveSubscription = isSubscribed(currentUser);
     
-    // Local request tracking state
-    const [usageStats, setUsageStats] = useState(getUsageStats());
+    // Usage tracking state from backend
+    const [usageStats, setUsageStats] = useState({ current: 0, limit: 200, remaining: 200, percentage: 0, isBlocked: false } as any);
     
-    // Update usage stats every minute to handle midnight reset
+    // Fetch usage from backend and poll every minute
     useEffect(() => {
-        const interval = setInterval(() => {
-            setUsageStats(getUsageStats());
-        }, 60000); // Check every minute
-        
+        const fetchUsage = async () => {
+            try {
+                const data = await getUserUsageStatus();
+                setUsageStats({
+                    current: data.totalUsage,
+                    limit: data.usageLimit,
+                    remaining: data.remainingRequests,
+                    percentage: data.percentage,
+                    isBlocked: !data.canProceed
+                });
+            } catch (e) {
+                // keep previous usage on error
+            }
+        };
+        fetchUsage();
+        const interval = setInterval(fetchUsage, 60000);
         return () => clearInterval(interval);
     }, []);
 
     const updateState = (updates: Partial<QuickStoryModuleState>) => {
         setModuleState(prev => ({ ...prev, ...updates }));
+    };
+
+    // Helper: check & track usage with backend and sync local counter box
+    const checkAndTrackQuickRequest = async (action: string) => {
+        try {
+            const result: RequestCheckResult = await checkAndTrackRequest(action);
+            // Sync UI usage box with backend numbers
+            if (result?.usage) {
+                setUsageStats({
+                    current: result.usage.current,
+                    limit: result.usage.limit,
+                    remaining: result.usage.remaining,
+                    percentage: result.usage.percentage,
+                    canUse: result.usage.current < result.usage.limit,
+                    isBlocked: !!result.blocked
+                });
+            }
+            if (result.blocked) {
+                return {
+                    allowed: false,
+                    message: result.message,
+                    stats: result.usage
+                } as const;
+            }
+            if (result.warning) {
+                window.dispatchEvent(new CustomEvent('usage-warning', { detail: { warning: result.warning } }));
+            }
+            return { allowed: true, stats: result.usage, message: result.message } as const;
+        } catch (error) {
+            console.warn('Backend request check failed, proceeding with local counter');
+            return { allowed: true } as const;
+        }
     };
 
     const updateTask = (taskId: string, updates: Partial<QuickStoryTask>) => {
@@ -244,7 +290,14 @@ Chỉ trả về JSON.`;
         
         const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
     
-        // Step 1: Generate Outline
+        // Step 1: Generate Outline (count usage)
+        {
+            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+            if (requestCheck && (requestCheck as any).allowed === false) {
+                throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
+            }
+        }
+        // Generate Outline
         updateTask(task.id, { progressMessage: 'Bước 1/3: Đang tạo dàn ý...' });
         const outlinePrompt = `Tạo một dàn ý chi tiết cho một câu chuyện có tiêu đề "${title}". Dàn ý phải logic, có mở đầu, phát triển, cao trào và kết thúc. Dàn ý phải được viết bằng ${outputLanguageLabel}.`;
         const outlineResult = await retryApiCall(() => generateText(outlinePrompt, undefined, false, apiSettings), 3, true);
@@ -273,6 +326,13 @@ Chỉ trả về JSON.`;
         }
 
         for (let i = 0; i < numChunks; i++) {
+            // Count each chunk as a request for fair tracking
+            {
+                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+                if (requestCheck && (requestCheck as any).allowed === false) {
+                    throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
+                }
+            }
             if (abortSignal.aborted) throw new DOMException('Aborted', 'AbortError');
             updateTask(task.id, { progressMessage: `Bước 2/3: Đang viết phần ${i + 1}/${numChunks}...` });
             const context = fullStory.length > 2000 ? '...\n' + fullStory.slice(-2000) : fullStory;
@@ -293,7 +353,13 @@ ${context || "Đây là phần đầu tiên."}
         if (!fullStory.trim()) throw new Error("Không thể viết truyện từ dàn ý.");
         await delay(500, abortSignal);
     
-        // Step 3: Post-Edit
+        // Step 3: Post-Edit (count usage)
+        {
+            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+            if (requestCheck && (requestCheck as any).allowed === false) {
+                throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
+            }
+        }
         updateTask(task.id, { progressMessage: enableQualityAnalysis ? 'Bước 3/4: Đang biên tập...' : 'Bước 3/3: Đang biên tập...' });
         const minLength = Math.round(currentTargetLengthNum * 0.9);
         const maxLength = Math.round(currentTargetLengthNum * 1.1);
@@ -314,6 +380,13 @@ ${context || "Đây là phần đầu tiên."}
         // Analyze story quality and consistency (only if enabled and for longer texts)
         let storyQualityStats: any = null;
         if (enableQualityAnalysis && finalStory.length > 500) {
+            // Count analysis as a usage as well
+            {
+                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.BATCH_STORY);
+                if (requestCheck && (requestCheck as any).allowed === false) {
+                    throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
+                }
+            }
             try {
                 updateTask(task.id, { progressMessage: 'Bước 4/4: Đang phân tích chất lượng...' });
                 storyQualityStats = await analyzeStoryQuality(title, finalStory);

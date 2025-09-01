@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Activity, Clock, TrendingUp } from 'lucide-react';
-import { getUsageStats, getTimeUntilReset } from '../services/localRequestCounter';
+import { getUserUsageStatus } from '../services/rateLimitService';
 
 interface UsageStatus {
   canProceed: boolean;
@@ -15,10 +15,10 @@ interface UsageStatus {
     weightedUsage: number;
   }>;
   warning?: {
-    type: 'approaching_limit' | 'high_usage';
     message: string;
-  };
-  resetTime: string;
+    percentage: number;
+  } | null;
+  resetTime: number;
 }
 
 interface UsageQuotaDisplayProps {
@@ -68,27 +68,18 @@ const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
-      // Get local usage stats
-      const localStats = getUsageStats();
-      const timeLeft = getTimeUntilReset();
-      
-      // Convert to expected format
+      const data = await getUserUsageStatus();
       const status: UsageStatus = {
-        canProceed: localStats.canUse,
-        totalUsage: localStats.current,
-        usageLimit: localStats.limit,
-        remainingRequests: localStats.remaining,
-        percentage: localStats.percentage,
-        subscription: 'local', // Not used in local mode
-        moduleBreakdown: [], // Not available in local mode
-        resetTime: `${timeLeft.hours}h ${timeLeft.minutes}m`,
-        warning: localStats.percentage >= 90 ? {
-          type: 'approaching_limit',
-          message: `Cảnh báo: Đã sử dụng ${localStats.percentage}% quota hôm nay`
-        } : undefined
+        canProceed: data.canProceed,
+        totalUsage: data.totalUsage,
+        usageLimit: data.usageLimit,
+        remainingRequests: data.remainingRequests,
+        percentage: data.percentage,
+        subscription: data.subscription,
+        moduleBreakdown: data.moduleBreakdown || [],
+        warning: data.warning || null,
+        resetTime: data.resetTime as unknown as number
       };
-      
       setUsageStatus(status);
     } catch (err) {
       console.error('Failed to load usage status:', err);
