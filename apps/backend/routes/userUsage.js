@@ -61,7 +61,7 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
         date: today,
         dailyLimit: 200,
         subscriptionType: user.subscriptionType || 'free',
-        requestCount: 0,
+        totalUsage: 0,
         moduleUsage: [],
         requestHistory: [],
         warningsIssued: []
@@ -78,11 +78,11 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     const timeUntilReset = tomorrow - now;
     
     const usageData = {
-      current: usageRecord.requestCount,
+      current: usageRecord.totalUsage,
       limit: usageRecord.dailyLimit,
-      remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.requestCount),
-      percentage: Math.min(100, (usageRecord.requestCount / usageRecord.dailyLimit) * 100),
-      isBlocked: usageRecord.requestCount >= usageRecord.dailyLimit,
+      remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.totalUsage),
+      percentage: Math.min(100, (usageRecord.totalUsage / usageRecord.dailyLimit) * 100),
+      isBlocked: usageRecord.totalUsage >= usageRecord.dailyLimit,
       resetTime: timeUntilReset
     };
     
@@ -138,24 +138,28 @@ router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId
         date: today,
         dailyLimit: 200,
         subscriptionType: user.subscriptionType || 'free',
-        requestCount: 0,
+        totalUsage: 0,
         moduleUsage: [],
         requestHistory: [],
         warningsIssued: []
       });
     }
     
-    // Tăng request count
-    usageRecord.requestCount += 1;
+    // Tăng usage count
+    usageRecord.totalUsage += 1;
     
     // Cập nhật module usage
     const moduleIndex = usageRecord.moduleUsage.findIndex(m => m.moduleId === moduleId);
     if (moduleIndex >= 0) {
-      usageRecord.moduleUsage[moduleIndex].count += 1;
+      usageRecord.moduleUsage[moduleIndex].requestCount += 1;
+      usageRecord.moduleUsage[moduleIndex].weightedUsage += 1;
+      usageRecord.moduleUsage[moduleIndex].lastUsed = new Date();
     } else {
       usageRecord.moduleUsage.push({
         moduleId,
-        count: 1,
+        moduleName: moduleId, // Use moduleId as moduleName for now
+        requestCount: 1,
+        weightedUsage: 1,
         lastUsed: new Date()
       });
     }
@@ -164,7 +168,7 @@ router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId
     usageRecord.requestHistory.push({
       timestamp: new Date(),
       moduleId,
-      action: action || 'generate'
+      weight: 1
     });
     
     // Giữ chỉ 100 records gần nhất
@@ -174,16 +178,16 @@ router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId
     
     await usageRecord.save();
     
-    console.log(`Usage recorded for user ${userId}: ${usageRecord.requestCount}/${usageRecord.dailyLimit}`);
+    console.log(`Usage recorded for user ${userId}: ${usageRecord.totalUsage}/${usageRecord.dailyLimit}`);
     
     res.json({
       success: true,
       message: 'Usage recorded successfully',
       data: {
-        current: usageRecord.requestCount,
+        current: usageRecord.totalUsage,
         limit: usageRecord.dailyLimit,
-        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.requestCount),
-        isBlocked: usageRecord.requestCount >= usageRecord.dailyLimit
+        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.totalUsage),
+        isBlocked: usageRecord.totalUsage >= usageRecord.dailyLimit
       }
     });
     

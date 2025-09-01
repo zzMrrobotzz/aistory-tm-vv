@@ -46,8 +46,8 @@ const DailyUsageLimitSchema = new mongoose.Schema({
   moduleUsage: [{
     moduleId: {
       type: String,
-      required: true,
-      enum: ['write-story', 'batch-story-writing', 'rewrite', 'batch-rewrite']
+      required: true
+      // Removed enum restriction to allow new modules like quick-story, etc.
     },
     moduleName: {
       type: String,
@@ -114,8 +114,9 @@ const DailyUsageLimitSchema = new mongoose.Schema({
   // User subscription info at time of usage
   subscriptionType: {
     type: String,
-    enum: ['free', 'monthly', 'quarterly', 'lifetime'],
-    required: true
+    required: true,
+    default: 'free'
+    // Removed enum restriction to allow flexible subscription types including trial packages
   },
   
   // Status tracking  

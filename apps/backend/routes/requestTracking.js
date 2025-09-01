@@ -58,7 +58,7 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
         date: today,
         dailyLimit: 200,
         subscriptionType: user.subscriptionType || 'free',
-        requestCount: 0,
+        totalUsage: 0,
         moduleUsage: [],
         requestHistory: [],
         warningsIssued: []
@@ -69,13 +69,13 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
     }
     
     // Kiểm tra xem có bị block không
-    if (usageRecord.requestCount >= usageRecord.dailyLimit) {
+    if (usageRecord.totalUsage >= usageRecord.dailyLimit) {
       return res.status(429).json({
         success: false,
         blocked: true,
         message: 'Bạn đã đạt giới hạn request hôm nay. Vui lòng thử lại vào ngày mai.',
         usage: {
-          current: usageRecord.requestCount,
+          current: usageRecord.totalUsage,
           limit: usageRecord.dailyLimit,
           remaining: 0,
           percentage: 100,
@@ -84,18 +84,22 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
       });
     }
     
-    // Tăng request count
-    usageRecord.requestCount += 1;
+    // Tăng usage count
+    usageRecord.totalUsage += 1;
     
     // Cập nhật module usage dựa trên action
     const moduleId = action || 'unknown';
     const moduleIndex = usageRecord.moduleUsage.findIndex(m => m.moduleId === moduleId);
     if (moduleIndex >= 0) {
-      usageRecord.moduleUsage[moduleIndex].count += 1;
+      usageRecord.moduleUsage[moduleIndex].requestCount += 1;
+      usageRecord.moduleUsage[moduleIndex].weightedUsage += 1;
+      usageRecord.moduleUsage[moduleIndex].lastUsed = new Date();
     } else {
       usageRecord.moduleUsage.push({
         moduleId,
-        count: 1,
+        moduleName: moduleId, // Use moduleId as moduleName for now
+        requestCount: 1,
+        weightedUsage: 1,
         lastUsed: new Date()
       });
     }
@@ -104,7 +108,7 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
     usageRecord.requestHistory.push({
       timestamp: new Date(),
       moduleId,
-      action: action || 'generate'
+      weight: 1
     });
     
     // Giữ chỉ 100 records gần nhất
@@ -114,17 +118,17 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
     
     await usageRecord.save();
     
-    console.log(`Request tracked for user ${userId}: ${usageRecord.requestCount}/${usageRecord.dailyLimit}`);
+    console.log(`Request tracked for user ${userId}: ${usageRecord.totalUsage}/${usageRecord.dailyLimit}`);
     
     res.json({
       success: true,
       blocked: false,
       message: 'Request allowed',
       usage: {
-        current: usageRecord.requestCount,
+        current: usageRecord.totalUsage,
         limit: usageRecord.dailyLimit,
-        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.requestCount),
-        percentage: Math.min(100, (usageRecord.requestCount / usageRecord.dailyLimit) * 100),
+        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.totalUsage),
+        percentage: Math.min(100, (usageRecord.totalUsage / usageRecord.dailyLimit) * 100),
         isBlocked: false
       }
     });
@@ -168,7 +172,7 @@ router.get('/today-record', authenticateUser, updateUserActivity, extractUserId,
         date: today,
         dailyLimit: 200,
         subscriptionType: user.subscriptionType || 'free',
-        requestCount: 0,
+        totalUsage: 0,
         moduleUsage: [],
         requestHistory: [],
         warningsIssued: []
@@ -189,11 +193,11 @@ router.get('/today-record', authenticateUser, updateUserActivity, extractUserId,
       data: {
         userId: usageRecord.userId,
         date: usageRecord.date,
-        requestCount: usageRecord.requestCount,
+        requestCount: usageRecord.totalUsage,
         dailyLimit: usageRecord.dailyLimit,
-        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.requestCount),
-        percentage: Math.min(100, (usageRecord.requestCount / usageRecord.dailyLimit) * 100),
-        isBlocked: usageRecord.requestCount >= usageRecord.dailyLimit,
+        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.totalUsage),
+        percentage: Math.min(100, (usageRecord.totalUsage / usageRecord.dailyLimit) * 100),
+        isBlocked: usageRecord.totalUsage >= usageRecord.dailyLimit,
         moduleUsage: usageRecord.moduleUsage,
         resetTime: timeUntilReset
       }
