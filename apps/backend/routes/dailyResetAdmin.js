@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const dailyResetService = require('../services/dailyResetService');
 const auth = require('../middleware/auth');
-const { isAdmin } = require('../middleware/isAdmin');
+const { isAdmin } = require('../middleware/adminAuth');
 
 /**
  * Admin routes for managing Daily Reset Service
