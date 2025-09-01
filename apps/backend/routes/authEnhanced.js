@@ -63,7 +63,7 @@ router.post('/login-enhanced', async (req, res) => {
         
         jwt.sign(
             payload,
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'your_user_secret',
             { expiresIn: '30d' },
             (err, token) => {
                 if (err) throw err;
@@ -193,7 +193,7 @@ router.post('/register-enhanced', async (req, res) => {
         
         jwt.sign(
             payload,
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'your_user_secret',
             { expiresIn: '30d' },
             (err, token) => {
                 if (err) throw err;

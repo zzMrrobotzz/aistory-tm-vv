@@ -85,7 +85,7 @@ router.post('/register', antiSharingMiddleware, async (req, res) => {
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'your_user_secret',
       { expiresIn: '30d' },
       async (err, token) => {
         if (err) throw err;
@@ -162,7 +162,7 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'your_user_secret',
       { expiresIn: '30d' },
       async (err, token) => {
         if (err) throw err;

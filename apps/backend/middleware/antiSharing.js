@@ -93,7 +93,7 @@ const checkAccountBlock = async (req, res, next) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_user_secret');
       const userId = decoded.user.id;
 
       // Check if user has active block

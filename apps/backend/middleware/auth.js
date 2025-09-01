@@ -13,7 +13,7 @@ module.exports = async function (req, res, next) {
 
   // Verify token
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_user_secret');
     req.user = decoded.user;
 
     // SINGLE SESSION VALIDATION - Check if session exists and is valid
