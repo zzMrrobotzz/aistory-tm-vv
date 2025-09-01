@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser } = require('../middleware/adminAuth');
+const { updateUserActivity } = require('../middleware/activityTracker');
 const DailyUsageLimit = require('../models/DailyUsageLimit');
 const User = require('../models/User');
 const { getVietnamDate } = require('../utils/timezone');
@@ -28,7 +29,7 @@ const extractUserId = (req, res, next) => {
 };
 
 // GET /api/user/usage-status - Lấy trạng thái usage hiện tại
-router.get('/usage-status', authenticateUser, extractUserId, async (req, res) => {
+router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
     const today = getVietnamDate();
@@ -104,7 +105,7 @@ router.get('/usage-status', authenticateUser, extractUserId, async (req, res) =>
 });
 
 // POST /api/user/record-usage - Ghi nhận usage (đơn giản hóa)
-router.post('/record-usage', authenticateUser, extractUserId, async (req, res) => {
+router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
     const { moduleId, action } = req.body;
@@ -193,7 +194,7 @@ router.post('/record-usage', authenticateUser, extractUserId, async (req, res) =
 });
 
 // GET /api/user/usage-history - Lấy lịch sử usage
-router.get('/usage-history', authenticateUser, extractUserId, async (req, res) => {
+router.get('/usage-history', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
     const { days = 7 } = req.query;

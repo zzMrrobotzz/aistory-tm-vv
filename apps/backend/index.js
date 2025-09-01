@@ -537,8 +537,8 @@ app.use('/api/tutorials', require('./routes/tutorials')); // Public tutorials fo
 app.use('/api/support-content', require('./routes/supportContent')); // Public support content
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution  
-app.use('/api/user', auth, updateUserActivity, require('./routes/userStats')); // User statistics
-app.use('/api/user', auth, updateUserActivity, require('./routes/userUsage')); // User usage info
+app.use('/api/user', require('./routes/userStats')); // User statistics (auth handled in routes)
+app.use('/api/user', require('./routes/userUsage')); // User usage info (auth handled in routes)
 app.use('/api/requests', auth, updateUserActivity, require('./routes/requestTracking')); // Simple request tracking
 app.use('/api/admin/rate-limit', require('./routes/rateLimitAdmin')); // Rate limit management (no auth for now)
 app.use('/api/admin/daily-reset', dailyResetAdminRouter); // Daily reset service management

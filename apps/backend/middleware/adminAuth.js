@@ -41,6 +41,7 @@ const authenticateUser = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Missing or invalid Authorization header:', authHeader);
       return res.status(401).json({ 
         success: false, 
         message: 'User token required' 
@@ -48,12 +49,16 @@ const authenticateUser = (req, res, next) => {
     }
 
     const token = authHeader.substring(7);
+    console.log('🔑 Received token (first 50 chars):', token.substring(0, 50) + '...');
+    console.log('🔧 Using JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'USING FALLBACK');
     
     // Verify user token (sử dụng cùng secret với auth route)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_user_secret');
+    const jwtSecret = process.env.JWT_SECRET || 'your_user_secret';
+    console.log('🔐 Attempting JWT verify with secret length:', jwtSecret.length);
+    const decoded = jwt.verify(token, jwtSecret);
     
     // Log để debug
-    console.log('Token decoded:', JSON.stringify(decoded, null, 2));
+    console.log('✅ Token decoded successfully:', JSON.stringify(decoded, null, 2));
     
     req.user = decoded;
     next();
