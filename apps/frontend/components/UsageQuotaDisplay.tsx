@@ -83,7 +83,21 @@ const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({
       setUsageStatus(status);
     } catch (err) {
       console.error('Failed to load usage status:', err);
-      setError('Không thể tải thông tin usage');
+      
+      // Fallback to basic display without error UI 
+      const fallbackStatus: UsageStatus = {
+        canProceed: true,
+        totalUsage: 0,
+        usageLimit: 200,
+        remainingRequests: 200,
+        percentage: 0,
+        subscription: 'Unknown',
+        moduleBreakdown: [],
+        warning: null,
+        resetTime: 0
+      };
+      setUsageStatus(fallbackStatus);
+      // Don't set error to avoid red error UI
     } finally {
       setLoading(false);
     }
