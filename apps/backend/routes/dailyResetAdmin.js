@@ -2,14 +2,14 @@ const express = require('express');
 const router = express.Router();
 const dailyResetService = require('../services/dailyResetService');
 const auth = require('../middleware/auth');
-const adminAuth = require('../middleware/adminAuth');
+const { isAdmin } = require('../middleware/isAdmin');
 
 /**
  * Admin routes for managing Daily Reset Service
  */
 
 // GET /api/admin/daily-reset/status - Get service status
-router.get('/status', auth, adminAuth, async (req, res) => {
+router.get('/status', auth, isAdmin, async (req, res) => {
     try {
         const status = dailyResetService.getStatus();
         
@@ -28,7 +28,7 @@ router.get('/status', auth, adminAuth, async (req, res) => {
 });
 
 // GET /api/admin/daily-reset/check-today - Check today's usage
-router.get('/check-today', auth, adminAuth, async (req, res) => {
+router.get('/check-today', auth, isAdmin, async (req, res) => {
     try {
         const todayUsage = await dailyResetService.checkTodayUsage();
         
@@ -47,7 +47,7 @@ router.get('/check-today', auth, adminAuth, async (req, res) => {
 });
 
 // POST /api/admin/daily-reset/manual - Manual reset (admin only)
-router.post('/manual', auth, adminAuth, async (req, res) => {
+router.post('/manual', auth, isAdmin, async (req, res) => {
     try {
         const { force } = req.body;
         
@@ -79,7 +79,7 @@ router.post('/manual', auth, adminAuth, async (req, res) => {
 });
 
 // POST /api/admin/daily-reset/start - Start cron job
-router.post('/start', auth, adminAuth, async (req, res) => {
+router.post('/start', auth, isAdmin, async (req, res) => {
     try {
         dailyResetService.startCronJob();
         
@@ -99,7 +99,7 @@ router.post('/start', auth, adminAuth, async (req, res) => {
 });
 
 // POST /api/admin/daily-reset/stop - Stop cron job
-router.post('/stop', auth, adminAuth, async (req, res) => {
+router.post('/stop', auth, isAdmin, async (req, res) => {
     try {
         dailyResetService.stopCronJob();
         
@@ -119,7 +119,7 @@ router.post('/stop', auth, adminAuth, async (req, res) => {
 });
 
 // GET /api/admin/daily-reset/logs - Get recent reset logs (if implemented)
-router.get('/logs', auth, adminAuth, async (req, res) => {
+router.get('/logs', auth, isAdmin, async (req, res) => {
     try {
         // For now, return service status and today's check
         const status = dailyResetService.getStatus();
