@@ -283,9 +283,9 @@ Chỉ trả về JSON.`;
         
         const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
     
-        // Step 1: Generate Outline (count usage)
+        // Check usage limit ONCE for entire story (not per API call)
         {
-            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
+            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY, 1);
             if (requestCheck && (requestCheck as any).allowed === false) {
                 throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
             }
@@ -319,13 +319,6 @@ Chỉ trả về JSON.`;
         }
 
         for (let i = 0; i < numChunks; i++) {
-            // Count each chunk as a request for fair tracking
-            {
-                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
-                if (requestCheck && (requestCheck as any).allowed === false) {
-                    throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
-                }
-            }
             if (abortSignal.aborted) throw new DOMException('Aborted', 'AbortError');
             updateTask(task.id, { progressMessage: `Bước 2/3: Đang viết phần ${i + 1}/${numChunks}...` });
             const context = fullStory.length > 2000 ? '...\n' + fullStory.slice(-2000) : fullStory;
@@ -346,13 +339,7 @@ ${context || "Đây là phần đầu tiên."}
         if (!fullStory.trim()) throw new Error("Không thể viết truyện từ dàn ý.");
         await delay(500, abortSignal);
     
-        // Step 3: Post-Edit (count usage)
-        {
-            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
-            if (requestCheck && (requestCheck as any).allowed === false) {
-                throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
-            }
-        }
+        // Step 3: Post-Edit (no additional usage count - part of story creation)
         updateTask(task.id, { progressMessage: enableQualityAnalysis ? 'Bước 3/4: Đang biên tập...' : 'Bước 3/3: Đang biên tập...' });
         const minLength = Math.round(currentTargetLengthNum * 0.9);
         const maxLength = Math.round(currentTargetLengthNum * 1.1);
@@ -373,13 +360,7 @@ ${context || "Đây là phần đầu tiên."}
         // Analyze story quality and consistency (only if enabled and for longer texts)
         let storyQualityStats: any = null;
         if (enableQualityAnalysis && finalStory.length > 500) {
-            // Count analysis as a usage as well
-            {
-                const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY);
-                if (requestCheck && (requestCheck as any).allowed === false) {
-                    throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
-                }
-            }
+            // Quality analysis is part of story creation, no additional usage count
             try {
                 updateTask(task.id, { progressMessage: 'Bước 4/4: Đang phân tích chất lượng...' });
                 storyQualityStats = await analyzeStoryQuality(title, finalStory);
