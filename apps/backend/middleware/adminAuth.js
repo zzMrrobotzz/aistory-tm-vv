@@ -52,6 +52,9 @@ const authenticateUser = (req, res, next) => {
     // Verify user token (sử dụng cùng secret với auth route)
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_user_secret');
     
+    // Log để debug
+    console.log('Token decoded:', JSON.stringify(decoded, null, 2));
+    
     req.user = decoded;
     next();
   } catch (error) {

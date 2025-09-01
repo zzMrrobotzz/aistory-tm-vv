@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ApiSettings, ShortFormScriptModuleState, ShortFormScriptInputType, GroundingChunk, HistoryItem, ActiveModule } from '../../types';
 import {
     HOOK_LANGUAGE_OPTIONS,
@@ -8,7 +8,9 @@ import {
     SCRIPT_STRUCTURE_OPTIONS
 } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
-import { checkAndTrackRequest, REQUEST_ACTIONS } from '../../services/requestTrackingService';
+import { getUsageStats, incrementRequestCount } from '../../services/localRequestCounter';
+import { isSubscribed } from '../../services/authService';
+import UpgradePrompt from '../UpgradePrompt';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -33,6 +35,24 @@ const ShortFormScriptModule: React.FC<ShortFormScriptModuleProps> = ({
     } = moduleState;
 
     const [isCopied, setIsCopied] = useState(false);
+    
+    // Subscription check
+    const hasActiveSubscription = isSubscribed(currentUser);
+    
+    // Usage tracking state
+    const [usageStats, setUsageStats] = useState({ current: 0, limit: 200, remaining: 200, percentage: 0, isBlocked: false } as any);
+    
+    useEffect(() => {
+        const fetchUsage = async () => {
+            try {
+                const stats = getUsageStats();
+                setUsageStats(stats);
+            } catch (error) {
+                console.warn('Error loading usage stats:', error);
+            }
+        };
+        fetchUsage();
+    }, []);
 
     const updateState = (updates: Partial<ShortFormScriptModuleState>) => {
         setModuleState(prev => ({ ...prev, ...updates }));
@@ -70,13 +90,15 @@ const ShortFormScriptModule: React.FC<ShortFormScriptModuleProps> = ({
             return;
         }
 
-        // Check rate limit before starting
-        const rateLimitCheck = await checkAndTrackRequest(REQUEST_ACTIONS.SHORT_FORM_SCRIPT);
-        if (!rateLimitCheck.success) {
-            updateState({ 
-                error: rateLimitCheck.message || 'Đã vượt quá giới hạn sử dụng hôm nay. Vui lòng nâng cấp gói hoặc thử lại vào ngày mai.',
-                isLoading: false 
-            });
+        // Check subscription
+        if (!hasActiveSubscription) {
+            updateState({ error: 'Cần nâng cấp gói đăng ký để sử dụng tính năng này.' });
+            return;
+        }
+        
+        // Check usage limit
+        if (usageStats.isBlocked) {
+            updateState({ error: 'Đã đạt giới hạn sử dụng hôm nay. Vui lòng thử lại vào ngày mai.' });
             return;
         }
 
@@ -146,6 +168,10 @@ Now, generate the complete script.
                 progressMessage: 'Tạo kịch bản thành công!',
             });
 
+            // Increment request count and update usage stats
+            const newData = incrementRequestCount();
+            setUsageStats(newData);
+
             // Add to history
             addHistoryItem({
                 module: ActiveModule.ShortFormScript,
@@ -203,43 +229,85 @@ Now, generate the complete script.
                 </ul>
             </InfoBox>
 
+            {/* Subscription Check */}
+            {!hasActiveSubscription && (
+                <UpgradePrompt 
+                    message="🔒 Tính năng Xưởng Kịch Bản Video Ngắn dành riêng cho thành viên có gói đăng ký. Nâng cấp để truy cập tính năng này và tạo ra những kịch bản video viral chuyên nghiệp!" 
+                />
+            )}
+
+            {/* Daily Usage Counter */}
+            <div className={`p-4 rounded-lg border ${usageStats.isBlocked ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                        <span className={`text-2xl mr-2 ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                            {usageStats.isBlocked ? '🚫' : '📊'}
+                        </span>
+                        <div>
+                            <h3 className={`font-semibold ${usageStats.isBlocked ? 'text-red-800' : 'text-green-800'}`}>
+                                Sử dụng hôm nay: {usageStats.current}/{usageStats.limit}
+                            </h3>
+                            <p className={`text-sm ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                                {usageStats.isBlocked 
+                                    ? `Đã đạt giới hạn! Reset vào 00:00 ngày mai.`
+                                    : `Còn lại ${usageStats.remaining} requests (${usageStats.percentage}% đã dùng)`
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    <div className={`text-2xl font-bold ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
+                        {usageStats.percentage}%
+                    </div>
+                </div>
+                {/* Progress Bar */}
+                <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                            usageStats.percentage >= 90 ? 'bg-red-500' : 
+                            usageStats.percentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(100, usageStats.percentage)}%` }}
+                    ></div>
+                </div>
+            </div>
+
             {/* Settings */}
             <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow my-8">
                 <h3 className="text-xl font-semibold text-gray-800">Cài đặt Chung cho Kịch bản</h3>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Nền tảng mục tiêu:</label>
-                        <select value={platform} onChange={e => updateState({ platform: e.target.value as any })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
+                        <select value={platform} onChange={e => updateState({ platform: e.target.value as any })} className="w-full p-2 border border-gray-300 rounded-md" disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked}>
                             {SCRIPT_PLATFORM_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Phong cách Video:</label>
-                        <select value={videoStyle} onChange={e => updateState({ videoStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
+                        <select value={videoStyle} onChange={e => updateState({ videoStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked}>
                             {SCRIPT_VIDEO_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>
                     {videoStyle === 'custom' && (
                         <div>
                              <label className="block text-sm font-medium text-gray-700 mb-1">Phong cách tùy chỉnh:</label>
-                             <input type="text" value={customVideoStyle} onChange={e => updateState({ customVideoStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Ví dụ: Kể chuyện kiểu phim tài liệu" disabled={isLoading}/>
+                             <input type="text" value={customVideoStyle} onChange={e => updateState({ customVideoStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Ví dụ: Kể chuyện kiểu phim tài liệu" disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked}/>
                         </div>
                     )}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Thời lượng mục tiêu:</label>
-                        <select value={targetDuration} onChange={e => updateState({ targetDuration: e.target.value as any })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
+                        <select value={targetDuration} onChange={e => updateState({ targetDuration: e.target.value as any })} className="w-full p-2 border border-gray-300 rounded-md" disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked}>
                             {SCRIPT_TARGET_DURATION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Cấu trúc Kịch bản:</label>
-                        <select value={structure} onChange={e => updateState({ structure: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
+                        <select value={structure} onChange={e => updateState({ structure: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked}>
                             {SCRIPT_STRUCTURE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ Kịch bản:</label>
-                        <select value={outputLanguage} onChange={e => updateState({ outputLanguage: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
+                        <select value={outputLanguage} onChange={e => updateState({ outputLanguage: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked}>
                             {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>
@@ -255,18 +323,18 @@ Now, generate the complete script.
 
             <div className="p-4 border rounded-lg bg-white shadow-sm">
                 {activeInputTab === 'idea' && (
-                    <textarea value={ideaInput} onChange={e => updateState({ ideaInput: e.target.value })} rows={5} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập ý tưởng cốt lõi, chủ đề, hoặc tóm tắt ngắn gọn..." disabled={isLoading} />
+                    <textarea value={ideaInput} onChange={e => updateState({ ideaInput: e.target.value })} rows={5} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập ý tưởng cốt lõi, chủ đề, hoặc tóm tắt ngắn gọn..." disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked} />
                 )}
                 {activeInputTab === 'youtubeLink' && (
-                    <input type="url" value={youtubeLinkInput} onChange={e => updateState({ youtubeLinkInput: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Dán link video YouTube vào đây, ví dụ: https://www.youtube.com/watch?v=..." disabled={isLoading} />
+                    <input type="url" value={youtubeLinkInput} onChange={e => updateState({ youtubeLinkInput: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Dán link video YouTube vào đây, ví dụ: https://www.youtube.com/watch?v=..." disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked} />
                 )}
                 {activeInputTab === 'story' && (
-                    <textarea value={storyInput} onChange={e => updateState({ storyInput: e.target.value })} rows={10} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Dán toàn bộ câu chuyện dài của bạn vào đây. AI sẽ chắt lọc những phần hay nhất để tạo kịch bản." disabled={isLoading} />
+                    <textarea value={storyInput} onChange={e => updateState({ storyInput: e.target.value })} rows={10} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Dán toàn bộ câu chuyện dài của bạn vào đây. AI sẽ chắt lọc những phần hay nhất để tạo kịch bản." disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked} />
                 )}
             </div>
             
-            <button onClick={handleGenerateScript} disabled={isLoading} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50">
-                {isLoading ? 'Đang Sáng Tạo...' : '🚀 Tạo Kịch Bản Viral'}
+            <button onClick={handleGenerateScript} disabled={!hasActiveSubscription || isLoading || usageStats.isBlocked} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50">
+                {!hasActiveSubscription ? '🔒 Cần Nâng cấp Gói' : usageStats.isBlocked ? '🚫 Đã đạt giới hạn' : (isLoading ? 'Đang Sáng Tạo...' : '🚀 Tạo Kịch Bản Viral')}
             </button>
 
             {isLoading && <LoadingSpinner message={progressMessage || "Đang xử lý..."} />}

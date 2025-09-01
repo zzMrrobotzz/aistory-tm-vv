@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-tm-backend.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com';
 
 export const REQUEST_ACTIONS = {
   WRITE_STORY: 'write-story',
