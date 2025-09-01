@@ -24,7 +24,7 @@ import { delay, dataUrlToBlob } from '../../utils';
 import { logApiCall, logImageGenerated } from '../../services/usageService';
 import { ApiKeyStorage } from '../../utils/apiKeyStorage';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
-import { canMakeRequest, incrementRequestCount, getUsageStats } from '../../services/localRequestCounter';
+import { checkAndTrackRequest, REQUEST_ACTIONS, RequestCheckResult } from '../../services/requestTrackingService';
 
 interface ImageGenerationSuiteModuleProps {
   apiSettings: ApiSettings;
@@ -61,6 +61,35 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
 
   const updateState = (updates: Partial<ImageGenerationSuiteModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
+  };
+
+  // Helper function to check and track request with backend
+  const checkAndTrackImageRequest = async (action: string): Promise<{ allowed: boolean; stats: any; message?: string }> => {
+    try {
+      const result: RequestCheckResult = await checkAndTrackRequest(action);
+      
+      if (result.blocked) {
+        return {
+          allowed: false,
+          stats: result.usage,
+          message: result.message
+        };
+      }
+      
+      return {
+        allowed: true,
+        stats: result.usage,
+        message: result.warning
+      };
+    } catch (error) {
+      console.warn('Backend request check failed, using local fallback');
+      // Fallback to local logic if backend fails
+      return {
+        allowed: true,
+        stats: { current: 0, limit: 200, remaining: 200, percentage: 0 },
+        message: 'Sử dụng chế độ offline'
+      };
+    }
   };
   
   const [isProcessing, setIsProcessing] = useState(false); 
@@ -183,15 +212,15 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       return;
     }
 
-    // Check local request limit FIRST - before starting any processing
-    if (!canMakeRequest()) {
-      const stats = getUsageStats();
-      updateState({ singleImageOverallError: `Đã đạt giới hạn ${stats.limit} requests/ngày. Hãy chờ đến ngày mai để sử dụng lại.` });
+    // Check request limit with backend tracking
+    const requestCheck = await checkAndTrackImageRequest(REQUEST_ACTIONS.IMAGE_GEN);
+    if (!requestCheck.allowed) {
+      updateState({ singleImageOverallError: `${requestCheck.message} Hãy chờ đến ngày mai để sử dụng lại.` });
       return;
     }
-
-    // Increment counter immediately when user starts
-    incrementRequestCount();
+    if (requestCheck.message) {
+      console.log('⚠️ Image generation warning:', requestCheck.message);
+    }
     if (imageEngine === 'stability' && !effectiveStabilityKey) {
       updateState({ settingsError: 'Vui lòng cấu hình API Key cho Stability AI trong module Cài đặt → Quản Lý API Keys.', singleImageOverallError: null });
       return;
@@ -402,15 +431,15 @@ Generate exactly ${count} ${type} prompts now:`;
       return;
     }
 
-    // Check local request limit FIRST - before starting any processing
-    if (!canMakeRequest()) {
-      const stats = getUsageStats();
-      updateState({ ctxPromptsError: `Đã đạt giới hạn ${stats.limit} requests/ngày. Hãy chờ đến ngày mai để sử dụng lại.` });
+    // Check request limit with backend tracking
+    const requestCheck = await checkAndTrackImageRequest(REQUEST_ACTIONS.IMAGE_GEN);
+    if (!requestCheck.allowed) {
+      updateState({ ctxPromptsError: `${requestCheck.message} Hãy chờ đến ngày mai để sử dụng lại.` });
       return;
     }
-
-    // Increment counter immediately when user starts
-    incrementRequestCount();
+    if (requestCheck.message) {
+      console.log('⚠️ Context prompts warning:', requestCheck.message);
+    }
     updateState({ 
         generatedCtxPrompts: [],
         generatedImagePrompts: [],
@@ -489,15 +518,15 @@ Generate exactly ${count} ${type} prompts now:`;
       return;
     }
 
-    // Check local request limit FIRST - before starting any processing
-    if (!canMakeRequest()) {
-      const stats = getUsageStats();
-      updateState({ batchOverallError: `Đã đạt giới hạn ${stats.limit} requests/ngày. Hãy chờ đến ngày mai để sử dụng lại.` });
+    // Check request limit with backend tracking
+    const requestCheck = await checkAndTrackImageRequest(REQUEST_ACTIONS.IMAGE_GEN);
+    if (!requestCheck.allowed) {
+      updateState({ batchOverallError: `${requestCheck.message} Hãy chờ đến ngày mai để sử dụng lại.` });
       return;
     }
-
-    // Increment counter immediately when user starts
-    incrementRequestCount();
+    if (requestCheck.message) {
+      console.log('⚠️ Batch generation warning:', requestCheck.message);
+    }
     if (imageEngine === 'stability' && !effectiveStabilityKey) {
       updateState({ settingsError: 'Vui lòng cấu hình API Key cho Stability AI trong module Cài đặt → Quản Lý API Keys.', batchOverallError: null });
       return;

@@ -14,7 +14,9 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
-import { canMakeRequest, incrementRequestCount, getUsageStats, getTimeUntilReset } from '../../services/localRequestCounter';
+import { checkAndTrackRequest, REQUEST_ACTIONS, RequestCheckResult } from '../../services/requestTrackingService';
+// Keep local counter as fallback for time until reset
+import { getTimeUntilReset } from '../../services/localRequestCounter';
 
 // Retry logic with exponential backoff for API calls
 const retryApiCall = async (
@@ -121,6 +123,36 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
   setModuleState, 
   currentUser 
 }) => {
+  
+  // Helper function to check and track request with backend
+  const checkAndTrackRewriteRequest = async (action: string): Promise<{ allowed: boolean; stats: any; message?: string }> => {
+    try {
+      const result: RequestCheckResult = await checkAndTrackRequest(action);
+      
+      if (result.blocked) {
+        return {
+          allowed: false,
+          stats: result.usage,
+          message: result.message
+        };
+      }
+      
+      return {
+        allowed: true,
+        stats: result.usage,
+        message: result.warning
+      };
+    } catch (error) {
+      console.warn('Backend request check failed, using local fallback');
+      // Fallback to local logic if backend fails
+      return {
+        allowed: true,
+        stats: { current: 0, limit: 200, remaining: 200, percentage: 0 },
+        message: 'Sử dụng chế độ offline'
+      };
+    }
+  };
+
   const hasActiveSubscription = isSubscribed(currentUser);
   const abortControllerRef = useRef<AbortController | null>(null);
   
@@ -549,10 +581,10 @@ Chỉ trả về JSON.`;
         // Check local request limit FIRST
         console.log('🔍 Queue: Checking local request limit for item:', item.id);
         
-        if (!canMakeRequest()) {
-            const stats = getUsageStats();
+        const requestCheck = await checkAndTrackRewriteRequest(REQUEST_ACTIONS.REWRITE);
+        if (!requestCheck.allowed) {
             const timeLeft = getTimeUntilReset();
-            const errorMessage = `Giới hạn đạt ${stats.limit}/${stats.limit}. Reset sau ${timeLeft.hours}h ${timeLeft.minutes}m`;
+            const errorMessage = `${requestCheck.message} Reset sau ${timeLeft.hours}h ${timeLeft.minutes}m`;
             
             console.log('❌ Queue: Request blocked for item:', item.id, '- limit reached');
             
@@ -572,10 +604,11 @@ Chỉ trả về JSON.`;
             throw new Error(errorMessage);
         }
         
-        // Increment counter immediately for each queue item
-        const newStats = incrementRequestCount();
-        setUsageStats(newStats); // Update UI immediately
-        console.log(`✅ Queue: Request counted for item ${item.id} (${newStats.count}/${newStats.limit})`);
+        if (requestCheck.message) {
+            console.log('⚠️ Queue warning:', requestCheck.message);
+        }
+        setUsageStats(requestCheck.stats); // Update UI immediately
+        console.log(`✅ Queue: Request tracked for item ${item.id} (${requestCheck.stats.current}/${requestCheck.stats.limit})`);
 
         const CHUNK_CHAR_COUNT = 4000;
         // Use minimum chunks for better progress visualization
@@ -762,10 +795,10 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         // Check local request limit FIRST
         console.log('🔍 RewriteModule: Checking local request limit');
         
-        if (!canMakeRequest()) {
-            const stats = getUsageStats();
+        const requestCheck = await checkAndTrackRewriteRequest(REQUEST_ACTIONS.REWRITE);
+        if (!requestCheck.allowed) {
             const timeLeft = getTimeUntilReset();
-            const errorMessage = `Đã đạt giới hạn ${stats.limit} requests/ngày. Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
+            const errorMessage = `${requestCheck.message} Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
             
             console.log('❌ RewriteModule: Request blocked - limit reached');
             setModuleState(prev => ({ 
@@ -776,10 +809,11 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             return;
         }
         
-        // Increment counter immediately when user starts
-        const newStats = incrementRequestCount();
-        setUsageStats(newStats); // Update UI immediately
-        console.log(`✅ RewriteModule: Request counted (${newStats.count}/${newStats.limit}), proceeding with rewrite`);
+        if (requestCheck.message) {
+            console.log('⚠️ RewriteModule warning:', requestCheck.message);
+        }
+        setUsageStats(requestCheck.stats); // Update UI immediately
+        console.log(`✅ RewriteModule: Request tracked (${requestCheck.stats.current}/${requestCheck.stats.limit}), proceeding with rewrite`);
 
         setModuleState(prev => ({ ...prev, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false }));
         
