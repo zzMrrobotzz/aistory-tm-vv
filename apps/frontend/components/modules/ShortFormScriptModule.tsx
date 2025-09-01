@@ -9,7 +9,7 @@ import {
 } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
 import { getUsageStats, incrementRequestCount } from '../../services/localRequestCounter';
-import { isSubscribed } from '../../services/authService';
+import { isSubscribed } from '../../utils';
 import UpgradePrompt from '../UpgradePrompt';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
