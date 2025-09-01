@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser } = require('../middleware/adminAuth');
+const { updateUserActivity } = require('../middleware/activityTracker');
 const DailyUsageLimit = require('../models/DailyUsageLimit');
 const User = require('../models/User');
 const { getVietnamDate } = require('../utils/timezone');
@@ -28,7 +29,7 @@ const extractUserId = (req, res, next) => {
 };
 
 // POST /api/requests/check-and-track - Kiểm tra và ghi nhận request
-router.post('/check-and-track', authenticateUser, extractUserId, async (req, res) => {
+router.post('/check-and-track', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
     const { action } = req.body;
@@ -139,7 +140,7 @@ router.post('/check-and-track', authenticateUser, extractUserId, async (req, res
 });
 
 // GET /api/requests/today-record - Lấy record hôm nay
-router.get('/today-record', authenticateUser, extractUserId, async (req, res) => {
+router.get('/today-record', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
     const today = getVietnamDate();

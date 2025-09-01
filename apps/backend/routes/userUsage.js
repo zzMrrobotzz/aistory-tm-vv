@@ -31,10 +31,14 @@ const extractUserId = (req, res, next) => {
 // GET /api/user/usage-status - Lấy trạng thái usage hiện tại
 router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
+    console.log('🔍 Usage status request received');
+    console.log('Request user from auth:', req.user);
+    console.log('Request userId from extract:', req.userId);
+    
     const userId = req.userId;
     const today = getVietnamDate();
     
-    console.log(`Getting usage status for user ${userId} on ${today}`);
+    console.log(`✅ Getting usage status for user ${userId} on ${today}`);
     
     // Tìm hoặc tạo record cho hôm nay
     let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });

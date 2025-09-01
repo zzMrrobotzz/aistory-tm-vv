@@ -539,7 +539,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/auth-enhanced', authEnhancedRouter); // Enhanced authentication with username resolution  
 app.use('/api/user', require('./routes/userStats')); // User statistics (auth handled in routes)
 app.use('/api/user', require('./routes/userUsage')); // User usage info (auth handled in routes)
-app.use('/api/requests', auth, updateUserActivity, require('./routes/requestTracking')); // Simple request tracking
+app.use('/api/requests', require('./routes/requestTracking')); // Simple request tracking (auth handled in routes)
 app.use('/api/admin/rate-limit', require('./routes/rateLimitAdmin')); // Rate limit management (no auth for now)
 app.use('/api/admin/daily-reset', dailyResetAdminRouter); // Daily reset service management
 
