@@ -17,7 +17,9 @@ import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle, Loader2, X } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logStoryGenerated } from '../../services/usageService';
-import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
+import { checkAndTrackRequest, getRequestStatus, REQUEST_ACTIONS, RequestCheckResult } from '../../services/requestTrackingService';
+// Keep local counter as fallback
+import { getTimeUntilReset } from '../../services/localRequestCounter';
 
 interface WriteStoryModuleProps {
   apiSettings: ApiSettings;
@@ -28,6 +30,35 @@ interface WriteStoryModuleProps {
 }
 
 const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis, currentUser }) => {
+  
+  // Helper function to check and track request with backend
+  const checkAndTrackStoryRequest = async (action: string): Promise<{ allowed: boolean; stats: any; message?: string }> => {
+    try {
+      const result: RequestCheckResult = await checkAndTrackRequest(action);
+      
+      if (result.blocked) {
+        return {
+          allowed: false,
+          stats: result.usage,
+          message: result.message
+        };
+      }
+      
+      return {
+        allowed: true,
+        stats: result.usage,
+        message: result.warning
+      };
+    } catch (error) {
+      console.warn('Backend request check failed, using local fallback');
+      // Fallback to local logic if backend fails
+      return {
+        allowed: true,
+        stats: { current: 0, limit: 200, remaining: 200, percentage: 0 },
+        message: 'Sử dụng chế độ offline'
+      };
+    }
+  };
   const {
     activeWriteTab,
     // Common settings
@@ -796,11 +827,16 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       return;
     }
 
-    // Check request limit FIRST
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
+    // Check request limit with backend tracking
+    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.allowed) {
+      const timeLeft = getTimeUntilReset();
+      const errorMessage = `${requestCheck.message} Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
+      updateState({ hookError: errorMessage });
       return;
+    }
+    if (requestCheck.message) {
+      console.log('⚠️ Request warning:', requestCheck.message);
     }
     
     const abortCtrl = new AbortController();
@@ -866,17 +902,19 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
+    // Check request limit with backend tracking
+    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.allowed) {
+      const timeLeft = getTimeUntilReset();
+      const errorMessage = `${requestCheck.message} Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
+      updateState({ storyError: errorMessage });
       return;
     }
-
-    // Show warning if any
-    if (requestCheck.warning) {
-      console.warn('Request limit warning:', requestCheck.warning);
+    if (requestCheck.message) {
+      console.log('⚠️ Request warning:', requestCheck.message);
     }
+
+    // Local counter system doesn't need warning checks
     let currentStoryStyle = writingStyle;
     if (writingStyle === 'custom') {
       if (!customWritingStyle.trim()) {
@@ -1151,11 +1189,16 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       return;
     }
 
-    // Check request limit FIRST
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
+    // Check request limit with backend tracking
+    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.allowed) {
+      const timeLeft = getTimeUntilReset();
+      const errorMessage = `${requestCheck.message} Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
+      updateState({ lessonError: errorMessage });
       return;
+    }
+    if (requestCheck.message) {
+      console.log('⚠️ Request warning:', requestCheck.message);
     }
     let currentLessonStyle = lessonWritingStyle;
     if (lessonWritingStyle === 'custom') {
