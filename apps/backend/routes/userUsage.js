@@ -137,14 +137,20 @@ router.get('/usage-history', async (req, res) => {
 // @access  Protected (requires auth)
 router.post('/record-usage', async (req, res) => {
     try {
+        console.log('record-usage called with body:', req.body);
+        console.log('req.user:', req.user);
+        
         // Support both token shapes: { _id } and { id }
         const userId = req.user?._id || req.user?.id;
         if (!userId) {
+            console.error('No userId found in token');
             return res.status(401).json({
                 success: false,
                 message: 'Unauthorized: missing user id in token'
             });
         }
+        
+        console.log('Using userId:', userId);
         const { moduleId, moduleName } = req.body;
         
         if (!moduleId || !moduleName) {
@@ -181,12 +187,16 @@ router.post('/record-usage', async (req, res) => {
         const effectiveDailyLimit = config.getEffectiveDailyLimit(req.user);
         const moduleWeight = config.getModuleWeight(moduleId);
         
+        console.log('About to call getOrCreateDaily with:', { userId, userInfo, effectiveDailyLimit });
+        
         // Get or create daily usage record
         const dailyUsage = await DailyUsageLimit.getOrCreateDaily(
             userId, 
             userInfo, 
             effectiveDailyLimit
         );
+        
+        console.log('DailyUsage created/found:', dailyUsage);
         
         // Record the usage
         const requestMetadata = {
@@ -211,10 +221,12 @@ router.post('/record-usage', async (req, res) => {
         
     } catch (error) {
         console.error('Error recording usage:', error);
+        console.error('Error stack:', error.stack);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi ghi nhận usage',
-            error: error.message
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });

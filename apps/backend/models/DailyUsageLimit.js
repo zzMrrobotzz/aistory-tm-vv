@@ -270,13 +270,18 @@ DailyUsageLimitSchema.methods.addWarning = function(percentage, message) {
 
 // Static method to get or create daily usage for user
 DailyUsageLimitSchema.statics.getOrCreateDaily = async function(userId, userInfo, dailyLimit) {
+  console.log('getOrCreateDaily called with:', { userId, userInfo, dailyLimit });
+  
   // Use Vietnam timezone instead of UTC
   const { getVietnamDate } = require('../utils/timezone');
   const today = getVietnamDate();
   
+  console.log('Today (Vietnam):', today);
+  
   let usage = await this.findOne({ userId, date: today });
   
   if (!usage) {
+    console.log('Creating new daily usage record');
     usage = new this({
       userId,
       username: userInfo.username,
@@ -289,6 +294,9 @@ DailyUsageLimitSchema.statics.getOrCreateDaily = async function(userId, userInfo
       warningsIssued: []
     });
     await usage.save();
+    console.log('New daily usage record saved');
+  } else {
+    console.log('Found existing daily usage record');
   }
   
   // Update daily limit if it changed (due to subscription changes, etc.)
