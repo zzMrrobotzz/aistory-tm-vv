@@ -30,6 +30,7 @@ const TranslateModule: React.FC<TranslateModuleProps> = ({
         setModuleState(prev => ({ ...prev, ...updates }));
     };
 
+
     const handlePaste = async () => {
         try {
             const text = await navigator.clipboard.readText();

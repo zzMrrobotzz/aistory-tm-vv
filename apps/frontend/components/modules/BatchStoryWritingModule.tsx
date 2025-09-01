@@ -47,6 +47,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
+
   const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
   const deepseekApiKeyForService = apiSettings.provider === 'deepseek' ? apiSettings.apiKey : undefined;
 
@@ -244,6 +245,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
       updateState({ batchError: 'Vui lòng thêm ít nhất một dàn ý hợp lệ.' });
       return;
     }
+
 
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
     const abortCtrl = new AbortController();

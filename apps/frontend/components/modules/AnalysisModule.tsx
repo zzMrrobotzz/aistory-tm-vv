@@ -27,11 +27,13 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
+
   const handleAnalyze = async () => {
     if (!sourceText.trim()) {
       updateState({ errorAnalysis: 'Vui lòng nhập nội dung truyện để phân tích.' });
       return;
     }
+
     updateState({ 
       errorAnalysis: null, 
       analysisFactors: [], 
@@ -112,6 +114,7 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
       updateState({ errorImprovement: 'Vui lòng nhập nội dung truyện để Gemini đưa ra đề xuất.' });
       return;
     }
+
     updateState({ 
       errorImprovement: null, 
       improvedStory: '', 
@@ -163,6 +166,7 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
       updateState({ errorImprovement: 'Không có dữ liệu truyện hoặc gợi ý để cải thiện.' });
       return;
     }
+
     updateState({ 
       errorImprovement: null, 
       viralOutlineAnalysisResult: '',
@@ -219,6 +223,7 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
       updateState({ errorViralOutline: 'Vui lòng nhập nội dung kịch bản/dàn ý để phân tích.' });
       return;
     }
+
     updateState({ 
       errorViralOutline: null, 
       viralOutlineAnalysisResult: '', 

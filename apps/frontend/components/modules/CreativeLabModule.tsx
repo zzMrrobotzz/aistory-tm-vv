@@ -17,7 +17,6 @@ import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService'; // Use the generic text generation service
 import { delay } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
-import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
 
 
 interface CreativeLabModuleProps {
@@ -64,12 +63,6 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
-      return;
-    }
     updateState({ 
       isAnalyzingReferenceOutline: true, 
       errorAnalyzingReferenceOutline: null, 
@@ -116,12 +109,6 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
-      return;
-    }
     updateState({ quickOutlineError: null, quickOutlineResult: '', quickOutlineLoading: true, quickOutlineProgressMessage: 'Đang tạo dàn ý nhanh...' });
 
     let currentPlotStructureInfo = plotStructure; // This is the 'value' from PLOT_STRUCTURE_OPTIONS
@@ -180,12 +167,6 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
-      return;
-    }
     updateState({ singleOutlineError: null, finalOutline: '', singleOutlineLoading: true, singleOutlineProgressMessage: 'Đang tạo dàn ý chuyên sâu...' });
 
     let currentPlotStructureInfo = plotStructure; // This is the 'value'
@@ -364,12 +345,6 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       return;
     }
 
-    // Check request limit FIRST - before starting any processing
-    const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.CREATIVE_LAB);
-    if (!requestCheck.success) {
-      showRequestLimitError(requestCheck);
-      return;
-    }
 
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, batchConcurrencyLimit));
 

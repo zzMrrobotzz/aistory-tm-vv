@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ApiSettings, ImageEditorModuleState, ImageEditorResultHistoryItem } from '../../types';
 import { editImageWithText, editImageWithMultipleImagesAndText } from '../../services/geminiService';
-import { checkAndTrackRequest, REQUEST_ACTIONS, showRequestLimitError } from '../../services/requestTrackingService';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { Upload, Download, ArrowLeft, ArrowRight, Eye, RefreshCw, Plus, ImageUp, X, RotateCcw, Trash, History as HistoryIcon, Trash2 } from 'lucide-react';
@@ -118,12 +117,6 @@ const ImageEditorModule: React.FC<ImageEditorModuleProps> = ({ apiSettings, modu
             return;
         }
 
-        // Check request limit FIRST - before starting any processing
-        const requestCheck = await checkAndTrackRequest(REQUEST_ACTIONS.IMAGE_EDIT);
-        if (!requestCheck.success) {
-            showRequestLimitError(requestCheck);
-            return;
-        }
 
         updateState({ isLoading: true, error: null });
 
