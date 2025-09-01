@@ -283,13 +283,8 @@ Chỉ trả về JSON.`;
         
         const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
     
-        // Check usage limit ONCE for entire story (not per API call)
-        {
-            const requestCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY, 1);
-            if (requestCheck && (requestCheck as any).allowed === false) {
-                throw new Error((requestCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
-            }
-        }
+        // ✅ Usage already tracked at batch level when user clicked "Generate"
+        // No additional tracking needed during individual story processing
         // Generate Outline
         updateTask(task.id, { progressMessage: 'Bước 1/3: Đang tạo dàn ý...' });
         const outlinePrompt = `Tạo một dàn ý chi tiết cho một câu chuyện có tiêu đề "${title}". Dàn ý phải logic, có mở đầu, phát triển, cao trào và kết thúc. Dàn ý phải được viết bằng ${outputLanguageLabel}.`;
@@ -468,19 +463,26 @@ ${context || "Đây là phần đầu tiên."}
         }
     };
     
-    const handleQueueAll = () => {
-        let hasQueueableTasks = false;
+    const handleQueueAll = async () => {
+        const queueableTasks = tasks.filter(t => t.status === 'pending' || t.status === 'canceled' || t.status === 'error');
+        if (queueableTasks.length === 0) return;
+        
+        // ✅ Track usage ONCE when user starts queue processing (based on number of stories)
+        const storyCount = queueableTasks.length;
+        const usageCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY, storyCount);
+        if (usageCheck && (usageCheck as any).allowed === false) {
+            alert((usageCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
+            return;
+        }
+        
         const newTasks = tasks.map(t => {
             if (t.status === 'pending' || t.status === 'canceled' || t.status === 'error') {
-                hasQueueableTasks = true;
                 return { ...t, status: 'queued' as const, progressMessage: 'Đã xếp hàng', error: null };
             }
             return t;
         });
         
-        if (hasQueueableTasks) {
-            updateState({ tasks: newTasks, isProcessingQueue: true });
-        }
+        updateState({ tasks: newTasks, isProcessingQueue: true });
     };
     
     const handleStopQueue = () => {
@@ -650,6 +652,14 @@ ${context || "Đây là phần đầu tiên."}
     const handleGenerateSequelStoriesBatch = async () => {
         if (sequelSelectedTitles.length === 0) {
             updateState({ sequelError: "Vui lòng chọn ít nhất một tiêu đề để viết." });
+            return;
+        }
+        
+        // ✅ Track usage ONCE when user starts the batch (based on number of stories)
+        const storyCount = sequelSelectedTitles.length;
+        const usageCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY, storyCount);
+        if (usageCheck && (usageCheck as any).allowed === false) {
+            updateState({ sequelError: (usageCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.' });
             return;
         }
         
