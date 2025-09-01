@@ -9,7 +9,14 @@ const DailyUsageLimit = require('../models/DailyUsageLimit');
 // @access  Protected (requires auth)
 router.get('/usage-status', async (req, res) => {
     try {
-        const userId = req.user._id;
+        // Support both token shapes: { _id } and { id }
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized: missing user id in token'
+            });
+        }
         
         const usageStatus = await getUserUsageStatus(userId);
         const config = await RateLimitConfig.getDefault();
@@ -64,7 +71,14 @@ router.get('/usage-status', async (req, res) => {
 // @access  Protected (requires auth)
 router.get('/usage-history', async (req, res) => {
     try {
-        const userId = req.user._id;
+        // Support both token shapes: { _id } and { id }
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized: missing user id in token'
+            });
+        }
         const { days = 7 } = req.query;
         
         const DailyUsageLimit = require('../models/DailyUsageLimit');
@@ -123,7 +137,14 @@ router.get('/usage-history', async (req, res) => {
 // @access  Protected (requires auth)
 router.post('/record-usage', async (req, res) => {
     try {
-        const userId = req.user._id;
+        // Support both token shapes: { _id } and { id }
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized: missing user id in token'
+            });
+        }
         const { moduleId, moduleName } = req.body;
         
         if (!moduleId || !moduleName) {
