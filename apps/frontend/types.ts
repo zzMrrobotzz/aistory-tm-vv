@@ -27,6 +27,7 @@ export enum ActiveModule {
   Tutorials = "tutorials", // Added for tutorial videos
   Pricing = "pricing",
   UsageStats = "usage-stats", // Added for usage statistics
+  QuickStory = "quick-story", // Added for Quick Story Generator
 }
 
 // Interface for ElevenLabs API key management
@@ -908,4 +909,67 @@ export interface ImageEditorModuleState {
     editHistory: string[];
     historyIndex: number;
     resultHistory: ImageEditorResultHistoryItem[];
+}
+
+// --- Quick Story Module Types ---
+export type QuickStoryActiveTab = 'quickBatch' | 'sequelGenerator';
+
+export interface QuickStoryTask {
+    id: string;
+    title: string;
+    settings: {
+        targetLength: string;
+        writingStyle: string;
+        customWritingStyle: string;
+        outputLanguage: string;
+        referenceViralStoryForStyle: string;
+    };
+    status: 'pending' | 'queued' | 'processing' | 'completed' | 'error' | 'canceled';
+    progressMessage: string;
+    generatedStory: string | null;
+    error: string | null;
+}
+
+export interface SequelStoryResult {
+    id: string;
+    title: string;
+    story: string | null;
+    status: 'queued' | 'processing' | 'completed' | 'error' | 'canceled';
+    error: string | null;
+}
+
+export interface AdnSet {
+    name: string;
+    content: string;
+}
+
+export interface QuickStoryModuleState {
+    activeTab: QuickStoryActiveTab;
+    
+    // Common settings
+    targetLength: string;
+    writingStyle: string;
+    customWritingStyle: string;
+    outputLanguage: string;
+    
+    // Quick Batch Tab
+    title: string;
+    referenceViralStoryForStyle: string;
+    tasks: QuickStoryTask[];
+    isProcessingQueue: boolean;
+    
+    // Sequel Generator Tab
+    sequelInputStories: string;
+    sequelNumTitlesToSuggest: number;
+    sequelSuggestedTitles: string[];
+    sequelSelectedTitles: string[];
+    sequelGeneratedStories: SequelStoryResult[];
+    sequelIsGeneratingTitles: boolean;
+    sequelIsGeneratingStories: boolean;
+    sequelProgressMessage: string;
+    sequelError: string | null;
+    
+    // ADN Management
+    adnSetName: string;
+    savedAdnSets: AdnSet[];
 }

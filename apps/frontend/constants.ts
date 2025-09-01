@@ -17,6 +17,7 @@ export const NAVIGATION_GROUPS = [
     subItems: [
       { id: ActiveModule.CreativeLab, label: "Xây Dàn Ý Truyện", icon: "📝" },
       { id: ActiveModule.WriteStory, label: "Viết Truyện & Hook", icon: "✍️" },
+      { id: ActiveModule.QuickStory, label: "Tạo Truyện Nhanh", icon: "⚡️" },
       { id: ActiveModule.BatchStoryWriting, label: "Viết Truyện Hàng Loạt", icon: "📚" },
       { id: ActiveModule.EditStory, label: "Biên Tập Truyện", icon: "✂️" },
       { id: ActiveModule.Rewrite, label: "Viết Lại", icon: "🔄" },

@@ -22,6 +22,7 @@ import {
   UserProfile, // Add UserProfile
   AiAssistantModuleState, // Added for Content Summarizer
   ImageEditorModuleState, // Added for Image Editor
+  QuickStoryModuleState, // Added for Quick Story Generator
 } from './types';
 import { 
     DEFAULT_API_PROVIDER, HOOK_LANGUAGE_OPTIONS, 
@@ -59,6 +60,7 @@ import SupportModule from './components/modules/SupportModule'; // Added
 import TutorialComponent from './components/TutorialComponent'; // Added for tutorials
 import SupportChatbot from './components/SupportChatbot'; // Added for chatbot
 import UsageStatsModule from './components/modules/UsageStatsModule'; // Added for usage statistics
+import QuickStoryModule from './components/modules/QuickStoryModule'; // Added for Quick Story Generator
 import { getUserProfile, refreshUserProfile, logout } from './services/authService'; // Import getUserProfile and logout
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { ApiKeyStorage } from './utils/apiKeyStorage'; // Import ApiKeyStorage
@@ -704,6 +706,42 @@ const MainApp: React.FC = () => {
   };
   const [contentSummarizerState, setContentSummarizerState] = useState<AiAssistantModuleState>(initialContentSummarizerState);
 
+  // Quick Story Module State
+  const initialQuickStoryState: QuickStoryModuleState = {
+    activeTab: 'quickBatch',
+    targetLength: STORY_LENGTH_OPTIONS[1].value,
+    writingStyle: WRITING_STYLE_OPTIONS[0].value,
+    customWritingStyle: '',
+    outputLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
+    title: '',
+    referenceViralStoryForStyle: '',
+    tasks: [],
+    isProcessingQueue: false,
+    sequelInputStories: '',
+    sequelNumTitlesToSuggest: 5,
+    sequelSuggestedTitles: [],
+    sequelSelectedTitles: [],
+    sequelGeneratedStories: [],
+    sequelIsGeneratingTitles: false,
+    sequelIsGeneratingStories: false,
+    sequelProgressMessage: '',
+    sequelError: null,
+    adnSetName: '',
+    savedAdnSets: [],
+  };
+  const [quickStoryState, setQuickStoryState] = useState<QuickStoryModuleState>(() => {
+    const savedState = localStorage.getItem('quickStoryModuleState_v1');
+    if (savedState) {
+      try {
+        return { ...initialQuickStoryState, ...JSON.parse(savedState) };
+      } catch (error) {
+        console.warn('Failed to parse saved quick story state:', error);
+        return initialQuickStoryState;
+      }
+    }
+    return initialQuickStoryState;
+  });
+
   // Load announcements from backend
   useEffect(() => {
     const loadAnnouncements = async () => {
@@ -952,6 +990,25 @@ const MainApp: React.FC = () => {
     delete stateToSave.mainText;
     localStorage.setItem('ttsModuleState_v4', JSON.stringify(stateToSave));
   }, [ttsState]);
+
+  // Save Quick Story state to localStorage
+  useEffect(() => {
+    const stateToSave = { ...quickStoryState };
+    // Remove runtime states that shouldn't be persisted
+    delete stateToSave.isProcessingQueue;
+    delete stateToSave.sequelIsGeneratingTitles;
+    delete stateToSave.sequelIsGeneratingStories;
+    delete stateToSave.sequelProgressMessage;
+    delete stateToSave.sequelError;
+    // Reset task statuses to prevent stale processing states
+    stateToSave.tasks = stateToSave.tasks.map(task => ({
+      ...task,
+      status: task.status === 'processing' || task.status === 'queued' ? 'pending' : task.status,
+      progressMessage: task.status === 'processing' || task.status === 'queued' ? 'Sẵn sàng' : task.progressMessage
+    }));
+    
+    localStorage.setItem('quickStoryModuleState_v1', JSON.stringify(stateToSave));
+  }, [quickStoryState]);
 
   // Load API keys from localStorage on app initialization
   useEffect(() => {
@@ -1209,6 +1266,13 @@ const MainApp: React.FC = () => {
         return <UsageStatsModule currentUser={currentUser} />;
       case ActiveModule.Pricing:
         return <Pricing />;
+      case ActiveModule.QuickStory:
+        return <QuickStoryModule 
+                  apiSettings={apiSettings}
+                  moduleState={quickStoryState}
+                  setModuleState={setQuickStoryState}
+                  addHistoryItem={addHistoryItem}
+                />;
       default:
         return <Dashboard currentUser={currentUser} setActiveModule={setActiveModule} />;
     }
@@ -1218,6 +1282,12 @@ const MainApp: React.FC = () => {
     logout();
     navigate('/login');
   }, [navigate]);
+
+  // Dummy function for history functionality - can be implemented later
+  const addHistoryItem = useCallback((itemData: any) => {
+    console.log('History item added:', itemData);
+    // TODO: Implement proper history functionality
+  }, []);
 
   return (
     <div className="bg-gray-100">
