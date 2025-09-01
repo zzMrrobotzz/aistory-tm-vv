@@ -321,6 +321,24 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
 
   // Process individual story queue item
   const processStoryQueueItem = async (item: WriteStoryQueueItem) => {
+    // Check request limit for queue item
+    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.allowed) {
+      // Mark item as failed due to limit
+      setModuleState(prev => ({
+        ...prev,
+        storyQueue: prev.storyQueue.map(qItem =>
+          qItem.id === item.id
+            ? { ...qItem, status: 'failed', error: requestCheck.message }
+            : qItem
+        ),
+      }));
+      throw new Error(`Request limit reached: ${requestCheck.message}`);
+    }
+    if (requestCheck.message) {
+      console.log('⚠️ Queue story request warning:', requestCheck.message);
+    }
+
     const CHUNK_WORD_COUNT = 1000; // Base chunks on target word count, not character count
     const currentTargetLengthNum = parseInt(targetLength);
     const numChunks = Math.max(1, Math.ceil(currentTargetLengthNum / CHUNK_WORD_COUNT)); // Ensure at least 1 chunk
@@ -667,6 +685,24 @@ Provide ONLY the story content for this section:`;
 
   // Process individual hook queue item
   const processHookQueueItem = async (item: HookQueueItem) => {
+    // Check request limit for queue item
+    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
+    if (!requestCheck.allowed) {
+      // Mark item as failed due to limit
+      setModuleState(prev => ({
+        ...prev,
+        hookQueue: prev.hookQueue.map(qItem =>
+          qItem.id === item.id
+            ? { ...qItem, status: 'failed', error: requestCheck.message }
+            : qItem
+        ),
+      }));
+      throw new Error(`Request limit reached: ${requestCheck.message}`);
+    }
+    if (requestCheck.message) {
+      console.log('⚠️ Queue hook request warning:', requestCheck.message);
+    }
+
     const { hookSettings } = item;
     let fullGeneratedHooks = '';
 
