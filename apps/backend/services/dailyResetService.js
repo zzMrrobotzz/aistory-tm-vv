@@ -179,15 +179,10 @@ class DailyResetService {
       
       // Count today's usage records
       const usageCount = await DailyUsageLimit.countDocuments({ date: today });
-      const trackingCount = await RequestTracking.countDocuments({ date: today });
       
       // Get sample of today's records
       const sampleUsage = await DailyUsageLimit.find({ date: today })
-        .select('userId totalUsage dailyLimit lastActivity')
-        .limit(5);
-        
-      const sampleTracking = await RequestTracking.find({ date: today })
-        .select('userId requestCount dailyLimit lastRequestAt')
+        .select('userId requestCount dailyLimit lastActivity')
         .limit(5);
 
       return {
@@ -195,11 +190,11 @@ class DailyResetService {
         vietnamTime: this.getVietnamTime(),
         counts: {
           usageRecords: usageCount,
-          trackingRecords: trackingCount
+          trackingRecords: 0 // Removed - using simplified system
         },
         samples: {
           usage: sampleUsage,
-          tracking: sampleTracking
+          tracking: [] // Removed - using simplified system
         }
       };
     } catch (error) {
