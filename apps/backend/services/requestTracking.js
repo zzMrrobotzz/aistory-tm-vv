@@ -76,19 +76,22 @@ RequestTrackingSchema.statics.getTodayRecord = async function(userId) {
   // Use Vietnam timezone instead of UTC
   const { getVietnamDate } = require('../utils/timezone');
   const today = getVietnamDate();
-  
-  let record = await this.findOne({ userId, date: today });
-  
-  if (!record) {
-    record = new this({
+
+  // Atomic upsert to avoid duplicate key race conditions
+  const filter = { userId, date: today };
+  const update = {
+    $setOnInsert: {
       userId,
       date: today,
       requestCount: 0,
-      dailyLimit: 200
-    });
-    await record.save();
-  }
-  
+      dailyLimit: 200,
+      lastRequestAt: new Date(),
+      requests: []
+    }
+  };
+  const options = { new: true, upsert: true, setDefaultsOnInsert: true };
+
+  const record = await this.findOneAndUpdate(filter, update, options);
   return record;
 };
 

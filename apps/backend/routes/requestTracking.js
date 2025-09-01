@@ -7,7 +7,14 @@ const RequestTracking = require('../services/requestTracking');
 // @access  Protected (requires auth)
 router.post('/check-and-track', async (req, res) => {
     try {
-        const userId = req.user._id;
+        // Support both token shapes: { _id } and { id }
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized: missing user id in token'
+            });
+        }
         const { action } = req.body;
         
         if (!action) {
@@ -17,23 +24,28 @@ router.post('/check-and-track', async (req, res) => {
             });
         }
         
-        const result = await RequestTracking.checkAndIncrementRequest(userId, action);
+        try {
+            const result = await RequestTracking.checkAndIncrementRequest(userId, action);
         
-        if (result.blocked) {
-            return res.status(429).json({
-                success: false,
-                blocked: true,
+            if (result.blocked) {
+                return res.status(429).json({
+                    success: false,
+                    blocked: true,
+                    message: result.message,
+                    usage: result.usage
+                });
+            }
+        
+            res.json({
+                success: true,
                 message: result.message,
-                usage: result.usage
+                usage: result.usage,
+                warning: result.warning
             });
+        } catch (err) {
+            console.error('check-and-track internal error:', err);
+            return res.status(500).json({ success: false, message: 'Internal error processing request counter' });
         }
-        
-        res.json({
-            success: true,
-            message: result.message,
-            usage: result.usage,
-            warning: result.warning
-        });
         
     } catch (error) {
         console.error('Error in check-and-track:', error);
@@ -50,7 +62,13 @@ router.post('/check-and-track', async (req, res) => {
 // @access  Protected (requires auth)
 router.get('/status', async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized: missing user id in token'
+            });
+        }
         const record = await RequestTracking.getTodayRecord(userId);
         
         res.json({
@@ -79,7 +97,13 @@ router.get('/status', async (req, res) => {
 // @access  Protected (requires auth)
 router.get('/history', async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user?._id || req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized: missing user id in token'
+            });
+        }
         const { days = 7 } = req.query;
         
         const records = await RequestTracking.getUserHistory(userId, parseInt(days));
