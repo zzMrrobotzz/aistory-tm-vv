@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://aistory-tm-backend.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-tm-backend.onrender.com';
 
 export const REQUEST_ACTIONS = {
   WRITE_STORY: 'write-story',
@@ -52,7 +52,7 @@ export interface UsageStatusResponse {
 // Kiểm tra và ghi nhận request
 export const checkAndTrackRequest = async (action: string): Promise<RequestTrackingResponse> => {
   try {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('userToken');
     if (!token) {
       return {
         success: false,
@@ -68,7 +68,7 @@ export const checkAndTrackRequest = async (action: string): Promise<RequestTrack
       {
         headers: {
           'Content-Type': 'application/json',
-          'x-auth-token': token
+          'Authorization': `Bearer ${token}`
         },
         validateStatus: () => true // Không throw error cho HTTP status codes
       }
@@ -106,7 +106,7 @@ export const checkAndTrackRequest = async (action: string): Promise<RequestTrack
 // Lấy trạng thái usage hiện tại
 export const getUserUsageStatus = async (): Promise<UsageStatusResponse> => {
   try {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('userToken');
     if (!token) {
       throw new Error('Không tìm thấy token xác thực');
     }
@@ -115,7 +115,7 @@ export const getUserUsageStatus = async (): Promise<UsageStatusResponse> => {
       `${API_URL}/api/user/usage-status`,
       {
         headers: {
-          'x-auth-token': token
+          'Authorization': `Bearer ${token}`
         }
       }
     );
@@ -130,7 +130,7 @@ export const getUserUsageStatus = async (): Promise<UsageStatusResponse> => {
 // Ghi nhận usage (đơn giản hóa)
 export const recordUsage = async (moduleId: string, action?: string): Promise<any> => {
   try {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('userToken');
     if (!token) {
       throw new Error('Không tìm thấy token xác thực');
     }
@@ -141,7 +141,7 @@ export const recordUsage = async (moduleId: string, action?: string): Promise<an
       {
         headers: {
           'Content-Type': 'application/json',
-          'x-auth-token': token
+          'Authorization': `Bearer ${token}`
         }
       }
     );

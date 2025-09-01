@@ -8,7 +8,8 @@ const { getVietnamDate } = require('../utils/timezone');
 // Middleware để extract userId từ token
 const extractUserId = (req, res, next) => {
   try {
-    const userId = req.user?._id || req.user?.id;
+    // Token structure: { user: { id: userId } }
+    const userId = req.user?.user?.id || req.user?.id;
     if (!userId) {
       return res.status(401).json({
         success: false,

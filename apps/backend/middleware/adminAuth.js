@@ -49,8 +49,8 @@ const authenticateUser = (req, res, next) => {
 
     const token = authHeader.substring(7);
     
-    // Verify user token (sử dụng cùng secret với key validation)
-    const decoded = jwt.verify(token, process.env.USER_JWT_SECRET || 'your_user_secret');
+    // Verify user token (sử dụng cùng secret với auth route)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_user_secret');
     
     req.user = decoded;
     next();
