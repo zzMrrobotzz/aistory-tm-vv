@@ -2,11 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ApiSettings, QuickStoryModuleState, QuickStoryTask, QuickStoryActiveTab, ActiveModule, SequelStoryResult, UserProfile, QuickStoryWordStats, QuickStoryQualityStats } from '../../types';
 import { STORY_LENGTH_OPTIONS, WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
-import { checkAndTrackRequest, REQUEST_ACTIONS, RequestCheckResult } from '../../services/requestTrackingService';
+import { checkAndTrackRequest, REQUEST_ACTIONS, getUserUsageStatus, recordUsage } from '../../services/requestTrackingService';
 import { delay, isSubscribed } from '../../utils';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
 import { getTimeUntilReset } from '../../services/localRequestCounter';
-import { getUserUsageStatus } from '../../services/rateLimitService';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -101,24 +100,20 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     // Usage tracking state from backend
     const [usageStats, setUsageStats] = useState({ current: 0, limit: 200, remaining: 200, percentage: 0, isBlocked: false } as any);
     
-    // Fetch usage from backend and poll every minute
+    // Thay thế useEffect cũ bằng logic mới
     useEffect(() => {
         const fetchUsage = async () => {
             try {
-                const data = await getUserUsageStatus();
-                setUsageStats({
-                    current: data.totalUsage,
-                    limit: data.usageLimit,
-                    remaining: data.remainingRequests,
-                    percentage: data.percentage,
-                    isBlocked: !data.canProceed
-                });
-            } catch (e) {
-                // keep previous usage on error
+                const status = await getUserUsageStatus();
+                if (status.success) {
+                    setUsageStats(status.data.usage);
+                }
+            } catch (error) {
+                console.error('Failed to fetch usage status:', error);
             }
         };
-        fetchUsage();
-        const interval = setInterval(fetchUsage, 60000);
+        fetchUsage(); // Initial fetch
+        const interval = setInterval(fetchUsage, 60000); // Poll every minute
         return () => clearInterval(interval);
     }, []);
 
@@ -129,7 +124,7 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     // Helper: check & track usage with backend and sync local counter box
     const checkAndTrackQuickRequest = async (action: string) => {
         try {
-            const result: RequestCheckResult = await checkAndTrackRequest(action);
+            const result = await checkAndTrackRequest(action);
             // Sync UI usage box with backend numbers
             if (result?.usage) {
                 setUsageStats({
@@ -148,9 +143,7 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
                     stats: result.usage
                 } as const;
             }
-            if (result.warning) {
-                window.dispatchEvent(new CustomEvent('usage-warning', { detail: { warning: result.warning } }));
-            }
+            // Removed warning handling as it's not in the new interface
             return { allowed: true, stats: result.usage, message: result.message } as const;
         } catch (error) {
             console.warn('Backend request check failed, proceeding with local counter');

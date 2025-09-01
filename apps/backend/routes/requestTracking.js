@@ -1,177 +1,210 @@
 const express = require('express');
 const router = express.Router();
-const RequestTracking = require('../services/requestTracking');
+const { authenticateUser } = require('../middleware/adminAuth');
+const DailyUsageLimit = require('../models/DailyUsageLimit');
+const User = require('../models/User');
+const { getVietnamDate } = require('../utils/timezone');
 
-// @route   POST /api/requests/check-and-track
-// @desc    Check if user can make request and track it if yes
-// @access  Protected (requires auth)
-router.post('/check-and-track', async (req, res) => {
-    try {
-        // Support both token shapes: { _id } and { id }
-        const userId = req.user?._id || req.user?.id;
-        if (!userId) {
-            return res.status(401).json({
-                success: false,
-                message: 'Unauthorized: missing user id in token'
-            });
-        }
-        const { action } = req.body;
-        
-        if (!action) {
-            return res.status(400).json({
-                success: false,
-                message: 'Action is required'
-            });
-        }
-        
-        try {
-            const result = await RequestTracking.checkAndIncrementRequest(userId, action);
-        
-            if (result.blocked) {
-                return res.status(429).json({
-                    success: false,
-                    blocked: true,
-                    message: result.message,
-                    usage: result.usage
-                });
-            }
-        
-            res.json({
-                success: true,
-                message: result.message,
-                usage: result.usage,
-                warning: result.warning
-            });
-        } catch (err) {
-            console.error('check-and-track internal error:', err);
-            return res.status(500).json({ success: false, message: 'Internal error processing request counter' });
-        }
-        
-    } catch (error) {
-        console.error('Error in check-and-track:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: error.message
-        });
+// Middleware để extract userId từ token
+const extractUserId = (req, res, next) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: missing user id in token'
+      });
     }
+    req.userId = userId;
+    next();
+  } catch (error) {
+    console.error('Error extracting userId:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Unauthorized: invalid token'
+    });
+  }
+};
+
+// POST /api/requests/check-and-track - Kiểm tra và ghi nhận request
+router.post('/check-and-track', authenticateUser, extractUserId, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { action } = req.body;
+    const today = getVietnamDate();
+    
+    console.log(`Checking and tracking request for user ${userId}, action: ${action}`);
+    
+    // Tìm hoặc tạo record cho hôm nay
+    let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });
+    
+    if (!usageRecord) {
+      // Lấy thông tin user để tạo record mới
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+      
+      // Tạo record mới với limit mặc định
+      usageRecord = new DailyUsageLimit({
+        userId,
+        username: user.username,
+        email: user.email,
+        date: today,
+        dailyLimit: 200,
+        subscriptionType: user.subscriptionType || 'free',
+        requestCount: 0,
+        moduleUsage: [],
+        requestHistory: [],
+        warningsIssued: []
+      });
+      
+      await usageRecord.save();
+      console.log(`Created new usage record for user ${userId}`);
+    }
+    
+    // Kiểm tra xem có bị block không
+    if (usageRecord.requestCount >= usageRecord.dailyLimit) {
+      return res.status(429).json({
+        success: false,
+        blocked: true,
+        message: 'Bạn đã đạt giới hạn request hôm nay. Vui lòng thử lại vào ngày mai.',
+        usage: {
+          current: usageRecord.requestCount,
+          limit: usageRecord.dailyLimit,
+          remaining: 0,
+          percentage: 100,
+          isBlocked: true
+        }
+      });
+    }
+    
+    // Tăng request count
+    usageRecord.requestCount += 1;
+    
+    // Cập nhật module usage dựa trên action
+    const moduleId = action || 'unknown';
+    const moduleIndex = usageRecord.moduleUsage.findIndex(m => m.moduleId === moduleId);
+    if (moduleIndex >= 0) {
+      usageRecord.moduleUsage[moduleIndex].count += 1;
+    } else {
+      usageRecord.moduleUsage.push({
+        moduleId,
+        count: 1,
+        lastUsed: new Date()
+      });
+    }
+    
+    // Thêm vào request history
+    usageRecord.requestHistory.push({
+      timestamp: new Date(),
+      moduleId,
+      action: action || 'generate'
+    });
+    
+    // Giữ chỉ 100 records gần nhất
+    if (usageRecord.requestHistory.length > 100) {
+      usageRecord.requestHistory = usageRecord.requestHistory.slice(-100);
+    }
+    
+    await usageRecord.save();
+    
+    console.log(`Request tracked for user ${userId}: ${usageRecord.requestCount}/${usageRecord.dailyLimit}`);
+    
+    res.json({
+      success: true,
+      blocked: false,
+      message: 'Request allowed',
+      usage: {
+        current: usageRecord.requestCount,
+        limit: usageRecord.dailyLimit,
+        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.requestCount),
+        percentage: Math.min(100, (usageRecord.requestCount / usageRecord.dailyLimit) * 100),
+        isBlocked: false
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in check-and-track:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra và ghi nhận request',
+      error: error.message
+    });
+  }
 });
 
-// @route   GET /api/requests/status
-// @desc    Get current user's request status
-// @access  Protected (requires auth)
-router.get('/status', async (req, res) => {
-    try {
-        const userId = req.user?._id || req.user?.id;
-        if (!userId) {
-            return res.status(401).json({
-                success: false,
-                message: 'Unauthorized: missing user id in token'
-            });
-        }
-        const record = await RequestTracking.getTodayRecord(userId);
-        
-        res.json({
-            success: true,
-            usage: {
-                current: record.requestCount,
-                limit: record.dailyLimit,
-                remaining: record.getRemainingRequests(),
-                percentage: record.getUsagePercentage(),
-                lastRequestAt: record.lastRequestAt
-            }
+// GET /api/requests/today-record - Lấy record hôm nay
+router.get('/today-record', authenticateUser, extractUserId, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const today = getVietnamDate();
+    
+    console.log(`Getting today record for user ${userId} on ${today}`);
+    
+    // Tìm hoặc tạo record cho hôm nay
+    let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });
+    
+    if (!usageRecord) {
+      // Lấy thông tin user để tạo record mới
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
         });
-        
-    } catch (error) {
-        console.error('Error getting request status:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error getting request status',
-            error: error.message
-        });
+      }
+      
+      // Tạo record mới với limit mặc định
+      usageRecord = new DailyUsageLimit({
+        userId,
+        username: user.username,
+        email: user.email,
+        date: today,
+        dailyLimit: 200,
+        subscriptionType: user.subscriptionType || 'free',
+        requestCount: 0,
+        moduleUsage: [],
+        requestHistory: [],
+        warningsIssued: []
+      });
+      
+      await usageRecord.save();
+      console.log(`Created new usage record for user ${userId}`);
     }
-});
-
-// @route   GET /api/requests/history
-// @desc    Get user's request history
-// @access  Protected (requires auth)
-router.get('/history', async (req, res) => {
-    try {
-        const userId = req.user?._id || req.user?.id;
-        if (!userId) {
-            return res.status(401).json({
-                success: false,
-                message: 'Unauthorized: missing user id in token'
-            });
-        }
-        const { days = 7 } = req.query;
-        
-        const records = await RequestTracking.getUserHistory(userId, parseInt(days));
-        
-        // Calculate stats
-        const totalRequests = records.reduce((sum, record) => sum + record.requestCount, 0);
-        const avgPerDay = records.length > 0 ? Math.round(totalRequests / records.length) : 0;
-        const daysWithActivity = records.filter(record => record.requestCount > 0).length;
-        
-        res.json({
-            success: true,
-            data: {
-                records: records.map(record => ({
-                    date: record.date,
-                    requestCount: record.requestCount,
-                    percentage: record.getUsagePercentage(),
-                    lastRequestAt: record.lastRequestAt
-                })),
-                stats: {
-                    totalRequests,
-                    avgPerDay,
-                    daysWithActivity,
-                    totalDays: records.length
-                }
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error getting request history:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error getting request history',
-            error: error.message
-        });
-    }
-});
-
-// @route   POST /api/requests/reset-daily
-// @desc    Reset daily limit (admin only - for testing)
-// @access  Protected (requires auth)
-router.post('/reset-daily', async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const today = new Date().toISOString().split('T')[0];
-        
-        await RequestTracking.findOneAndUpdate(
-            { userId, date: today },
-            { 
-                requestCount: 0, 
-                requests: [], 
-                lastRequestAt: new Date() 
-            },
-            { upsert: true }
-        );
-        
-        res.json({
-            success: true,
-            message: 'Daily request count reset to 0'
-        });
-        
-    } catch (error) {
-        console.error('Error resetting daily requests:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error resetting daily requests',
-            error: error.message
-        });
-    }
+    
+    // Tính toán thời gian reset
+    const now = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const timeUntilReset = tomorrow - now;
+    
+    res.json({
+      success: true,
+      data: {
+        userId: usageRecord.userId,
+        date: usageRecord.date,
+        requestCount: usageRecord.requestCount,
+        dailyLimit: usageRecord.dailyLimit,
+        remaining: Math.max(0, usageRecord.dailyLimit - usageRecord.requestCount),
+        percentage: Math.min(100, (usageRecord.requestCount / usageRecord.dailyLimit) * 100),
+        isBlocked: usageRecord.requestCount >= usageRecord.dailyLimit,
+        moduleUsage: usageRecord.moduleUsage,
+        resetTime: timeUntilReset
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error getting today record:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy record hôm nay',
+      error: error.message
+    });
+  }
 });
 
 module.exports = router;

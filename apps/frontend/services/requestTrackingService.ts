@@ -1,204 +1,7 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrender.com/api';
+const API_URL = process.env.REACT_APP_API_URL || 'https://aistory-tm-backend.onrender.com';
 
-export interface RequestUsage {
-  current: number;
-  limit: number;
-  remaining: number;
-  percentage: number;
-  lastRequestAt?: string;
-}
-
-export interface RequestCheckResult {
-  success: boolean;
-  blocked?: boolean;
-  message: string;
-  usage: RequestUsage;
-  warning?: string;
-}
-
-/**
- * Check if user can make a request and track it immediately
- * Call this BEFORE starting any AI operation
- */
-export const checkAndTrackRequest = async (action: string): Promise<RequestCheckResult> => {
-  try {
-    const token = localStorage.getItem('userToken');
-    
-    if (!token) {
-      return {
-        success: false,
-        blocked: true,
-        message: 'Vui lòng đăng nhập để sử dụng tính năng này',
-        usage: {
-          current: 0,
-          limit: 200,
-          remaining: 200,
-          percentage: 0
-        }
-      };
-    }
-
-    const response = await axios.post(
-      `${API_URL}/requests/check-and-track`,
-      { action },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': token
-        },
-        // Avoid cached 500s and make errors visible
-        validateStatus: () => true
-      }
-    );
-
-    if (response.status >= 400) {
-      // Normalize error from backend
-      const data = response.data || {};
-      return {
-        success: false,
-        blocked: response.status === 429,
-        message: data.message || `HTTP ${response.status}`,
-        usage: data.usage || { current: 0, limit: 200, remaining: 200, percentage: 0 },
-        warning: data.warning
-      } as RequestCheckResult;
-    }
-
-    return {
-      success: true,
-      blocked: false,
-      message: response.data.message,
-      usage: response.data.usage,
-      warning: response.data.warning
-    };
-    
-  } catch (error: any) {
-    console.error('Error checking request limit:', error);
-    
-    if (error.response?.status === 429) {
-      // Rate limited
-      return {
-        success: false,
-        blocked: true,
-        message: error.response.data.message || 'Đã đạt giới hạn requests hôm nay',
-        usage: error.response.data.usage || {
-          current: 200,
-          limit: 200,
-          remaining: 0,
-          percentage: 100
-        }
-      };
-    }
-    
-    // On error, allow request but show warning
-    return {
-      success: true,
-      blocked: false,
-      message: 'Không thể kiểm tra giới hạn request. Hệ thống sẽ hoạt động bình thường.',
-      usage: {
-        current: 0,
-        limit: 200,
-        remaining: 200,
-        percentage: 0
-      },
-      warning: 'Lỗi kết nối. Không thể kiểm tra giới hạn requests.'
-    };
-  }
-};
-
-/**
- * Get current user's request status
- */
-export const getRequestStatus = async (): Promise<RequestUsage> => {
-  try {
-    const token = localStorage.getItem('userToken');
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await axios.get(`${API_URL}/requests/status`, {
-      headers: {
-        'x-auth-token': token,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    return response.data.usage;
-    
-  } catch (error) {
-    console.error('Error getting request status:', error);
-    throw error;
-  }
-};
-
-/**
- * Get user's request history
- */
-export const getRequestHistory = async (days: number = 7) => {
-  try {
-    const token = localStorage.getItem('userToken');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-
-    const response = await axios.get(`${API_URL}/requests/history?days=${days}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': token
-      }
-    });
-
-    return response.data;
-    
-  } catch (error) {
-    console.error('Error fetching request history:', error);
-    throw error;
-  }
-};
-
-/**
- * Reset daily request count (for testing)
- */
-export const resetDailyRequests = async () => {
-  try {
-    const token = localStorage.getItem('userToken');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-
-    const response = await axios.post(`${API_URL}/requests/reset-daily`, {}, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-auth-token': token
-      }
-    });
-
-    return response.data;
-    
-  } catch (error) {
-    console.error('Error resetting daily requests:', error);
-    throw error;
-  }
-};
-
-/**
- * Show user-friendly error message
- */
-export const showRequestLimitError = (result: RequestCheckResult) => {
-  if (result.blocked) {
-    alert(`❌ ${result.message}\n\nUsage: ${result.usage.current}/${result.usage.limit} requests`);
-  } else if (result.warning) {
-    alert(`⚠️ ${result.warning}`);
-  }
-};
-
-/**
- * Action names mapping for different features
- */
 export const REQUEST_ACTIONS = {
   WRITE_STORY: 'write-story',
   BATCH_STORY: 'batch-story-writing', 
@@ -215,4 +18,137 @@ export const REQUEST_ACTIONS = {
   SHORT_FORM_SCRIPT: 'short-form-script'
 } as const;
 
-export type RequestAction = typeof REQUEST_ACTIONS[keyof typeof REQUEST_ACTIONS];
+export interface RequestTrackingResponse {
+  success: boolean;
+  blocked?: boolean;
+  message: string;
+  usage?: {
+    current: number;
+    limit: number;
+    remaining: number;
+    percentage: number;
+    isBlocked: boolean;
+  };
+  status?: number;
+}
+
+export interface UsageStatusResponse {
+  success: boolean;
+  data: {
+    usage: {
+      current: number;
+      limit: number;
+      remaining: number;
+      percentage: number;
+      isBlocked: boolean;
+      resetTime: number;
+    };
+    config: {
+      resetTime: number;
+    };
+  };
+}
+
+// Kiểm tra và ghi nhận request
+export const checkAndTrackRequest = async (action: string): Promise<RequestTrackingResponse> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return {
+        success: false,
+        message: 'Không tìm thấy token xác thực'
+      };
+    }
+
+    console.log(`Checking and tracking request for action: ${action}`);
+
+    const response = await axios.post(
+      `${API_URL}/api/requests/check-and-track`,
+      { action },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token
+        },
+        validateStatus: () => true // Không throw error cho HTTP status codes
+      }
+    );
+
+    console.log('Request tracking response:', response.data);
+
+    if (response.status >= 400) {
+      return {
+        success: false,
+        blocked: response.status === 429,
+        message: response.data?.message || `Error: ${response.status}`,
+        usage: response.data?.usage || null,
+        status: response.status
+      };
+    }
+
+    return {
+      success: true,
+      blocked: false,
+      message: response.data.message,
+      usage: response.data.usage
+    };
+
+  } catch (error) {
+    console.error('Error in checkAndTrackRequest:', error);
+    return {
+      success: false,
+      message: 'Lỗi kết nối server',
+      status: 500
+    };
+  }
+};
+
+// Lấy trạng thái usage hiện tại
+export const getUserUsageStatus = async (): Promise<UsageStatusResponse> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      throw new Error('Không tìm thấy token xác thực');
+    }
+
+    const response = await axios.get(
+      `${API_URL}/api/user/usage-status`,
+      {
+        headers: {
+          'x-auth-token': token
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error getting usage status:', error);
+    throw error;
+  }
+};
+
+// Ghi nhận usage (đơn giản hóa)
+export const recordUsage = async (moduleId: string, action?: string): Promise<any> => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      throw new Error('Không tìm thấy token xác thực');
+    }
+
+    const response = await axios.post(
+      `${API_URL}/api/user/record-usage`,
+      { moduleId, action: action || 'generate' },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error recording usage:', error);
+    throw error;
+  }
+};
