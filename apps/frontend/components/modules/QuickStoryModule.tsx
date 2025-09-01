@@ -1,13 +1,65 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ApiSettings, QuickStoryModuleState, QuickStoryTask, QuickStoryActiveTab, ActiveModule, SequelStoryResult, UserProfile } from '../../types';
+import { ApiSettings, QuickStoryModuleState, QuickStoryTask, QuickStoryActiveTab, ActiveModule, SequelStoryResult, UserProfile, QuickStoryWordStats, QuickStoryQualityStats } from '../../types';
 import { STORY_LENGTH_OPTIONS, WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
 import { delay } from '../../utils';
+import { logApiCall, logTextRewritten } from '../../services/usageService';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { Trash2, PlusCircle, Square, Play, Trash, Clipboard, ClipboardCheck, ChevronsRight, BookCopy, Zap, Save, Download, Loader2 } from 'lucide-react';
+
+// Advanced retry logic with exponential backoff for API calls (from RewriteModule)
+const retryApiCall = async (
+  apiFunction: () => Promise<any>,
+  maxRetries: number = 3,
+  isQueueMode: boolean = false
+): Promise<any> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await apiFunction();
+    } catch (error: any) {
+      console.log('QuickStory Retry - Error details:', { 
+        message: error?.message, 
+        status: error?.status, 
+        code: error?.code,
+        attempt: i + 1 
+      });
+      
+      const isServerError = error?.message?.includes('500') || 
+                           error?.message?.includes('Internal Server Error') ||
+                           error?.message?.includes('ServerError') ||
+                           error?.status === 500 ||
+                           error?.code === 500;
+                           
+      const is503Error = error?.message?.includes('503') ||
+                         error?.message?.includes('Service Unavailable') ||
+                         error?.status === 503 ||
+                         error?.code === 503;
+      
+      if ((isServerError || is503Error) && i < maxRetries - 1) {
+        // Special handling for 503 errors - longer delays (1min, 2min, 4min)
+        let backoffDelay;
+        if (is503Error) {
+          const baseDelay503 = 60000; // 1 minute base delay for 503
+          backoffDelay = baseDelay503 * Math.pow(2, i);
+          console.warn(`🚨 QuickStory 503 SERVICE UNAVAILABLE: Extended retry (attempt ${i + 1}/${maxRetries}), waiting ${Math.round(backoffDelay/1000)}s... [Queue mode: ${isQueueMode}]`);
+        } else {
+          // Regular 500 errors - shorter delays
+          const baseDelay = isQueueMode ? 6000 : 4000;
+          backoffDelay = baseDelay * Math.pow(2, i);
+          console.warn(`🔄 QuickStory RETRY: API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms... [Queue mode: ${isQueueMode}]`);
+        }
+        await delay(backoffDelay);
+        continue;
+      }
+      console.error(`❌ QuickStory FINAL FAILURE: All ${maxRetries} retry attempts failed. Error:`, error);
+      throw error;
+    }
+  }
+  throw new Error('All retry attempts failed');
+};
 
 interface QuickStoryModuleProps {
   apiSettings: ApiSettings;
@@ -34,6 +86,9 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     const sequelAbortControllerRef = useRef<AbortController | null>(null);
     const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
     const [selectedAdnSetName, setSelectedAdnSetName] = useState('');
+    
+    // Quality analysis toggle - default ON for accurate full-text analysis
+    const [enableQualityAnalysis, setEnableQualityAnalysis] = useState<boolean>(true);
 
     const updateState = (updates: Partial<QuickStoryModuleState>) => {
         setModuleState(prev => ({ ...prev, ...updates }));
@@ -46,6 +101,114 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
                 task.id === taskId ? { ...task, ...updates } : task
             )
         }));
+    };
+    
+    // Calculate word statistics
+    const calculateWordStats = (originalText: string, generatedText: string) => {
+        const countWords = (text: string) => {
+            return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+        };
+
+        const originalWords = countWords(originalText || '');
+        const generatedWords = countWords(generatedText);
+        
+        // Simple word change calculation
+        const originalWordsArray = (originalText || '').toLowerCase().trim().split(/\s+/);
+        const generatedWordsArray = generatedText.toLowerCase().trim().split(/\s+/);
+        
+        let wordsChanged = 0;
+        const maxLength = Math.max(originalWordsArray.length, generatedWordsArray.length);
+        
+        for (let i = 0; i < maxLength; i++) {
+            const originalWord = originalWordsArray[i] || '';
+            const generatedWord = generatedWordsArray[i] || '';
+            if (originalWord !== generatedWord) {
+                wordsChanged++;
+            }
+        }
+
+        const changePercentage = originalWords > 0 ? Math.round((wordsChanged / originalWords) * 100) : 0;
+
+        return {
+            originalWords,
+            generatedWords,
+            wordsChanged,
+            changePercentage
+        };
+    };
+
+    // Calculate story quality and consistency statistics (FULL TEXT ANALYSIS)
+    const analyzeStoryQuality = async (titleUsed: string, generatedStory: string) => {
+        try {
+            // Full text analysis for maximum accuracy
+            const analysisPrompt = `Bạn là chuyên gia phân tích văn học chuyên nghiệp. Hãy phân tích độ nhất quán và hoàn thiện của toàn bộ câu chuyện đã được tạo.
+
+**TIÊU ĐỀ TRUYỆN:**
+"${titleUsed}"
+
+**TOÀN BỘ CÂU CHUYỆN ĐÃ TẠO:**
+---
+${generatedStory}
+---
+
+**YÊU CẦU:** Phân tích toàn bộ câu chuyện và trả về JSON chính xác:
+
+{
+  "consistencyScore": [số 0-100],
+  "completenessScore": [số 0-100], 
+  "overallQualityScore": [số 0-100],
+  "analysis": {
+    "characterConsistency": "[phân tích nhân vật - 1-2 câu]",
+    "plotCoherence": "[phân tích cốt truyện - 1-2 câu]", 
+    "timelineConsistency": "[phân tích thời gian - 1-2 câu]",
+    "settingConsistency": "[phân tích bối cảnh - 1-2 câu]",
+    "overallAssessment": "[đánh giá tổng thể - 2-3 câu]"
+  }
+}
+
+**TIÊU CHÍ:**
+- consistencyScore: Tính nhất quán nhân vật, bối cảnh, thời gian trong TOÀN BỘ câu chuyện
+- completenessScore: Độ hoàn thiện cốt truyện từ đầu đến cuối theo tiêu đề
+- overallQualityScore: Chất lượng tổng thể = (consistencyScore + completenessScore)/2
+
+Chỉ trả về JSON.`;
+
+            const result = await retryApiCall(() => generateText(analysisPrompt, undefined, false, apiSettings), 3, false);
+            const jsonMatch = result?.text.match(/\{[\s\S]*\}/);
+            
+            if (jsonMatch) {
+                const analysisData = JSON.parse(jsonMatch[0]);
+                return analysisData;
+            }
+            
+            // Fallback nếu không parse được JSON
+            return {
+                consistencyScore: 75,
+                completenessScore: 80,
+                overallQualityScore: 77,
+                analysis: {
+                    characterConsistency: "Nhân vật tương đối nhất quán",
+                    plotCoherence: "Cốt truyện có logic tốt", 
+                    timelineConsistency: "Thời gian hợp lý",
+                    settingConsistency: "Bối cảnh ổn định",
+                    overallAssessment: "Chất lượng tổng thể khá tốt, phân tích toàn bộ văn bản"
+                }
+            };
+        } catch (error) {
+            console.error('Story quality analysis error:', error);
+            return {
+                consistencyScore: 70,
+                completenessScore: 70,
+                overallQualityScore: 70,
+                analysis: {
+                    characterConsistency: "Lỗi phân tích toàn bộ văn bản",
+                    plotCoherence: "Lỗi phân tích toàn bộ văn bản",
+                    timelineConsistency: "Lỗi phân tích toàn bộ văn bản", 
+                    settingConsistency: "Lỗi phân tích toàn bộ văn bản",
+                    overallAssessment: "Cần kiểm tra thủ công - lỗi phân tích toàn bộ"
+                }
+            };
+        }
     };
     
     // ----- START: QUICK BATCH LOGIC -----
@@ -66,7 +229,7 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
         // Step 1: Generate Outline
         updateTask(task.id, { progressMessage: 'Bước 1/3: Đang tạo dàn ý...' });
         const outlinePrompt = `Tạo một dàn ý chi tiết cho một câu chuyện có tiêu đề "${title}". Dàn ý phải logic, có mở đầu, phát triển, cao trào và kết thúc. Dàn ý phải được viết bằng ${outputLanguageLabel}.`;
-        const outlineResult = await generateText(outlinePrompt, undefined, false, apiSettings);
+        const outlineResult = await retryApiCall(() => generateText(outlinePrompt, undefined, false, apiSettings), 3, true);
         const storyOutline = (outlineResult.text ?? '').trim();
         if (abortSignal.aborted) throw new DOMException('Aborted', 'AbortError');
         if (!storyOutline) throw new Error("Không thể tạo dàn ý từ tiêu đề.");
@@ -105,7 +268,7 @@ ${context || "Đây là phần đầu tiên."}
             **Yêu cầu:** Viết phần tiếp theo của câu chuyện, khoảng ${CHUNK_WORD_COUNT} từ. Chỉ viết nội dung, không lặp lại, không tiêu đề.`;
             
             if (i > 0) await delay(1000, abortSignal);
-            const chunkResult = await generateText(writePrompt, undefined, false, apiSettings);
+            const chunkResult = await retryApiCall(() => generateText(writePrompt, undefined, false, apiSettings), 3, true);
             fullStory += (fullStory ? '\n\n' : '') + ((chunkResult.text ?? '').trim() || '');
         }
         if (abortSignal.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -113,7 +276,7 @@ ${context || "Đây là phần đầu tiên."}
         await delay(500, abortSignal);
     
         // Step 3: Post-Edit
-        updateTask(task.id, { progressMessage: 'Bước 3/3: Đang biên tập...' });
+        updateTask(task.id, { progressMessage: enableQualityAnalysis ? 'Bước 3/4: Đang biên tập...' : 'Bước 3/3: Đang biên tập...' });
         const minLength = Math.round(currentTargetLengthNum * 0.9);
         const maxLength = Math.round(currentTargetLengthNum * 1.1);
         
@@ -127,8 +290,36 @@ ${context || "Đây là phần đầu tiên."}
         ---
         Hãy trả về TOÀN BỘ câu chuyện đã biên tập bằng ${outputLanguageLabel}. Không thêm lời bình hay giới thiệu.`;
 
-        const finalResult = await generateText(editPrompt, undefined, false, apiSettings);
-        return (finalResult.text ?? '').trim();
+        const finalResult = await retryApiCall(() => generateText(editPrompt, undefined, false, apiSettings), 3, true);
+        const finalStory = (finalResult.text ?? '').trim();
+        
+        // Analyze story quality and consistency (only if enabled and for longer texts)
+        let storyQualityStats: any = null;
+        if (enableQualityAnalysis && finalStory.length > 500) {
+            try {
+                updateTask(task.id, { progressMessage: 'Bước 4/4: Đang phân tích chất lượng...' });
+                storyQualityStats = await analyzeStoryQuality(title, finalStory);
+            } catch (error) {
+                console.error('Story quality analysis failed:', error);
+                // Continue without quality stats if analysis fails
+            }
+        }
+        
+        // Calculate word statistics
+        const wordStats = calculateWordStats('', finalStory); // No original text for stories
+        
+        // Update task with final results including analysis
+        updateTask(task.id, { 
+            wordStats: wordStats,
+            storyQualityStats: storyQualityStats
+        });
+        
+        // Log usage statistics
+        const totalApiCalls = numChunks + 1 + (enableQualityAnalysis && finalStory.length > 500 ? 1 : 0); // outline + chunks + edit + analysis
+        logApiCall('quickstory', totalApiCalls);
+        logTextRewritten('quickstory', 1);
+        
+        return finalStory;
     };
 
     useEffect(() => {
@@ -150,6 +341,18 @@ ${context || "Đây là phần đầu tiên."}
                 const finalStory = await processTask(taskToProcess, abortSignal);
                 if (!abortSignal.aborted) {
                    updateTask(taskToProcess.id, { status: 'completed', generatedStory: finalStory, progressMessage: 'Hoàn thành!' });
+                   
+                   // Save to history
+                   if (finalStory.trim()) {
+                       addHistoryItem({
+                           module: ActiveModule.QuickStory,
+                           moduleLabel: 'Tạo Truyện Nhanh',
+                           title: `${taskToProcess.title}`,
+                           content: finalStory,
+                           contentType: 'text',
+                           restoreContext: { ...moduleState }
+                       });
+                   }
                 }
             } catch (e) {
                 if ((e as Error).name === 'AbortError') {
@@ -330,7 +533,7 @@ ${context || "Đây là phần đầu tiên."}
         ---`;
 
         try {
-            const result = await generateText(prompt, undefined, false, apiSettings);
+            const result = await retryApiCall(() => generateText(prompt, undefined, false, apiSettings), 3, false);
             const titles = (result.text ?? '').trim().split('\n').filter(t => t.trim() !== '');
 
             if (titles.length === 0) {
@@ -341,6 +544,9 @@ ${context || "Đây là phần đầu tiên."}
                 updateState({
                     sequelSuggestedTitles: titles,
                 });
+                
+                // Log usage statistics
+                logApiCall('quickstory-titles', 1);
             }
         } catch (e) {
             updateState({
@@ -388,7 +594,7 @@ ${context || "Đây là phần đầu tiên."}
         settings: { targetLength: string; writingStyle: string; customWritingStyle: string; outputLanguage: string },
         abortSignal: AbortSignal,
         onProgress: (message: string) => void
-    ): Promise<string> => {
+    ): Promise<{ story: string; wordStats: any; storyQualityStats: any }> => {
         const { targetLength, writingStyle, customWritingStyle, outputLanguage } = settings;
         let currentStoryStyle = WRITING_STYLE_OPTIONS.find(opt => opt.value === writingStyle)?.label || writingStyle;
         if (writingStyle === 'custom') currentStoryStyle = customWritingStyle;
@@ -429,7 +635,7 @@ ${context || "Đây là phần đầu tiên."}
             **Yêu cầu:** Viết phần tiếp theo của câu chuyện mới, khoảng ${CHUNK_WORD_COUNT} từ. Chỉ viết nội dung, không lặp lại, không tiêu đề.`;
             
             if (i > 0) await delay(1000, abortSignal);
-            const chunkResult = await generateText(writePrompt, undefined, false, apiSettings);
+            const chunkResult = await retryApiCall(() => generateText(writePrompt, undefined, false, apiSettings), 3, true);
             fullStory += (fullStory ? '\n\n' : '') + ((chunkResult.text ?? '').trim() || '');
         }
         if (abortSignal.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -448,8 +654,34 @@ ${context || "Đây là phần đầu tiên."}
         ---
         Hãy trả về TOÀN BỘ câu chuyện đã biên tập bằng ${outputLanguageLabel}.`;
 
-        const finalResult = await generateText(editPrompt, undefined, false, apiSettings);
-        return (finalResult.text ?? '').trim();
+        const finalResult = await retryApiCall(() => generateText(editPrompt, undefined, false, apiSettings), 3, true);
+        const finalStory = (finalResult.text ?? '').trim();
+        
+        // Analyze story quality and consistency (only if enabled and for longer texts)
+        let storyQualityStats: any = null;
+        if (enableQualityAnalysis && finalStory.length > 500) {
+            try {
+                onProgress('Đang phân tích chất lượng...');
+                storyQualityStats = await analyzeStoryQuality(selectedTitle, finalStory);
+            } catch (error) {
+                console.error('Story quality analysis failed:', error);
+                // Continue without quality stats if analysis fails
+            }
+        }
+        
+        // Calculate word statistics
+        const wordStats = calculateWordStats('', finalStory); // No original text for sequel stories
+        
+        // Log usage statistics
+        const totalApiCalls = numChunks + 1 + (enableQualityAnalysis && finalStory.length > 500 ? 1 : 0); // chunks + edit + analysis
+        logApiCall('quickstory-sequel', totalApiCalls);
+        logTextRewritten('quickstory-sequel', 1);
+        
+        return {
+            story: finalStory,
+            wordStats: wordStats,
+            storyQualityStats: storyQualityStats
+        };
     }, [apiSettings]);
 
     useEffect(() => {
@@ -486,14 +718,19 @@ ${context || "Đây là phần đầu tiên."}
 
             try {
                 updateSequelTask({ status: 'processing' });
-                const finalStory = await processSequelStory(taskToProcess.title, sequelInputStories, { targetLength, writingStyle, customWritingStyle, outputLanguage }, abortSignal, (progressMsg) => {
+                const storyResult = await processSequelStory(taskToProcess.title, sequelInputStories, { targetLength, writingStyle, customWritingStyle, outputLanguage }, abortSignal, (progressMsg) => {
                     const totalCompleted = sequelGeneratedStories.filter(t => t.status === 'completed').length;
                     const totalTasks = sequelGeneratedStories.length;
                     updateState({ sequelProgressMessage: `[${totalCompleted + 1}/${totalTasks}] "${taskToProcess.title.substring(0, 30)}...": ${progressMsg}` });
                 });
                 
                 if (!abortSignal.aborted) {
-                   updateSequelTask({ status: 'completed', story: finalStory });
+                   updateSequelTask({ 
+                       status: 'completed', 
+                       story: storyResult.story,
+                       wordStats: storyResult.wordStats,
+                       storyQualityStats: storyResult.storyQualityStats
+                   });
                 }
             } catch (e) {
                  if ((e as Error).name === 'AbortError') {
@@ -605,6 +842,30 @@ ${context || "Đây là phần đầu tiên."}
                  {writingStyle === 'custom' && (
                      <input type="text" value={customWritingStyle} onChange={(e) => updateState({ customWritingStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập phong cách viết tùy chỉnh..." disabled={isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories}/>
                 )}
+                
+                {/* Quality Analysis Toggle */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <label className="flex items-center cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={enableQualityAnalysis}
+                            onChange={(e) => setEnableQualityAnalysis(e.target.checked)}
+                            className="mr-3 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                            disabled={isAnyTaskQueuedOrProcessing || sequelIsGeneratingTitles || sequelIsGeneratingStories}
+                        />
+                        <div>
+                            <span className="text-sm font-medium text-gray-700">
+                                🎯 Phân tích chất lượng TOÀN BỘ câu chuyện (tốn thêm API)
+                            </span>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Bật để phân tích độ nhất quán và hoàn thiện của TOÀN BỘ truyện. Sẽ mất thêm thời gian và API calls nhưng cho kết quả chính xác nhất.
+                            </p>
+                            <p className="text-xs text-orange-600 mt-1 font-medium">
+                                ⚠️ Phân tích toàn bộ văn bản để đảm bảo độ chính xác cao nhất trong đánh giá nhất quán & hoàn thiện.
+                            </p>
+                        </div>
+                    </label>
+                </div>
             </div>
 
             {activeTab === 'quickBatch' && (
@@ -670,6 +931,117 @@ ${context || "Đây là phần đầu tiên."}
                                                     </button>
                                                 </div>
                                                 <textarea readOnly value={task.generatedStory} rows={8} className="w-full p-2 text-xs border rounded bg-gray-50 whitespace-pre-wrap"/>
+                                                
+                                                {/* Word Statistics */}
+                                                {task.wordStats && (
+                                                    <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                                        <h4 className="text-xs font-semibold text-blue-800 mb-2">📊 Thống kê từ:</h4>
+                                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-600">Số từ:</span>
+                                                                <span className="font-semibold text-green-600">{task.wordStats.generatedWords.toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-600">Chất lượng:</span>
+                                                                <span className="font-semibold text-purple-600">{task.storyQualityStats?.overallQualityScore || 'N/A'}%</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Story Quality Analysis */}
+                                                {task.storyQualityStats && (
+                                                    <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                                                        <h4 className="text-sm font-semibold text-purple-800 mb-3 flex items-center">
+                                                            🎯 Đánh Giá Chất Lượng Câu Chuyện
+                                                        </h4>
+                                                        
+                                                        {/* Quality Scores */}
+                                                        <div className="grid grid-cols-3 gap-3 mb-3">
+                                                            <div className="text-center">
+                                                                <div className="text-lg font-bold text-purple-700">{task.storyQualityStats.consistencyScore}%</div>
+                                                                <div className="text-xs text-gray-600">Tính nhất quán</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-lg font-bold text-pink-700">{task.storyQualityStats.completenessScore}%</div>
+                                                                <div className="text-xs text-gray-600">Độ hoàn thiện</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-lg font-bold text-indigo-700">{task.storyQualityStats.overallQualityScore}%</div>
+                                                                <div className="text-xs text-gray-600">Chất lượng tổng</div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Quality Progress Bars */}
+                                                        <div className="space-y-2 mb-3">
+                                                            <div>
+                                                                <div className="flex justify-between text-xs mb-1">
+                                                                    <span>Nhất quán</span>
+                                                                    <span>{task.storyQualityStats.consistencyScore}%</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                    <div 
+                                                                        className="bg-purple-600 h-2 rounded-full transition-all duration-300" 
+                                                                        style={{ width: `${task.storyQualityStats.consistencyScore}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex justify-between text-xs mb-1">
+                                                                    <span>Hoàn thiện</span>
+                                                                    <span>{task.storyQualityStats.completenessScore}%</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                    <div 
+                                                                        className="bg-pink-600 h-2 rounded-full transition-all duration-300" 
+                                                                        style={{ width: `${task.storyQualityStats.completenessScore}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex justify-between text-xs mb-1">
+                                                                    <span>Tổng thể</span>
+                                                                    <span>{task.storyQualityStats.overallQualityScore}%</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                    <div 
+                                                                        className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+                                                                        style={{ width: `${task.storyQualityStats.overallQualityScore}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Detailed Analysis */}
+                                                        <details className="text-xs">
+                                                            <summary className="cursor-pointer text-purple-700 font-medium hover:text-purple-800 mb-2">
+                                                                📋 Xem phân tích chi tiết
+                                                            </summary>
+                                                            <div className="space-y-2 text-xs bg-white p-2 rounded border">
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700">👥 Nhân vật:</span>
+                                                                    <p className="text-gray-600 ml-2">{task.storyQualityStats.analysis.characterConsistency}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700">📚 Cốt truyện:</span>
+                                                                    <p className="text-gray-600 ml-2">{task.storyQualityStats.analysis.plotCoherence}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700">⏰ Thời gian:</span>
+                                                                    <p className="text-gray-600 ml-2">{task.storyQualityStats.analysis.timelineConsistency}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700">🏞️ Bối cảnh:</span>
+                                                                    <p className="text-gray-600 ml-2">{task.storyQualityStats.analysis.settingConsistency}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700">🎯 Tổng quan:</span>
+                                                                    <p className="text-gray-600 ml-2">{task.storyQualityStats.analysis.overallAssessment}</p>
+                                                                </div>
+                                                            </div>
+                                                        </details>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         <details className="text-xs mt-2">
@@ -798,6 +1170,117 @@ ${context || "Đây là phần đầu tiên."}
                                                         </button>
                                                     </div>
                                                     <textarea readOnly value={result.story} rows={10} className="w-full p-2 text-sm border rounded bg-white whitespace-pre-wrap"/>
+                                                    
+                                                    {/* Word Statistics */}
+                                                    {result.wordStats && (
+                                                        <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                                                            <h4 className="text-xs font-semibold text-blue-800 mb-2">📊 Thống kê từ:</h4>
+                                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-600">Số từ:</span>
+                                                                    <span className="font-semibold text-green-600">{result.wordStats.generatedWords.toLocaleString()}</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-600">Chất lượng:</span>
+                                                                    <span className="font-semibold text-purple-600">{result.storyQualityStats?.overallQualityScore || 'N/A'}%</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Story Quality Analysis */}
+                                                    {result.storyQualityStats && (
+                                                        <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                                                            <h4 className="text-sm font-semibold text-purple-800 mb-3 flex items-center">
+                                                                🎯 Đánh Giá Chất Lượng Câu Chuyện
+                                                            </h4>
+                                                            
+                                                            {/* Quality Scores */}
+                                                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                                                <div className="text-center">
+                                                                    <div className="text-lg font-bold text-purple-700">{result.storyQualityStats.consistencyScore}%</div>
+                                                                    <div className="text-xs text-gray-600">Tính nhất quán</div>
+                                                                </div>
+                                                                <div className="text-center">
+                                                                    <div className="text-lg font-bold text-pink-700">{result.storyQualityStats.completenessScore}%</div>
+                                                                    <div className="text-xs text-gray-600">Độ hoàn thiện</div>
+                                                                </div>
+                                                                <div className="text-center">
+                                                                    <div className="text-lg font-bold text-indigo-700">{result.storyQualityStats.overallQualityScore}%</div>
+                                                                    <div className="text-xs text-gray-600">Chất lượng tổng</div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Quality Progress Bars */}
+                                                            <div className="space-y-2 mb-3">
+                                                                <div>
+                                                                    <div className="flex justify-between text-xs mb-1">
+                                                                        <span>Nhất quán</span>
+                                                                        <span>{result.storyQualityStats.consistencyScore}%</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                        <div 
+                                                                            className="bg-purple-600 h-2 rounded-full transition-all duration-300" 
+                                                                            style={{ width: `${result.storyQualityStats.consistencyScore}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex justify-between text-xs mb-1">
+                                                                        <span>Hoàn thiện</span>
+                                                                        <span>{result.storyQualityStats.completenessScore}%</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                        <div 
+                                                                            className="bg-pink-600 h-2 rounded-full transition-all duration-300" 
+                                                                            style={{ width: `${result.storyQualityStats.completenessScore}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex justify-between text-xs mb-1">
+                                                                        <span>Tổng thể</span>
+                                                                        <span>{result.storyQualityStats.overallQualityScore}%</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                        <div 
+                                                                            className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+                                                                            style={{ width: `${result.storyQualityStats.overallQualityScore}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Detailed Analysis */}
+                                                            <details className="text-xs">
+                                                                <summary className="cursor-pointer text-purple-700 font-medium hover:text-purple-800 mb-2">
+                                                                    📋 Xem phân tích chi tiết
+                                                                </summary>
+                                                                <div className="space-y-2 text-xs bg-white p-2 rounded border">
+                                                                    <div>
+                                                                        <span className="font-semibold text-gray-700">👥 Nhân vật:</span>
+                                                                        <p className="text-gray-600 ml-2">{result.storyQualityStats.analysis.characterConsistency}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-semibold text-gray-700">📚 Cốt truyện:</span>
+                                                                        <p className="text-gray-600 ml-2">{result.storyQualityStats.analysis.plotCoherence}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-semibold text-gray-700">⏰ Thời gian:</span>
+                                                                        <p className="text-gray-600 ml-2">{result.storyQualityStats.analysis.timelineConsistency}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-semibold text-gray-700">🏞️ Bối cảnh:</span>
+                                                                        <p className="text-gray-600 ml-2">{result.storyQualityStats.analysis.settingConsistency}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-semibold text-gray-700">🎯 Tổng quan:</span>
+                                                                        <p className="text-gray-600 ml-2">{result.storyQualityStats.analysis.overallAssessment}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </details>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

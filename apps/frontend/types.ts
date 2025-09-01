@@ -914,6 +914,26 @@ export interface ImageEditorModuleState {
 // --- Quick Story Module Types ---
 export type QuickStoryActiveTab = 'quickBatch' | 'sequelGenerator';
 
+export interface QuickStoryWordStats {
+    originalWords: number;
+    generatedWords: number;
+    wordsChanged: number;
+    changePercentage: number;
+}
+
+export interface QuickStoryQualityStats {
+    consistencyScore: number;
+    completenessScore: number;
+    overallQualityScore: number;
+    analysis: {
+        characterConsistency: string;
+        plotCoherence: string;
+        timelineConsistency: string;
+        settingConsistency: string;
+        overallAssessment: string;
+    };
+}
+
 export interface QuickStoryTask {
     id: string;
     title: string;
@@ -928,6 +948,8 @@ export interface QuickStoryTask {
     progressMessage: string;
     generatedStory: string | null;
     error: string | null;
+    wordStats?: QuickStoryWordStats;
+    storyQualityStats?: QuickStoryQualityStats;
 }
 
 export interface SequelStoryResult {
@@ -936,6 +958,8 @@ export interface SequelStoryResult {
     story: string | null;
     status: 'queued' | 'processing' | 'completed' | 'error' | 'canceled';
     error: string | null;
+    wordStats?: QuickStoryWordStats;
+    storyQualityStats?: QuickStoryQualityStats;
 }
 
 export interface AdnSet {
