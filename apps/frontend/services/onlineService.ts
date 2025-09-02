@@ -7,6 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://aistory-backend.onrende
 class OnlineService {
   private updateInterval: NodeJS.Timeout | null = null;
   private isActive = false;
+  private isCleaningUp = false;
 
   /**
    * Start online tracking when user enters the tool
@@ -31,13 +32,22 @@ class OnlineService {
    * Stop online tracking
    */
   public stopOnlineTracking() {
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval);
-      this.updateInterval = null;
+    if (this.isCleaningUp || !this.updateInterval) {
+      return; // Prevent double cleanup
     }
     
-    this.isActive = false;
-    console.log('🔴 Online tracking stopped');
+    this.isCleaningUp = true;
+    
+    try {
+      clearInterval(this.updateInterval);
+      this.updateInterval = null;
+      this.isActive = false;
+      console.log('🔴 Online tracking stopped');
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    } finally {
+      this.isCleaningUp = false;
+    }
   }
 
   /**

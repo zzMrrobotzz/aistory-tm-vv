@@ -1087,14 +1087,19 @@ const MainApp: React.FC = () => {
 
   // Start online tracking when user enters the app
   useEffect(() => {
-    if (currentUser) {
+    let isSubscribed = true;
+    
+    if (currentUser && isSubscribed) {
       onlineService.startOnlineTracking();
-      
-      // Cleanup on unmount
-      return () => {
-        onlineService.stopOnlineTracking();
-      };
     }
+    
+    // Cleanup on unmount or currentUser change
+    return () => {
+      isSubscribed = false;
+      if (onlineService.isTracking()) {
+        onlineService.stopOnlineTracking();
+      }
+    };
   }, [currentUser]);
 
 

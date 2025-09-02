@@ -1003,13 +1003,13 @@ ${context || "Đây là phần đầu tiên."}
                     <h3 className="text-xl font-semibold text-gray-800">Thêm Nhiệm vụ Mới</h3>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề Truyện:</label>
-                        <textarea value={title} onChange={(e) => updateState({ title: e.target.value })} placeholder="Nhập tiêu đề cho truyện mới..." rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || usageStats.isBlocked}/>
+                        <textarea value={title} onChange={(e) => updateState({ title: e.target.value })} placeholder="Nhập tiêu đề cho truyện mới..." rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={!hasActiveSubscription || usageStats.isBlocked}/>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Văn Phong Viral Tham Khảo (Tùy chọn):</label>
-                        <textarea value={referenceViralStoryForStyle} onChange={(e) => updateState({ referenceViralStoryForStyle: e.target.value })} rows={4} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Dán 1 hoặc nhiều kịch bản/truyện viral vào đây..." disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || usageStats.isBlocked}></textarea>
+                        <textarea value={referenceViralStoryForStyle} onChange={(e) => updateState({ referenceViralStoryForStyle: e.target.value })} rows={4} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Dán 1 hoặc nhiều kịch bản/truyện viral vào đây..." disabled={!hasActiveSubscription || usageStats.isBlocked}></textarea>
                     </div>
-                    <button onClick={handleAddTask} disabled={!hasActiveSubscription || isAnyTaskQueuedOrProcessing || !title.trim() || usageStats.isBlocked} className="w-full flex items-center justify-center bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400">
+                    <button onClick={handleAddTask} disabled={!hasActiveSubscription || !title.trim() || usageStats.isBlocked} className="w-full flex items-center justify-center bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400">
                         {!hasActiveSubscription ? (
                             <>🔒 Cần Nâng cấp Gói</>
                         ) : usageStats.isBlocked ? (
