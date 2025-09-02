@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, GenerateContentResponse, GenerateContentParameters, Part, GroundingChunk as GenAIGroundingChunk } from "@google/genai";
 import { MODEL_TEXT, MODEL_IMAGE, GroundingChunk } from '../types';
 
@@ -30,6 +29,30 @@ const getAIInstance = (userApiKey?: string): GoogleGenAI => {
   return ai;
 };
 
+// Helper function to safely extract text from Gemini response
+const safeExtractText = (response: GenerateContentResponse): string => {
+  // First check the direct text property
+  if (response.text && typeof response.text === 'string' && response.text.trim().length > 0) {
+    return response.text;
+  }
+
+  // Check if response has candidates with content
+  if (response.candidates && response.candidates.length > 0) {
+    const candidate = response.candidates[0];
+    if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+      const firstPart = candidate.content.parts[0];
+      if (firstPart.text && typeof firstPart.text === 'string' && firstPart.text.trim().length > 0) {
+        console.log("Using text from candidates.content.parts[0]");
+        return firstPart.text;
+      }
+    }
+  }
+
+  console.error("Gemini response.text is not a valid string:", response.text);
+  console.error("Full response:", response);
+  throw new Error("Gemini API returned invalid response format - text property is missing, not a string, or empty");
+};
+
 export const generateText = async (
   prompt: string, 
   systemInstruction?: string,
@@ -59,13 +82,7 @@ export const generateText = async (
 
     const response: GenerateContentResponse = await aiInstance.models.generateContent(request);
     
-    // Safety check for response.text
-    if (!response.text || typeof response.text !== 'string') {
-      console.error("Gemini response.text is not a valid string:", response);
-      throw new Error("Gemini API returned invalid response format - text property is missing or not a string");
-    }
-    
-    const text = response.text;
+    const text = safeExtractText(response);
     let groundingChunks: GroundingChunk[] | undefined = undefined;
 
     if (useGoogleSearch && response.candidates && response.candidates[0]?.groundingMetadata?.groundingChunks) {
@@ -111,25 +128,17 @@ export const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstr
 
     const response: GenerateContentResponse = await aiInstance.models.generateContent(request);
     
-    // Safety check for response.text
-    if (!response.text || typeof response.text !== 'string') {
-      console.error("Gemini response.text is not a valid string:", response);
-      throw new Error("Gemini API returned invalid response format - text property is missing or not a string");
-    }
-    
-    let jsonStr = response.text.trim();
+    const jsonStr = safeExtractText(response).trim();
 
     const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
     const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
+    const finalJsonStr = match && match[2] ? match[2].trim() : jsonStr;
     
     try {
-      return JSON.parse(jsonStr) as T;
+      return JSON.parse(finalJsonStr) as T;
     } catch (e) {
-      console.error("Failed to parse JSON response from Gemini:", jsonStr, e);
-      throw new Error(`Gemini API returned invalid JSON: ${(e as Error).message}. Raw response: ${jsonStr}`);
+      console.error("Failed to parse JSON response from Gemini:", finalJsonStr, e);
+      throw new Error(`Gemini API returned invalid JSON: ${(e as Error).message}. Raw response: ${finalJsonStr}`);
     }
 
   } catch (error) {
@@ -211,13 +220,7 @@ export const generateTextFromImageAndText = async (
     
     const response: GenerateContentResponse = await aiInstance.models.generateContent(request);
     
-    // Safety check for response.text
-    if (!response.text || typeof response.text !== 'string') {
-      console.error("Gemini response.text is not a valid string:", response);
-      throw new Error("Gemini API returned invalid response format - text property is missing or not a string");
-    }
-    
-    return response.text;
+    return safeExtractText(response);
 
   } catch (error) {
     console.error("Error generating text from image and text with Gemini:", error);
