@@ -49,8 +49,8 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
         message: 'Module không bị giới hạn - sử dụng tự do',
         usage: {
           current: 0,
-          limit: 200,
-          remaining: 200,
+          limit: 1000,
+          remaining: 1000,
           percentage: 0,
           isBlocked: false
         }
@@ -76,7 +76,7 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
         username: user.username,
         email: user.email,
         date: today,
-        dailyLimit: 200,
+        dailyLimit: 1000,
         subscriptionType: user.subscriptionType || 'free',
         totalUsage: 0,
         moduleUsage: [],
@@ -194,7 +194,7 @@ router.get('/today-record', authenticateUser, updateUserActivity, extractUserId,
         username: user.username,
         email: user.email,
         date: today,
-        dailyLimit: 200,
+        dailyLimit: 1000,
         subscriptionType: user.subscriptionType || 'free',
         totalUsage: 0,
         moduleUsage: [],
