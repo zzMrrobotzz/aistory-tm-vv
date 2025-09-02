@@ -54,7 +54,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       // Fallback to local logic if backend fails
       return {
         allowed: true,
-        stats: { current: 0, limit: 200, remaining: 200, percentage: 0 },
+        stats: { current: 0, limit: 1000, remaining: 1000, percentage: 0 },
         message: 'Sử dụng chế độ offline'
       };
     }
