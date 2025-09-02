@@ -40,6 +40,30 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     
     console.log(`✅ Getting usage status for user ${userId} on ${today}`);
     
+    // TEMPORARY: Return unlimited usage for all users
+    return res.json({
+      success: true,
+      data: {
+        usage: {
+          current: 0,
+          limit: 999999,
+          remaining: 999999,
+          percentage: 0,
+          isBlocked: false,
+          moduleUsage: [],
+          lastActivity: new Date().toISOString(),
+          resetTime: 24 * 60 * 60 * 1000
+        },
+        config: {
+          isEnabled: false,
+          dailyLimit: 999999,
+          restrictedModules: [],
+          resetTime: '00:00',
+          timezone: 'Asia/Ho_Chi_Minh'
+        }
+      }
+    });
+    
     // Tìm hoặc tạo record cho hôm nay
     let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });
     
@@ -127,6 +151,18 @@ router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId
     const today = getVietnamDate();
     
     console.log(`Recording usage for user ${userId}, module: ${moduleId}, action: ${action}, itemCount: ${itemCount}`);
+    
+    // TEMPORARY: Return unlimited - no usage recording
+    return res.json({
+      success: true,
+      message: 'Usage recording disabled - unlimited mode',
+      data: {
+        current: 0,
+        limit: 999999,
+        remaining: 999999,
+        isBlocked: false
+      }
+    });
     
     // Tìm hoặc tạo record cho hôm nay
     let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });
