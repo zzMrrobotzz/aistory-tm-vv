@@ -40,7 +40,7 @@ const ShortFormScriptModule: React.FC<ShortFormScriptModuleProps> = ({
     const hasActiveSubscription = isSubscribed(currentUser);
     
     // Usage tracking state
-    const [usageStats, setUsageStats] = useState({ current: 0, limit: 1000, remaining: 1000, percentage: 0, isBlocked: false } as any);
+    const [usageStats, setUsageStats] = useState({ current: 0, limit: 999999, remaining: 999999, percentage: 0, isBlocked: false } as any);
     
     useEffect(() => {
         const fetchUsage = async () => {

@@ -184,8 +184,8 @@ export const checkRateLimit = async (moduleId: string): Promise<RateLimitCheckRe
       canProceed: true,
       usageStatus: {
         current: 0,
-        limit: 1000,
-        remaining: 1000,
+        limit: 999999,
+        remaining: 999999,
         percentage: 0,
         isBlocked: false,
         moduleUsage: [],
@@ -193,7 +193,7 @@ export const checkRateLimit = async (moduleId: string): Promise<RateLimitCheckRe
       },
       config: {
         isEnabled: false, // Disable on error
-        dailyLimit: 1000,
+        dailyLimit: 999999,
         restrictedModules: [],
         resetTime: '00:00',
         timezone: 'Asia/Ho_Chi_Minh'

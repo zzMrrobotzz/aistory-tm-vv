@@ -37,6 +37,20 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
     
     console.log(`Checking and tracking request for user ${userId}, action: ${action}, itemCount: ${itemCount}`);
     
+    // TEMPORARY: Disable all limits - allow unlimited usage
+    return res.json({
+      success: true,
+      blocked: false,
+      message: 'Unlimited usage enabled - no limits applied',
+      usage: {
+        current: 0,
+        limit: 999999,
+        remaining: 999999,
+        percentage: 0,
+        isBlocked: false
+      }
+    });
+    
     // Chỉ track usage cho các modules được giới hạn
     const limitedModules = ['write-story', 'quick-story', 'rewrite'];
     const isLimitedModule = limitedModules.includes(action);
@@ -181,6 +195,22 @@ router.get('/today-record', authenticateUser, updateUserActivity, extractUserId,
     const today = getVietnamDate();
     
     console.log(`Getting today record for user ${userId} on ${today}`);
+    
+    // TEMPORARY: Return unlimited usage stats
+    return res.json({
+      success: true,
+      data: {
+        userId: userId,
+        date: today,
+        requestCount: 0,
+        dailyLimit: 999999,
+        remaining: 999999,
+        percentage: 0,
+        isBlocked: false,
+        moduleUsage: [],
+        resetTime: new Date().getTime() + (24 * 60 * 60 * 1000)
+      }
+    });
     
     // Tìm hoặc tạo record cho hôm nay
     let usageRecord = await DailyUsageLimit.findOne({ userId, date: today });

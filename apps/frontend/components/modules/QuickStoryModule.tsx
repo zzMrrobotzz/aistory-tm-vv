@@ -98,7 +98,7 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     const hasActiveSubscription = isSubscribed(currentUser);
     
     // Usage tracking state from backend
-    const [usageStats, setUsageStats] = useState({ current: 0, limit: 1000, remaining: 1000, percentage: 0, isBlocked: false } as any);
+    const [usageStats, setUsageStats] = useState({ current: 0, limit: 999999, remaining: 999999, percentage: 0, isBlocked: false } as any);
     
     // Thay thế useEffect cũ bằng logic mới
     useEffect(() => {
