@@ -86,6 +86,13 @@ router.post('/check-and-track', authenticateUser, updateUserActivity, extractUse
       
       await usageRecord.save();
       console.log(`Created new usage record for user ${userId}`);
+    } else {
+      // Auto-update existing records with old dailyLimit to new limit
+      if (usageRecord.dailyLimit < 1000) {
+        usageRecord.dailyLimit = 1000;
+        await usageRecord.save();
+        console.log(`Updated dailyLimit to 1000 for user ${userId}`);
+      }
     }
     
     // Kiểm tra xem có bị block không (bao gồm itemCount sắp thêm vào)
@@ -204,6 +211,13 @@ router.get('/today-record', authenticateUser, updateUserActivity, extractUserId,
       
       await usageRecord.save();
       console.log(`Created new usage record for user ${userId}`);
+    } else {
+      // Auto-update existing records with old dailyLimit to new limit
+      if (usageRecord.dailyLimit < 1000) {
+        usageRecord.dailyLimit = 1000;
+        await usageRecord.save();
+        console.log(`Updated dailyLimit to 1000 for user ${userId}`);
+      }
     }
     
     // Tính toán thời gian reset
