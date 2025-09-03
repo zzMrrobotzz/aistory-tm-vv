@@ -6,6 +6,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { saveAs } from 'file-saver';
 import PackageManagement from './components/PackageManagement';
 import AdminAntiSharing from './pages/AdminAntiSharing';
+import PaymentManagement from './components/PaymentManagement';
 
 const { Header, Content, Footer } = Layout;
 const API_BASE = "https://aistory-backend.onrender.com/api";
@@ -242,6 +243,7 @@ function App() {
                     <Menu.Item key="keys">Quản lý Key</Menu.Item>
                     <Menu.Item key="providers">Quản lý API</Menu.Item>
                     <Menu.Item key="packages">Quản lý Gói</Menu.Item>
+                    <Menu.Item key="payments">Thanh Toán</Menu.Item>
                     <Menu.Item key="anti-sharing">Chống Chia Sẻ</Menu.Item>
                 </Menu>
                 <Button onClick={handleLogout} style={{ float: 'right', marginTop: 16 }}>Đăng xuất</Button>
@@ -251,6 +253,7 @@ function App() {
                     {currentView === 'keys' && <KeyManager />}
                     {currentView === 'providers' && <ApiProviderManager />}
                     {currentView === 'packages' && <PackageManagement />}
+                    {currentView === 'payments' && <PaymentManagement />}
                     {currentView === 'anti-sharing' && <AdminAntiSharing />}
                 </div>
             </Content>
