@@ -159,8 +159,8 @@ const Pricing: React.FC = () => {
             }, 2000); // Give webhook extra time to complete
             
           } else {
-            console.warn('❌ Payment not completed');
-            alert('❌ Thanh toán chưa hoàn tất. Vui lòng kiểm tra lại hoặc liên hệ hỗ trợ.');
+            console.warn('❌ Payment not completed automatically');
+            alert(`⏳ Thanh toán đang được xử lý...\n\nNếu bạn đã chuyển khoản thành công:\n✅ Hệ thống sẽ tự động cập nhật trong 1-2 phút\n✅ Hoặc liên hệ admin để xác nhận thủ công\n\nPayment ID: ${paymentData.paymentId.slice(-8)}`);
           }
           
         } catch (paymentError: any) {

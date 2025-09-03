@@ -228,14 +228,39 @@ class PaymentService {
 
           // Check if payment window is closed (secondary check)
           if (paymentWindow.closed && pollCount > 5) { // Give at least 5 polls before checking window
-            console.log('🪟 Payment window closed, doing final status check...');
+            console.log('🪟 Payment window closed, doing extended webhook wait...');
             
-            // Wait for webhook processing
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Extended wait for webhook processing (up to 15 seconds)
+            let webhookCheckCount = 0;
+            const maxWebhookChecks = 10; // 10 checks * 1.5s = 15 seconds
             
-            // Final payment status check
+            while (webhookCheckCount < maxWebhookChecks) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              webhookCheckCount++;
+              
+              const webhookStatus = await this.checkPaymentStatus(paymentData.paymentId);
+              console.log(`🔍 Webhook check #${webhookCheckCount}:`, webhookStatus.payment.status);
+              
+              if (webhookStatus.payment.status === 'completed') {
+                console.log('✅ Webhook processed successfully!');
+                isResolved = true;
+                clearInterval(checkInterval);
+                
+                if (onPaymentSuccess) {
+                  try {
+                    await onPaymentSuccess();
+                  } catch (callbackError) {
+                    console.warn('Success callback error:', callbackError);
+                  }
+                }
+                resolve(true);
+                return;
+              }
+            }
+            
+            // Final status check after extended wait
             const finalStatus = await this.checkPaymentStatus(paymentData.paymentId);
-            console.log('🔍 Final payment status:', finalStatus);
+            console.log('🔍 Final payment status after extended wait:', finalStatus);
             
             isResolved = true;
             clearInterval(checkInterval);
@@ -250,6 +275,7 @@ class PaymentService {
               }
               resolve(true);
             } else {
+              console.warn('⚠️ Payment still pending after webhook wait - may need manual verification');
               resolve(false);
             }
             return;
