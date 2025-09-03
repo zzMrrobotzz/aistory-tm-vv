@@ -291,11 +291,30 @@ router.post('/webhook/payos', async (req, res) => {
                 
                 // Tự động hoàn thành payment
                 const transactionRef = data.transactions?.[0]?.reference || `PAYOS_WEBHOOK_${orderCode}`;
-                await paymentService.completePayment(payment._id, transactionRef);
+                const completionResult = await paymentService.completePayment(payment._id, transactionRef);
                 
                 await createAuditLog('PAYMENT_WEBHOOK_COMPLETED', `PayOS webhook completed payment ${payment._id} [${requestId}]`);
                 
                 console.log(`✅ PayOS webhook [${requestId}]: Payment ${payment._id} completed automatically`);
+                
+                // NEW: Trigger frontend notification mechanism
+                // Store completion flag with expiry for frontend to check
+                global.completedPayments = global.completedPayments || new Map();
+                global.completedPayments.set(payment._id.toString(), {
+                    completedAt: new Date(),
+                    userId: payment.userId,
+                    planId: payment.planId,
+                    transactionRef
+                });
+                
+                // Auto cleanup after 5 minutes
+                setTimeout(() => {
+                    if (global.completedPayments) {
+                        global.completedPayments.delete(payment._id.toString());
+                    }
+                }, 5 * 60 * 1000);
+                
+                console.log(`📢 Payment completion notification stored for frontend: ${payment._id}`);
                 
                 return res.json({ 
                     success: true, 
@@ -666,5 +685,55 @@ function generateDebugRecommendations(payment, user, payosStatus) {
     
     return recommendations;
 }
+
+// GET /api/payment/check-completion/:paymentId - Check if payment was completed via webhook
+router.get('/check-completion/:paymentId', async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        
+        // Check if payment completion notification exists
+        if (global.completedPayments && global.completedPayments.has(paymentId)) {
+            const completionInfo = global.completedPayments.get(paymentId);
+            console.log(`✅ Frontend checking completion for ${paymentId}: FOUND`);
+            
+            // Remove notification after frontend checks (one-time use)
+            global.completedPayments.delete(paymentId);
+            
+            return res.json({
+                success: true,
+                completed: true,
+                completionInfo
+            });
+        }
+        
+        // Also check database status as fallback
+        const payment = await Payment.findById(paymentId);
+        if (payment && payment.status === 'completed') {
+            console.log(`✅ Frontend checking completion for ${paymentId}: Database shows completed`);
+            return res.json({
+                success: true,
+                completed: true,
+                completionInfo: {
+                    completedAt: payment.completedAt || payment.updatedAt,
+                    userId: payment.userId,
+                    planId: payment.planId
+                }
+            });
+        }
+        
+        console.log(`⏳ Frontend checking completion for ${paymentId}: Still pending`);
+        return res.json({
+            success: true,
+            completed: false
+        });
+        
+    } catch (error) {
+        console.error('❌ Error checking payment completion:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to check payment completion'
+        });
+    }
+});
 
 module.exports = router;

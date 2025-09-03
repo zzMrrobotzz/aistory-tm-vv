@@ -93,6 +93,31 @@ class PaymentService {
   }
 
   /**
+   * NEW: Check if payment was completed via webhook (real-time notification)
+   */
+  async checkPaymentCompletion(paymentId: string): Promise<{ completed: boolean; completionInfo?: any }> {
+    try {
+      const response = await fetch(`${API_URL}/payment/check-completion/${paymentId}`, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Payment completion check failed:', data);
+        throw new Error(data.error || 'Không thể kiểm tra completion status');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Payment completion check error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Debug payment status with detailed info
    */
   async debugPaymentStatus(paymentId: string): Promise<any> {
@@ -142,10 +167,12 @@ class PaymentService {
   }
 
   /**
-   * Open payment URL in new window and monitor payment completion
+   * NEW APPROACH: Direct webhook notification detection
    */
   async processPayment(paymentData: PaymentResponse, onPaymentSuccess?: () => void): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      console.log('🚀 Starting NEW webhook-direct payment monitoring for:', paymentData.paymentId);
+      
       // Open payment window
       const paymentWindow = window.open(
         paymentData.payUrl,
@@ -158,162 +185,158 @@ class PaymentService {
         return;
       }
 
-      let pollCount = 0;
-      const maxPolls = 200; // 200 polls * 1.5s = 5 minutes max
+      let checkCount = 0;
       let isResolved = false;
+      const maxChecks = 180; // 3 minutes at 1-second intervals
 
-      // Monitor payment completion with continuous polling - PRIORITY on webhook detection
-      const checkInterval = setInterval(async () => {
+      // NEW: Use direct webhook completion check
+      const webhookCheckInterval = setInterval(async () => {
         if (isResolved) {
-          clearInterval(checkInterval);
+          clearInterval(webhookCheckInterval);
           return;
         }
 
-        pollCount++;
+        checkCount++;
         
         try {
-          // PRIMARY: Check payment status FIRST - webhook can complete anytime
-          const status = await this.checkPaymentStatus(paymentData.paymentId);
-          console.log(`💳 Payment status check #${pollCount}:`, { 
-            status: status.payment.status, 
-            paymentId: paymentData.paymentId,
-            isExpired: status.isExpired,
-            windowClosed: paymentWindow.closed
-          });
+          // Check for webhook completion notification FIRST
+          const completionCheck = await this.checkPaymentCompletion(paymentData.paymentId);
+          console.log(`🔍 Webhook completion check #${checkCount}:`, completionCheck);
           
-          // IMMEDIATE SUCCESS HANDLING - regardless of window status
-          if (status.payment.status === 'completed') {
+          if (completionCheck.completed) {
+            // WEBHOOK COMPLETION DETECTED!
             isResolved = true;
-            clearInterval(checkInterval);
+            clearInterval(webhookCheckInterval);
             
-            console.log('🎉 Payment completed via webhook! Closing everything...');
+            console.log('🎉 WEBHOOK COMPLETION DETECTED! Processing immediately...');
             
-            // Force close payment window
+            // Force close everything
             if (!paymentWindow.closed) {
-              console.log('🪟 Closing payment window...');
+              console.log('🪟 Force closing payment window...');
               paymentWindow.close();
             }
             
-            // Force close payment modal
+            // Remove modal
             const modal = document.querySelector('.fixed.inset-0.bg-black');
             if (modal) {
-              console.log('🗂️ Removing payment modal...');
+              console.log('🗂️ Force removing payment modal...');
               modal.remove();
             }
             
-            // Call success callback immediately
-            console.log('✅ Calling payment success callback...');
+            // Call success callback
+            console.log('✅ Calling success callback for webhook completion...');
             if (onPaymentSuccess) {
               try {
                 await onPaymentSuccess();
-                console.log('✅ Success callback completed');
+                console.log('✅ Webhook success callback completed');
               } catch (callbackError) {
-                console.warn('⚠️ Success callback error:', callbackError);
+                console.warn('⚠️ Webhook success callback error:', callbackError);
               }
             }
             
             resolve(true);
             return;
           }
-
-          // Handle expired payments
+          
+          // Fallback: Also check regular status for expired payments
+          const status = await this.checkPaymentStatus(paymentData.paymentId);
           if (status.isExpired) {
             isResolved = true;
-            clearInterval(checkInterval);
+            clearInterval(webhookCheckInterval);
             if (!paymentWindow.closed) {
               paymentWindow.close();
             }
-            
             console.warn('⚠️ Payment expired');
             reject(new Error('Thanh toán đã hết hạn'));
             return;
           }
 
-          // SECONDARY: Handle window closed scenario (if webhook hasn't completed yet)
-          if (paymentWindow.closed && pollCount > 3) {
-            console.log('🪟 Payment window closed, payment still pending. Extending wait for webhook...');
+          // Check if user closed window (they might complete payment elsewhere)
+          if (paymentWindow.closed && checkCount > 5) {
+            console.log('🪟 User closed window, doing final webhook checks...');
             
-            // Extended wait specifically for webhook processing
-            let extendedWaitCount = 0;
-            const maxExtendedWaits = 12; // 12 * 2s = 24 seconds total wait
+            // Give webhook extra time to process (up to 30 seconds)
+            let finalChecks = 0;
+            const maxFinalChecks = 30;
             
-            while (extendedWaitCount < maxExtendedWaits && !isResolved) {
-              await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second intervals
-              extendedWaitCount++;
+            const finalCheckInterval = setInterval(async () => {
+              finalChecks++;
+              const finalCompletionCheck = await this.checkPaymentCompletion(paymentData.paymentId);
+              console.log(`🔍 Final webhook check #${finalChecks}/${maxFinalChecks}:`, finalCompletionCheck);
               
-              const webhookStatus = await this.checkPaymentStatus(paymentData.paymentId);
-              console.log(`🔍 Extended webhook wait #${extendedWaitCount}/${maxExtendedWaits}:`, {
-                status: webhookStatus.payment.status,
-                secondsWaited: extendedWaitCount * 2
-              });
-              
-              if (webhookStatus.payment.status === 'completed') {
-                console.log('🎊 Webhook finally processed! Payment completed');
+              if (finalCompletionCheck.completed) {
+                clearInterval(finalCheckInterval);
+                clearInterval(webhookCheckInterval);
                 isResolved = true;
-                clearInterval(checkInterval);
                 
-                // Close modal if still exists
+                // Remove modal if exists
                 const lateModal = document.querySelector('.fixed.inset-0.bg-black');
-                if (lateModal) {
-                  lateModal.remove();
-                }
+                if (lateModal) lateModal.remove();
                 
                 if (onPaymentSuccess) {
                   try {
                     await onPaymentSuccess();
-                  } catch (callbackError) {
-                    console.warn('Success callback error:', callbackError);
+                  } catch (error) {
+                    console.warn('Final success callback error:', error);
                   }
                 }
                 resolve(true);
                 return;
               }
-            }
+              
+              if (finalChecks >= maxFinalChecks) {
+                clearInterval(finalCheckInterval);
+                clearInterval(webhookCheckInterval);
+                isResolved = true;
+                console.warn('⚠️ No webhook completion detected after window close');
+                resolve(false);
+                return;
+              }
+            }, 1000);
             
-            // If still pending after extended wait
-            console.warn('⚠️ Payment still pending after extended webhook wait');
-            isResolved = true;
-            clearInterval(checkInterval);
-            resolve(false);
             return;
           }
 
-          // Global timeout check
-          if (pollCount >= maxPolls) {
-            console.warn('⚠️ Payment polling timeout reached');
+          // Global timeout
+          if (checkCount >= maxChecks) {
             isResolved = true;
-            clearInterval(checkInterval);
+            clearInterval(webhookCheckInterval);
             if (!paymentWindow.closed) {
               paymentWindow.close();
             }
+            console.warn('⚠️ Webhook monitoring timeout');
             reject(new Error('Thanh toán đã hết thời gian chờ'));
             return;
           }
 
         } catch (error) {
-          console.error('💥 Payment monitoring error:', error);
-          // Continue polling on error unless critical
-          if (pollCount > maxPolls / 2) { // Stop if too many errors
-            console.error('Too many polling errors, stopping...');
+          console.error('💥 Webhook monitoring error:', error);
+          
+          // Continue unless too many errors
+          if (checkCount > 60 && checkCount % 10 === 0) {
+            console.warn(`Too many errors in webhook monitoring: ${error.message}`);
+          }
+          
+          if (checkCount > maxChecks / 2) {
             isResolved = true;
-            clearInterval(checkInterval);
-            reject(new Error('Lỗi khi theo dõi thanh toán'));
+            clearInterval(webhookCheckInterval);
+            reject(new Error('Lỗi nghiêm trọng khi theo dõi webhook'));
             return;
           }
         }
-      }, 1000); // Check every 1 second for faster detection
+      }, 1000); // Check every 1 second
 
-      // Fallback timeout after 10 minutes
+      // Ultimate timeout after 5 minutes
       setTimeout(() => {
         if (!isResolved) {
           isResolved = true;
-          clearInterval(checkInterval);
+          clearInterval(webhookCheckInterval);
           if (!paymentWindow.closed) {
             paymentWindow.close();
           }
-          reject(new Error('Thanh toán đã hết thời gian'));
+          reject(new Error('Thanh toán đã hết thời gian chờ'));
         }
-      }, 10 * 60 * 1000);
+      }, 5 * 60 * 1000);
     });
   }
 
