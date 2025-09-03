@@ -338,16 +338,52 @@ ${context || "Đây là phần đầu tiên."}
         updateTask(task.id, { progressMessage: enableQualityAnalysis ? 'Bước 3/4: Đang biên tập...' : 'Bước 3/3: Đang biên tập...' });
         const minLength = Math.round(currentTargetLengthNum * 0.9);
         const maxLength = Math.round(currentTargetLengthNum * 1.1);
+        const estimatedCurrentWordCount = fullStory.split(/\s+/).filter(Boolean).length;
+
+        let actionVerb = "";
+        let diffDescription = "";
+        if (estimatedCurrentWordCount > maxLength) {
+            actionVerb = "RÚT NGẮN";
+            diffDescription = `khoảng ${estimatedCurrentWordCount - currentTargetLengthNum} từ`;
+        } else if (estimatedCurrentWordCount < minLength) {
+            actionVerb = "MỞ RỘNG";
+            diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
+        }
         
-        const editPrompt = `Bạn là một biên tập viên truyện chuyên nghiệp. Hãy biên tập lại "Truyện Gốc" để đáp ứng các yêu cầu:
-        1.  **ĐỘ DÀI (QUAN TRỌNG NHẤT):** Kết quả cuối cùng PHẢI nằm trong khoảng ${minLength} đến ${maxLength} từ.
-        2.  **TÍNH NHẤT QUÁN & LOGIC:** Đảm bảo nhân vật, tình tiết nhất quán và logic từ đầu đến cuối.
-        3.  **VĂN PHONG:** Tinh chỉnh cho mượt mà, loại bỏ lặp từ, nhưng vẫn giữ đúng phong cách "${currentStoryStyle}".
-        **Truyện Gốc Cần Biên Tập (bằng ${outputLanguageLabel}):**
-        ---
-        ${fullStory}
-        ---
-        Hãy trả về TOÀN BỘ câu chuyện đã biên tập bằng ${outputLanguageLabel}. Không thêm lời bình hay giới thiệu.`;
+        const editPrompt = `Bạn là một AI Biên tập viên chuyên nghiệp với nhiệm vụ **TUYỆT ĐỐI** là điều chỉnh độ dài của văn bản theo yêu cầu.
+
+**MỆNH LỆNH TỐI THƯỢNG (PRIORITY #1 - NON-NEGOTIABLE):**
+Truyện cuối cùng **PHẢI** có độ dài trong khoảng từ **${minLength} đến ${maxLength} từ**. Mục tiêu lý tưởng là **${currentTargetLengthNum} từ**.
+-   Truyện gốc hiện tại có khoảng **${estimatedCurrentWordCount} từ**.
+-   Mệnh lệnh của bạn là: **${actionVerb} ${diffDescription}**. Đây là nhiệm vụ quan trọng nhất, phải được ưu tiên trên tất cả các yếu-tố-khác.
+
+**CHIẾN LƯỢC BIÊN TẬP BẮT BUỘC ĐỂ ĐẠT MỤC TIÊU ĐỘ DÀI:**
+-   **NẾU CẦN RÚT NGẮN (BE RUTHLESS):**
+    -   **CẮT BỎ KHÔNG THƯƠNG TIẾC:** Loại bỏ các đoạn mô tả dài dòng, các đoạn hội thoại phụ không trực tiếp thúc đẩy cốt truyện, các tình tiết hoặc nhân vật phụ ít quan trọng.
+    -   **CÔ ĐỌNG HÓA:** Viết lại các câu dài, phức tạp thành các câu ngắn gọn, súc tích hơn. Thay vì mô tả một hành động trong 3 câu, hãy làm nó trong 1 câu.
+    -   **TÓM LƯỢC:** Thay vì kể chi tiết một sự kiện kéo dài, hãy tóm tắt nó lại. Ví dụ: thay vì kể chi tiết 5 phút nhân vật đi từ A đến B, chỉ cần nói "Sau một hồi di chuyển, anh đã đến B".
+    -   **Sự hi sinh là cần thiết:** Bạn phải chấp nhận hi sinh một số chi tiết và sự bay bổng của văn phong để đạt được mục tiêu độ dài. Việc này là BẮT BUỘC.
+-   **NẾU CẦN MỞ RỘNG:**
+    -   **THÊM MÔ TẢ GIÁC QUAN:** Thêm chi tiết về hình ảnh, âm thanh, mùi vị, cảm giác để làm cảnh vật sống động hơn.
+    -   **KÉO DÀI HỘI THOẠI:** Thêm các câu đối đáp, biểu cảm, suy nghĩ nội tâm của nhân vật trong lúc hội thoại.
+    -   **CHI TIẾT HÓA HÀNH ĐỘNG:** Mô tả hành động của nhân vật một cách chi tiết hơn (show, don't tell).
+
+**YÊU CẦU PHỤ (PRIORITY #2 - Only after satisfying Priority #1):**
+-   **Bám sát Dàn Ý:** Giữ lại các NÚT THẮT và CAO TRÀO chính từ "Dàn Ý Gốc".
+-   **Nhất quán:** Duy trì sự nhất quán về tên nhân vật, địa điểm, và logic cơ bản của câu chuyện.
+
+**DÀN Ý GỐC (để tham khảo cốt truyện chính):**
+---
+${storyOutline}
+---
+
+**TRUYỆN GỐC CẦN BIÊN TẬP (bằng ${outputLanguageLabel}):**
+---
+${fullStory}
+---
+
+**NHIỆM VỤ CUỐI CÙNG:**
+Hãy trả về TOÀN BỘ câu chuyện đã được biên tập lại bằng ngôn ngữ ${outputLanguageLabel}, với độ dài **TUYỆT ĐỐI** phải nằm trong khoảng **${minLength} đến ${maxLength} từ**. Không thêm lời bình, giới thiệu, hay tiêu đề. Bắt đầu ngay bây giờ.`;
 
         const finalResult = await retryApiCall(() => generateText(editPrompt, undefined, false, apiSettings), 3, true);
         const finalStory = (finalResult.text ?? '').trim();
@@ -736,14 +772,54 @@ ${context || "Đây là phần đầu tiên."}
         onProgress('Đang biên tập...');
         const minLength = Math.round(currentTargetLengthNum * 0.9);
         const maxLength = Math.round(currentTargetLengthNum * 1.1);
-        const editPrompt = `Bạn là một biên tập viên. Hãy biên tập lại "Truyện Gốc" dưới đây để đáp ứng các yêu cầu:
-        1. **ĐỘ DÀI:** Kết quả cuối cùng PHẢI nằm trong khoảng ${minLength} đến ${maxLength} từ.
-        2. **CHẤT LƯỢNG:** Tinh chỉnh cho mượt mà, nhất quán, logic, loại bỏ lặp từ.
-        **Truyện Gốc (bằng ${outputLanguageLabel}):**
-        ---
-        ${fullStory}
-        ---
-        Hãy trả về TOÀN BỘ câu chuyện đã biên tập bằng ${outputLanguageLabel}.`;
+        const estimatedCurrentWordCount = fullStory.split(/\s+/).filter(Boolean).length;
+
+        let actionVerb = "";
+        let diffDescription = "";
+        if (estimatedCurrentWordCount > maxLength) {
+            actionVerb = "RÚT NGẮN";
+            diffDescription = `khoảng ${estimatedCurrentWordCount - currentTargetLengthNum} từ`;
+        } else if (estimatedCurrentWordCount < minLength) {
+            actionVerb = "MỞ RỘNG";
+            diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
+        }
+
+        const editPrompt = `Bạn là một AI Biên tập viên chuyên nghiệp với nhiệm vụ **TUYỆT ĐỐI** là điều chỉnh độ dài của văn bản theo yêu cầu.
+
+**MỆNH LỆNH TỐI THƯỢNG (PRIORITY #1 - NON-NEGOTIABLE):**
+Truyện cuối cùng **PHẢI** có độ dài trong khoảng từ **${minLength} đến ${maxLength} từ**. Mục tiêu lý tưởng là **${currentTargetLengthNum} từ**.
+-   Truyện gốc hiện tại có khoảng **${estimatedCurrentWordCount} từ**.
+-   Mệnh lệnh của bạn là: **${actionVerb} ${diffDescription}**. Đây là nhiệm vụ quan trọng nhất, phải được ưu tiên trên tất cả các yếu-tố-khác.
+
+**CHIẾN LƯỢC BIÊN TẬP BẮT BUỘC ĐỂ ĐẠT MỤC TIÊU ĐỘ DÀI:**
+-   **NẾU CẦN RÚT NGẮN (BE RUTHLESS):**
+    -   **CẮT BỎ KHÔNG THƯƠNG TIẾC:** Loại bỏ các đoạn mô tả dài dòng, các đoạn hội thoại phụ không trực tiếp thúc đẩy cốt truyện, các tình tiết hoặc nhân vật phụ ít quan trọng.
+    -   **CÔ ĐỌNG HÓA:** Viết lại các câu dài, phức tạp thành các câu ngắn gọn, súc tích hơn.
+    -   **TÓM LƯỢC:** Thay vì kể chi tiết một sự kiện, hãy tóm tắt nó lại.
+    -   **Sự hi sinh là cần thiết:** Bạn phải chấp nhận hi sinh một số chi tiết và sự bay bổng của văn phong để đạt được mục tiêu độ dài. Việc này là BẮT BUỘC.
+-   **NẾU CẦN MỞ RỘNG:**
+    -   **THÊM MÔ TẢ GIÁC QUAN:** Thêm chi tiết về hình ảnh, âm thanh, mùi vị, cảm giác.
+    -   **KÉO DÀI HỘI THOẠI:** Thêm các câu đối đáp, suy nghĩ nội tâm của nhân vật.
+    -   **CHI TIẾT HÓA HÀNH ĐỘNG:** Mô tả hành động của nhân vật một cách chi tiết hơn.
+
+**YÊU CẦU PHỤ (PRIORITY #2 - Only after satisfying Priority #1):**
+-   **Bám sát Chủ đề & Tiêu đề:** Đảm bảo câu chuyện cuối cùng phản ánh đúng "Tiêu đề" và phù hợp với tinh thần chung của "Các truyện mẫu" đã được cung cấp làm ADN.
+-   **Nhất quán:** Duy trì sự nhất quán về tên nhân vật, địa điểm, và logic cơ bản của câu chuyện.
+
+**THÔNG TIN THAM KHẢO:**
+- **TIÊU ĐỀ TRUYỆN:** ${selectedTitle}
+- **CÁC TRUYỆN MẪU (ADN):** (một phần)
+---
+${sourceStories.substring(0, 2000)}...
+---
+
+**TRUYỆN GỐC CẦN BIÊN TẬP (bằng ${outputLanguageLabel}):**
+---
+${fullStory}
+---
+
+**NHIỆM VỤ CUỐI CÙNG:**
+Hãy trả về TOÀN BỘ câu chuyện đã được biên tập lại bằng ngôn ngữ ${outputLanguageLabel}, với độ dài **TUYỆT ĐỐI** phải nằm trong khoảng **${minLength} đến ${maxLength} từ**. Không thêm lời bình, giới thiệu, hay tiêu đề. Bắt đầu ngay bây giờ.`;
 
         const finalResult = await retryApiCall(() => generateText(editPrompt, undefined, false, apiSettings), 3, true);
         const finalStory = (finalResult.text ?? '').trim();
