@@ -103,62 +103,77 @@ const Pricing: React.FC = () => {
     setProcessing(true);
     
     try {
-      console.log('Creating payment for package:', packageData.planId);
+      console.log('🏪 Creating payment for package:', packageData.planId);
       
       // Create payment
       const paymentData = await paymentService.createPayment(packageData.planId);
       
       if (paymentData.success) {
+        console.log('💳 Payment created successfully:', paymentData.paymentId);
+        
         // Show payment modal with QR and transfer info
         paymentService.showPaymentModal(paymentData);
         
         // Process payment in popup window with enhanced callback
         try {
           const paymentCompleted = await paymentService.processPayment(paymentData, async () => {
-            // Callback when payment is successful
-            console.log('🎉 Payment completed, refreshing user profile...');
+            // Callback when payment is successful - this runs as soon as payment is detected
+            console.log('🎉 Payment success callback triggered!');
+            
             try {
+              console.log('🔄 Refreshing user profile after payment...');
               await refreshUserProfile();
               console.log('✅ User profile refreshed successfully');
               
-              // Emit payment success event to update UI
+              // Emit payment success event to update UI across app
               paymentEventBus.emit(PAYMENT_EVENTS.PAYMENT_SUCCESS);
+              
+              console.log('📢 Payment success event emitted');
             } catch (error) {
-              console.warn('⚠️ Failed to refresh profile:', error);
+              console.warn('⚠️ Failed to refresh profile in callback:', error);
             }
           });
           
+          console.log('💰 Payment processing result:', paymentCompleted);
+          
           if (paymentCompleted) {
-            // Give webhook time to process and profile refresh to complete
+            // Payment was successful - show immediate feedback
+            console.log('🎊 Payment completed successfully, showing success message');
+            
+            // Show success message with package details
+            alert(`🎉 Thanh toán thành công!\n\n✅ Gói: ${packageData.name}\n💰 Giá trị: ${formatPrice(packageData.price)}\n🔄 Đang cập nhật tài khoản...`);
+            
+            // Additional profile refresh and navigation with delay for webhook processing
             setTimeout(async () => {
-              alert(`✅ Thanh toán thành công cho gói ${packageData.name}!\n\nTrạng thái subscription đã được cập nhật.`);
-              
-              // Final refresh and UI update
               try {
+                console.log('🔄 Final profile refresh and navigation...');
                 await refreshUserProfile();
                 paymentEventBus.emit(PAYMENT_EVENTS.PAYMENT_SUCCESS);
                 
-                // Navigate back to dashboard instead of reload
-                window.history.pushState({}, '', '/');
-                window.location.reload();
+                // Redirect to main app instead of reload
+                window.location.href = '/';
               } catch (error) {
-                console.warn('Profile refresh failed, reloading page:', error);
+                console.warn('⚠️ Final profile refresh failed, forcing page reload:', error);
                 window.location.reload();
               }
-            }, 1000);
+            }, 2000); // Give webhook extra time to complete
+            
           } else {
-            alert('❌ Thanh toán chưa hoàn tất. Vui lòng kiểm tra và thử lại.');
+            console.warn('❌ Payment not completed');
+            alert('❌ Thanh toán chưa hoàn tất. Vui lòng kiểm tra lại hoặc liên hệ hỗ trợ.');
           }
+          
         } catch (paymentError: any) {
-          console.warn('Payment monitoring error:', paymentError.message);
-          // Still show success message since payment modal is displayed
-          alert('Vui lòng hoàn thành thanh toán trong cửa sổ đã mở. Giao diện sẽ cập nhật tự động sau khi thanh toán thành công.');
+          console.warn('⚠️ Payment monitoring error:', paymentError.message);
+          
+          // Show helpful message since payment modal is displayed  
+          alert(`ℹ️ Đang theo dõi thanh toán...\n\nVui lòng hoàn thành thanh toán trong cửa sổ đã mở.\nGiao diện sẽ cập nhật tự động sau khi thanh toán thành công.\n\nLỗi: ${paymentError.message}`);
         }
       } else {
         throw new Error(paymentData.error || 'Không thể tạo thanh toán');
       }
     } catch (error: any) {
-      console.error('Payment creation error:', error);
+      console.error('❌ Payment creation error:', error);
       setError(error.message || 'Có lỗi xảy ra khi tạo thanh toán. Vui lòng thử lại.');
     } finally {
       setProcessing(false);

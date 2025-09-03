@@ -158,49 +158,61 @@ class PaymentService {
         return;
       }
 
-      // Monitor payment completion
-      const checkInterval = setInterval(async () => {
-        try {
-          // Check if payment window is closed
-          if (paymentWindow.closed) {
-            clearInterval(checkInterval);
-            
-            // Wait a bit for webhook to process
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Check payment status
-            const status = await this.checkPaymentStatus(paymentData.paymentId);
-            
-            if (status.payment.status === 'completed') {
-              if (onPaymentSuccess) {
-                onPaymentSuccess();
-              }
-              resolve(true);
-            } else {
-              resolve(false);
-            }
-            return;
-          }
+      let pollCount = 0;
+      const maxPolls = 200; // 200 polls * 1.5s = 5 minutes max
+      let isResolved = false;
 
-          // Check payment status periodically
+      // Monitor payment completion with more aggressive polling
+      const checkInterval = setInterval(async () => {
+        if (isResolved) {
+          clearInterval(checkInterval);
+          return;
+        }
+
+        pollCount++;
+        
+        try {
+          // Check payment status periodically - prioritize this over window closed check
           const status = await this.checkPaymentStatus(paymentData.paymentId);
-          console.log('💳 Payment status check:', status);
+          console.log(`💳 Payment status check #${pollCount}:`, { 
+            status: status.payment.status, 
+            paymentId: paymentData.paymentId,
+            isExpired: status.isExpired 
+          });
           
           if (status.payment.status === 'completed') {
+            isResolved = true;
             clearInterval(checkInterval);
-            paymentWindow.close();
+            
+            // Close payment window if still open
+            if (!paymentWindow.closed) {
+              paymentWindow.close();
+            }
+            
+            // Close payment modal if exists
+            const modal = document.querySelector('.fixed.inset-0.bg-black');
+            if (modal) {
+              modal.remove();
+            }
             
             console.log('✅ Payment completed successfully, calling success callback');
             if (onPaymentSuccess) {
-              onPaymentSuccess();
+              try {
+                await onPaymentSuccess();
+              } catch (callbackError) {
+                console.warn('Success callback error:', callbackError);
+              }
             }
             resolve(true);
             return;
           }
 
           if (status.isExpired) {
+            isResolved = true;
             clearInterval(checkInterval);
-            paymentWindow.close();
+            if (!paymentWindow.closed) {
+              paymentWindow.close();
+            }
             
             // Debug expired payment
             try {
@@ -214,18 +226,62 @@ class PaymentService {
             return;
           }
 
+          // Check if payment window is closed (secondary check)
+          if (paymentWindow.closed && pollCount > 5) { // Give at least 5 polls before checking window
+            console.log('🪟 Payment window closed, doing final status check...');
+            
+            // Wait for webhook processing
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Final payment status check
+            const finalStatus = await this.checkPaymentStatus(paymentData.paymentId);
+            console.log('🔍 Final payment status:', finalStatus);
+            
+            isResolved = true;
+            clearInterval(checkInterval);
+            
+            if (finalStatus.payment.status === 'completed') {
+              if (onPaymentSuccess) {
+                try {
+                  await onPaymentSuccess();
+                } catch (callbackError) {
+                  console.warn('Success callback error:', callbackError);
+                }
+              }
+              resolve(true);
+            } else {
+              resolve(false);
+            }
+            return;
+          }
+
+          // Timeout check
+          if (pollCount >= maxPolls) {
+            isResolved = true;
+            clearInterval(checkInterval);
+            if (!paymentWindow.closed) {
+              paymentWindow.close();
+            }
+            reject(new Error('Thanh toán đã hết thời gian chờ'));
+            return;
+          }
+
         } catch (error) {
           console.error('Payment monitoring error:', error);
+          // Continue polling on error
         }
-      }, 3000); // Check every 3 seconds
+      }, 1500); // Check every 1.5 seconds (more frequent)
 
-      // Timeout after 10 minutes
+      // Fallback timeout after 10 minutes
       setTimeout(() => {
-        clearInterval(checkInterval);
-        if (!paymentWindow.closed) {
-          paymentWindow.close();
+        if (!isResolved) {
+          isResolved = true;
+          clearInterval(checkInterval);
+          if (!paymentWindow.closed) {
+            paymentWindow.close();
+          }
+          reject(new Error('Thanh toán đã hết thời gian'));
         }
-        reject(new Error('Thanh toán đã hết thời gian'));
       }, 10 * 60 * 1000);
     });
   }

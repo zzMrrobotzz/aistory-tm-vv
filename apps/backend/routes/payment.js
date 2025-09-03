@@ -4,6 +4,7 @@ const paymentService = require('../services/paymentService');
 const { createAuditLog } = require('../utils/auditLogger');
 const auth = require('../middleware/auth'); // Import auth middleware
 const CreditPackage = require('../models/CreditPackage');
+const Payment = require('../models/Payment'); // Import Payment model for webhook
 
 // POST /api/payment/create - Create a new payment for a subscription plan
 router.post('/create', auth, async (req, res) => {

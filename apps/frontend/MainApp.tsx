@@ -1278,7 +1278,8 @@ const MainApp: React.FC = () => {
 
   const handleLogout = useCallback(() => {
     logout();
-    navigate('/login');
+    // Force a page reload to ensure complete cleanup and avoid routing issues
+    window.location.href = '/login';
   }, [navigate]);
 
   // Dummy function for history functionality - can be implemented later
