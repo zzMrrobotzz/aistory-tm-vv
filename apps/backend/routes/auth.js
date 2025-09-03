@@ -97,7 +97,7 @@ router.post('/register', antiSharingMiddleware, async (req, res) => {
             userId: user._id,
             username: user.username,
             sessionToken: sessionTokenFromClient,
-            jwtToken: token,
+            // jwtToken: token,  // Temporarily remove to avoid DB issues
             ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
             userAgent: req.get('User-Agent') || '',
             isActive: true,
@@ -185,7 +185,7 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
               userId: user._id,
               username: user.username,
               sessionToken: sessionTokenFromClient,
-              jwtToken: token,
+              // jwtToken: token,  // Temporarily remove to avoid DB issues
               ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
               userAgent: req.get('User-Agent') || '',
               isActive: true,
