@@ -18,11 +18,6 @@ const userSessionSchema = new mongoose.Schema({
     unique: true,
     index: true
   },
-  // jwtToken: {
-  //   type: String,
-  //   required: false,  // Optional field for JWT token reference
-  //   index: true
-  // },
   deviceFingerprintId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DeviceFingerprint',

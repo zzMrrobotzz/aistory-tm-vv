@@ -153,11 +153,11 @@ export const login = async (userData: LoginData) => {
     
     console.log('Login successful, received data:', data);
     
-    // Initialize session monitoring for single session mode
-    if (data.sessionToken) {
+    // Initialize session monitoring for single session mode - temporarily disabled for stability
+    if (data.singleSession) {
       sessionService.initialize(() => {
         // Handle session termination
-        console.log('🚪 Session terminated, redirecting to login...');
+        console.log('Session terminated, redirecting to login...');
         logout();
         window.location.replace('/login');
       });
@@ -257,11 +257,11 @@ if (token) {
     if (sessionToken) {
         authApi.defaults.headers.common['x-session-token'] = sessionToken;
         
-        // Initialize session monitoring if we have a valid session
-        sessionService.initialize(() => {
-          console.log('🚪 Session terminated on app load, redirecting to login...');
-          logout();
-          window.location.replace('/login');
-        });
+        // Initialize session monitoring if we have a valid session - temporarily disabled for stability
+        // sessionService.initialize(() => {
+        //   console.log('Session terminated on app load, redirecting to login...');
+        //   logout();
+        //   window.location.replace('/login');
+        // });
     }
 } 
