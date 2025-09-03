@@ -117,8 +117,8 @@ const Pricing: React.FC = () => {
         // Process payment in popup window with enhanced callback
         try {
           const paymentCompleted = await paymentService.processPayment(paymentData, async () => {
-            // Callback when payment is successful - this runs as soon as payment is detected
-            console.log('🎉 Payment success callback triggered!');
+            // IMMEDIATE callback when payment is detected via webhook
+            console.log('🎉 Payment success callback triggered - processing immediately!');
             
             try {
               console.log('🔄 Refreshing user profile after payment...');
@@ -127,40 +127,38 @@ const Pricing: React.FC = () => {
               
               // Emit payment success event to update UI across app
               paymentEventBus.emit(PAYMENT_EVENTS.PAYMENT_SUCCESS);
-              
               console.log('📢 Payment success event emitted');
+              
+              // Show immediate success notification
+              console.log('🎊 Showing immediate success message...');
+              alert(`🎉 Thanh toán thành công!\n\n✅ Gói: ${packageData.name}\n💰 Giá: ${formatPrice(packageData.price)}\n\n🔄 Đang chuyển về giao diện tool...`);
+              
+              // Immediate redirect to main app (don't wait for outer logic)
+              console.log('🏃‍♂️ Redirecting to main app immediately...');
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 500); // Short delay to show the success message
+              
             } catch (error) {
               console.warn('⚠️ Failed to refresh profile in callback:', error);
+              // Even if profile refresh fails, still redirect
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 1000);
             }
           });
           
           console.log('💰 Payment processing result:', paymentCompleted);
           
           if (paymentCompleted) {
-            // Payment was successful - show immediate feedback
-            console.log('🎊 Payment completed successfully, showing success message');
-            
-            // Show success message with package details
-            alert(`🎉 Thanh toán thành công!\n\n✅ Gói: ${packageData.name}\n💰 Giá trị: ${formatPrice(packageData.price)}\n🔄 Đang cập nhật tài khoản...`);
-            
-            // Additional profile refresh and navigation with delay for webhook processing
-            setTimeout(async () => {
-              try {
-                console.log('🔄 Final profile refresh and navigation...');
-                await refreshUserProfile();
-                paymentEventBus.emit(PAYMENT_EVENTS.PAYMENT_SUCCESS);
-                
-                // Redirect to main app instead of reload
-                window.location.href = '/';
-              } catch (error) {
-                console.warn('⚠️ Final profile refresh failed, forcing page reload:', error);
-                window.location.reload();
-              }
-            }, 2000); // Give webhook extra time to complete
+            // Payment was completed via callback - callback already handled redirect
+            console.log('✅ Payment completed via webhook callback - redirect already handled');
+            // No additional action needed, callback already redirected user
             
           } else {
+            // Payment not completed - show helpful message  
             console.warn('❌ Payment not completed automatically');
-            alert(`⏳ Thanh toán đang được xử lý...\n\nNếu bạn đã chuyển khoản thành công:\n✅ Hệ thống sẽ tự động cập nhật trong 1-2 phút\n✅ Hoặc liên hệ admin để xác nhận thủ công\n\nPayment ID: ${paymentData.paymentId.slice(-8)}`);
+            alert(`⏳ Thanh toán đang được xử lý...\n\nNếu bạn đã chuyển khoản thành công:\n✅ Hệ thống sẽ tự động cập nhật trong 1-2 phút\n✅ Hoặc liên hệ admin để xác nhận thủ công\n\nPayment ID: ${paymentData.paymentId.slice(-8)}\n\nBạn có thể đóng trang này và quay lại sau.`);
           }
           
         } catch (paymentError: any) {
