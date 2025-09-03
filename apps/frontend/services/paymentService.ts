@@ -167,11 +167,11 @@ class PaymentService {
   }
 
   /**
-   * NEW APPROACH: Direct webhook notification detection
+   * LATEST APPROACH: Server-Sent Events (SSE) for real-time webhook notifications
    */
   async processPayment(paymentData: PaymentResponse, onPaymentSuccess?: () => void): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      console.log('🚀 Starting NEW webhook-direct payment monitoring for:', paymentData.paymentId);
+      console.log('🚀 Starting SSE-based payment monitoring for:', paymentData.paymentId);
       
       // Open payment window
       const paymentWindow = window.open(
@@ -185,158 +185,245 @@ class PaymentService {
         return;
       }
 
-      let checkCount = 0;
       let isResolved = false;
-      const maxChecks = 180; // 3 minutes at 1-second intervals
+      let eventSource: EventSource | null = null;
 
-      // NEW: Use direct webhook completion check
-      const webhookCheckInterval = setInterval(async () => {
-        if (isResolved) {
-          clearInterval(webhookCheckInterval);
-          return;
-        }
+      // Setup SSE connection
+      try {
+        const sseUrl = `${API_URL}/payment/stream-completion/${paymentData.paymentId}`;
+        eventSource = new EventSource(sseUrl);
+        console.log('📡 SSE connection established:', sseUrl);
 
-        checkCount++;
-        
-        try {
-          // Check for webhook completion notification FIRST
-          const completionCheck = await this.checkPaymentCompletion(paymentData.paymentId);
-          console.log(`🔍 Webhook completion check #${checkCount}:`, completionCheck);
-          
-          if (completionCheck.completed) {
-            // WEBHOOK COMPLETION DETECTED!
-            isResolved = true;
-            clearInterval(webhookCheckInterval);
-            
-            console.log('🎉 WEBHOOK COMPLETION DETECTED! Processing immediately...');
-            
-            // Force close everything
-            if (!paymentWindow.closed) {
-              console.log('🪟 Force closing payment window...');
-              paymentWindow.close();
-            }
-            
-            // Remove modal
-            const modal = document.querySelector('.fixed.inset-0.bg-black');
-            if (modal) {
-              console.log('🗂️ Force removing payment modal...');
-              modal.remove();
-            }
-            
-            // Call success callback
-            console.log('✅ Calling success callback for webhook completion...');
-            if (onPaymentSuccess) {
-              try {
-                await onPaymentSuccess();
-                console.log('✅ Webhook success callback completed');
-              } catch (callbackError) {
-                console.warn('⚠️ Webhook success callback error:', callbackError);
-              }
-            }
-            
-            resolve(true);
-            return;
-          }
-          
-          // Fallback: Also check regular status for expired payments
-          const status = await this.checkPaymentStatus(paymentData.paymentId);
-          if (status.isExpired) {
-            isResolved = true;
-            clearInterval(webhookCheckInterval);
-            if (!paymentWindow.closed) {
-              paymentWindow.close();
-            }
-            console.warn('⚠️ Payment expired');
-            reject(new Error('Thanh toán đã hết hạn'));
-            return;
-          }
+        eventSource.onopen = () => {
+          console.log('✅ SSE connection opened');
+        };
 
-          // Check if user closed window (they might complete payment elsewhere)
-          if (paymentWindow.closed && checkCount > 5) {
-            console.log('🪟 User closed window, doing final webhook checks...');
-            
-            // Give webhook extra time to process (up to 30 seconds)
-            let finalChecks = 0;
-            const maxFinalChecks = 30;
-            
-            const finalCheckInterval = setInterval(async () => {
-              finalChecks++;
-              const finalCompletionCheck = await this.checkPaymentCompletion(paymentData.paymentId);
-              console.log(`🔍 Final webhook check #${finalChecks}/${maxFinalChecks}:`, finalCompletionCheck);
+        eventSource.onmessage = async (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('📨 SSE message received:', data);
+
+            if (data.type === 'completed') {
+              // PAYMENT COMPLETED VIA SSE!
+              console.log('🎉 PAYMENT COMPLETED VIA SSE! Processing immediately...');
               
-              if (finalCompletionCheck.completed) {
-                clearInterval(finalCheckInterval);
-                clearInterval(webhookCheckInterval);
+              if (!isResolved) {
                 isResolved = true;
                 
-                // Remove modal if exists
-                const lateModal = document.querySelector('.fixed.inset-0.bg-black');
-                if (lateModal) lateModal.remove();
+                // Close SSE connection
+                if (eventSource) {
+                  eventSource.close();
+                  eventSource = null;
+                }
                 
+                // Close payment window
+                if (!paymentWindow.closed) {
+                  console.log('🪟 Closing payment window...');
+                  paymentWindow.close();
+                }
+                
+                // Remove modal
+                const modal = document.querySelector('.fixed.inset-0.bg-black');
+                if (modal) {
+                  console.log('🗂️ Removing payment modal...');
+                  modal.remove();
+                }
+                
+                // Call success callback
+                console.log('✅ Calling success callback...');
                 if (onPaymentSuccess) {
                   try {
                     await onPaymentSuccess();
-                  } catch (error) {
-                    console.warn('Final success callback error:', error);
+                    console.log('✅ Success callback completed');
+                  } catch (callbackError) {
+                    console.warn('⚠️ Success callback error:', callbackError);
                   }
                 }
+                
                 resolve(true);
-                return;
+              }
+            } else if (data.type === 'connected') {
+              console.log('🔗 SSE connected for payment:', data.paymentId);
+            } else if (data.type === 'heartbeat') {
+              console.log('💓 SSE heartbeat received');
+            } else if (data.type === 'error') {
+              console.error('❌ SSE error:', data.message);
+            }
+          } catch (parseError) {
+            console.error('❌ Error parsing SSE message:', parseError, event.data);
+          }
+        };
+
+        eventSource.onerror = (error) => {
+          console.error('❌ SSE connection error:', error);
+          if (!isResolved) {
+            console.log('🔄 SSE error, falling back to polling...');
+            // Continue to fallback polling below
+          }
+        };
+
+      } catch (sseError) {
+        console.error('❌ Failed to establish SSE:', sseError);
+        // Continue to fallback polling
+      }
+
+      // Fallback polling mechanism (in case SSE fails)
+      let pollCount = 0;
+      const maxPolls = 300; // 5 minutes at 1-second intervals
+
+      const fallbackPolling = setInterval(async () => {
+        if (isResolved) {
+          clearInterval(fallbackPolling);
+          return;
+        }
+
+        pollCount++;
+        
+        try {
+          // Check payment status as fallback
+          const status = await this.checkPaymentStatus(paymentData.paymentId);
+          
+          if (status.payment.status === 'completed') {
+            console.log('✅ Payment completed detected via fallback polling');
+            
+            if (!isResolved) {
+              isResolved = true;
+              clearInterval(fallbackPolling);
+              
+              // Close SSE if still open
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
               }
               
-              if (finalChecks >= maxFinalChecks) {
-                clearInterval(finalCheckInterval);
-                clearInterval(webhookCheckInterval);
-                isResolved = true;
-                console.warn('⚠️ No webhook completion detected after window close');
-                resolve(false);
-                return;
+              // Close window and modal
+              if (!paymentWindow.closed) {
+                paymentWindow.close();
               }
-            }, 1000);
+              
+              const modal = document.querySelector('.fixed.inset-0.bg-black');
+              if (modal) {
+                modal.remove();
+              }
+              
+              // Call success callback
+              if (onPaymentSuccess) {
+                try {
+                  await onPaymentSuccess();
+                } catch (callbackError) {
+                  console.warn('Fallback success callback error:', callbackError);
+                }
+              }
+              
+              resolve(true);
+            }
+            return;
+          }
+          
+          if (status.isExpired) {
+            if (!isResolved) {
+              isResolved = true;
+              clearInterval(fallbackPolling);
+              
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+              
+              if (!paymentWindow.closed) {
+                paymentWindow.close();
+              }
+              
+              reject(new Error('Thanh toán đã hết hạn'));
+            }
+            return;
+          }
+
+          // Handle window closure
+          if (paymentWindow.closed && pollCount > 5) {
+            console.log('🪟 Payment window closed, extending polling...');
             
+            // Continue polling for another 30 seconds
+            if (pollCount > maxPolls - 30) {
+              if (!isResolved) {
+                isResolved = true;
+                clearInterval(fallbackPolling);
+                
+                if (eventSource) {
+                  eventSource.close();
+                  eventSource = null;
+                }
+                
+                resolve(false);
+              }
+            }
             return;
           }
 
           // Global timeout
-          if (checkCount >= maxChecks) {
-            isResolved = true;
-            clearInterval(webhookCheckInterval);
-            if (!paymentWindow.closed) {
-              paymentWindow.close();
+          if (pollCount >= maxPolls) {
+            if (!isResolved) {
+              isResolved = true;
+              clearInterval(fallbackPolling);
+              
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+              
+              if (!paymentWindow.closed) {
+                paymentWindow.close();
+              }
+              
+              reject(new Error('Thanh toán đã hết thời gian chờ'));
             }
-            console.warn('⚠️ Webhook monitoring timeout');
-            reject(new Error('Thanh toán đã hết thời gian chờ'));
-            return;
           }
 
         } catch (error) {
-          console.error('💥 Webhook monitoring error:', error);
+          console.error('❌ Fallback polling error:', error);
           
-          // Continue unless too many errors
-          if (checkCount > 60 && checkCount % 10 === 0) {
-            console.warn(`Too many errors in webhook monitoring: ${error.message}`);
-          }
-          
-          if (checkCount > maxChecks / 2) {
-            isResolved = true;
-            clearInterval(webhookCheckInterval);
-            reject(new Error('Lỗi nghiêm trọng khi theo dõi webhook'));
-            return;
+          if (pollCount > maxPolls / 2) {
+            if (!isResolved) {
+              isResolved = true;
+              clearInterval(fallbackPolling);
+              
+              if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+              }
+              
+              reject(new Error('Lỗi khi theo dõi thanh toán'));
+            }
           }
         }
-      }, 1000); // Check every 1 second
+      }, 2000); // Fallback polling every 2 seconds
 
-      // Ultimate timeout after 5 minutes
+      // Ultimate cleanup
+      const cleanup = () => {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        clearInterval(fallbackPolling);
+      };
+
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', cleanup);
+      
+      // Ultimate timeout
       setTimeout(() => {
         if (!isResolved) {
+          console.log('⏰ Ultimate timeout reached');
           isResolved = true;
-          clearInterval(webhookCheckInterval);
+          cleanup();
+          
           if (!paymentWindow.closed) {
             paymentWindow.close();
           }
+          
           reject(new Error('Thanh toán đã hết thời gian chờ'));
         }
-      }, 5 * 60 * 1000);
+      }, 5 * 60 * 1000); // 5 minutes
     });
   }
 

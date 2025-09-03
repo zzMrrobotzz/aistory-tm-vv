@@ -686,6 +686,97 @@ function generateDebugRecommendations(payment, user, payosStatus) {
     return recommendations;
 }
 
+// SSE endpoint for real-time payment completion notifications
+router.get('/stream-completion/:paymentId', async (req, res) => {
+    const { paymentId } = req.params;
+    
+    console.log(`📡 SSE connection established for payment: ${paymentId}`);
+    
+    // Set SSE headers
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({ type: 'connected', paymentId })}\n\n`);
+
+    // Check for completion every 1 second
+    const checkInterval = setInterval(async () => {
+        try {
+            // Check for webhook completion notification
+            if (global.completedPayments && global.completedPayments.has(paymentId)) {
+                const completionInfo = global.completedPayments.get(paymentId);
+                console.log(`🎉 SSE sending completion notification for ${paymentId}`);
+                
+                // Send completion event
+                res.write(`data: ${JSON.stringify({ 
+                    type: 'completed', 
+                    paymentId, 
+                    completionInfo 
+                })}\n\n`);
+                
+                // Clean up
+                global.completedPayments.delete(paymentId);
+                clearInterval(checkInterval);
+                
+                // Close connection after a short delay
+                setTimeout(() => {
+                    res.end();
+                }, 1000);
+                
+                return;
+            }
+            
+            // Also check database as fallback
+            const payment = await Payment.findById(paymentId);
+            if (payment && payment.status === 'completed') {
+                console.log(`✅ SSE sending DB completion for ${paymentId}`);
+                
+                res.write(`data: ${JSON.stringify({ 
+                    type: 'completed', 
+                    paymentId,
+                    completionInfo: {
+                        completedAt: payment.completedAt || payment.updatedAt,
+                        userId: payment.userId,
+                        planId: payment.planId
+                    }
+                })}\n\n`);
+                
+                clearInterval(checkInterval);
+                setTimeout(() => {
+                    res.end();
+                }, 1000);
+                
+                return;
+            }
+            
+            // Send heartbeat
+            res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
+            
+        } catch (error) {
+            console.error('❌ SSE check error:', error);
+            res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+        }
+    }, 1000);
+
+    // Clean up on client disconnect
+    req.on('close', () => {
+        console.log(`🔌 SSE connection closed for payment: ${paymentId}`);
+        clearInterval(checkInterval);
+    });
+
+    // Timeout after 5 minutes
+    setTimeout(() => {
+        console.log(`⏰ SSE timeout for payment: ${paymentId}`);
+        clearInterval(checkInterval);
+        res.end();
+    }, 5 * 60 * 1000);
+});
+
 // GET /api/payment/check-completion/:paymentId - Check if payment was completed via webhook
 router.get('/check-completion/:paymentId', async (req, res) => {
     try {
