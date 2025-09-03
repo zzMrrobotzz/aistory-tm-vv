@@ -92,10 +92,12 @@ router.post('/register', antiSharingMiddleware, async (req, res) => {
         
         // Create session for new user
         try {
+          const sessionTokenFromClient = req.antiSharingData?.sessionToken || `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
           const newSession = new UserSession({
             userId: user._id,
             username: user.username,
-            sessionToken: token,
+            sessionToken: sessionTokenFromClient,
+            jwtToken: token,
             ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
             userAgent: req.get('User-Agent') || '',
             isActive: true,
@@ -112,7 +114,7 @@ router.post('/register', antiSharingMiddleware, async (req, res) => {
         
         res.json({ 
           token,
-          sessionToken: req.antiSharingData?.sessionToken
+          sessionToken: sessionTokenFromClient
         });
       }
     );
@@ -169,10 +171,12 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
         
         // Create session for single session tracking (optional, non-blocking)
         try {
-          // Check if session already exists for this token
+          const sessionTokenFromClient = req.antiSharingData?.sessionToken || `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+          
+          // Check if session already exists for this session token
           const existingSession = await UserSession.findOne({
             userId: user._id,
-            sessionToken: token
+            sessionToken: sessionTokenFromClient
           });
 
           if (!existingSession) {
@@ -180,7 +184,8 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
             const newSession = new UserSession({
               userId: user._id,
               username: user.username,
-              sessionToken: token,
+              sessionToken: sessionTokenFromClient,
+              jwtToken: token,
               ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
               userAgent: req.get('User-Agent') || '',
               isActive: true,
@@ -220,7 +225,7 @@ router.post('/login', checkConcurrentSession, antiSharingMiddleware, async (req,
         
         res.json({ 
           token,
-          sessionToken: req.antiSharingData?.sessionToken,
+          sessionToken: sessionTokenFromClient,
           user: {
             id: user.id,
             username: user.username,

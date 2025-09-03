@@ -1,0 +1,5 @@
+[33m29f05f2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m feat: Implement Server-Sent Events (SSE) for real-time PayOS payment completion
+[33mc4b9899[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: Complete redesign of PayOS webhook detection system
+[33m9642cce[m feat: Implement immediate webhook-driven payment completion with auto-redirect
+[33m3de289d[m feat: Enhance PayOS payment completion detection with extended webhook wait
+[33ma7ec8fe[m feat: Fix PayOS webhook auto-close and subscription update after payment
