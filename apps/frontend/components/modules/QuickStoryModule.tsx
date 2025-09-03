@@ -350,40 +350,67 @@ ${context || "Đây là phần đầu tiên."}
             diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
         }
         
-        const editPrompt = `Bạn là một AI Biên tập viên chuyên nghiệp với nhiệm vụ **TUYỆT ĐỐI** là điều chỉnh độ dài của văn bản theo yêu cầu.
+        const editPrompt = `Bạn là một biên tập viên truyện chuyên nghiệp. Nhiệm vụ của bạn là biên tập lại toàn bộ "Truyện Gốc" dưới đây để đáp ứng các yêu cầu sau:
+    
+**YÊU CẦU QUAN TRỌNG NHẤT VÀ ĐẦU TIÊN: ĐỘ DÀI CUỐI CÙNG CỦA TRUYỆN SAU KHI BIÊN TẬP PHẢI nằm trong khoảng từ ${minLength} đến ${maxLength} từ. MỤC TIÊU LÝ TƯỞNG là khoảng ${currentTargetLengthNum} từ.**
+    
+Truyện gốc bạn nhận được hiện có khoảng ${estimatedCurrentWordCount} từ.
+    
+${actionVerb ? `Yêu cầu Điều chỉnh Rõ ràng: Bạn cần ${actionVerb} ${diffDescription} cho truyện này.` : "Truyện đang trong khoảng độ dài chấp nhận được, hãy tập trung vào chất lượng."}
 
-**MỆNH LỆNH TỐI THƯỢNG (PRIORITY #1 - NON-NEGOTIABLE):**
-Truyện cuối cùng **PHẢI** có độ dài trong khoảng từ **${minLength} đến ${maxLength} từ**. Mục tiêu lý tưởng là **${currentTargetLengthNum} từ**.
--   Truyện gốc hiện tại có khoảng **${estimatedCurrentWordCount} từ**.
--   Mệnh lệnh của bạn là: **${actionVerb} ${diffDescription}**. Đây là nhiệm vụ quan trọng nhất, phải được ưu tiên trên tất cả các yếu-tố-khác.
+    
+**CÁCH THỨC ĐIỀU CHỈNH ĐỘ DÀI (Nếu cần):**
+    
+- **Nếu truyện quá dài (hiện tại ${estimatedCurrentWordCount} > ${maxLength} từ):** BẠN BẮT BUỘC PHẢI RÚT NGẮN NÓ. TUYỆT ĐỐI KHÔNG LÀM NÓ DÀI THÊM.
+        
+  1.  Cô đọng văn phong: Loại bỏ từ ngữ thừa, câu văn rườm rà, diễn đạt súc tích hơn.
+        
+  2.  Tóm lược các đoạn mô tả chi tiết không ảnh hưởng LỚN đến cốt truyện hoặc cảm xúc chính.
+        
+  3.  Nếu vẫn còn quá dài, xem xét gộp các cảnh phụ ít quan trọng hoặc cắt tỉa tình tiết không thiết yếu.
+        
+  4.  **DỪNG LẠI KHI ĐẠT GẦN MỤC TIÊU:** Khi truyện đã được rút ngắn và có độ dài ước tính gần ${maxLength} (nhưng vẫn trên ${minLength}), hãy chuyển sang tinh chỉnh nhẹ nhàng để đạt được khoảng ${currentTargetLengthNum} từ. **TUYỆT ĐỐI KHÔNG CẮT QUÁ TAY** làm truyện ngắn hơn ${minLength} từ.
+    
+- **Nếu truyện quá ngắn (hiện tại ${estimatedCurrentWordCount} < ${minLength} từ):** BẠN BẮT BUỘC PHẢI MỞ RỘNG NÓ. TUYỆT ĐỐI KHÔNG LÀM NÓ NGẮN ĐI.
+        
+  1.  Thêm chi tiết mô tả (cảm xúc nhân vật, không gian, thời gian, hành động nhỏ).
+        
+  2.  Kéo dài các đoạn hội thoại quan trọng, thêm phản ứng, suy nghĩ của nhân vật.
+        
+  3.  Mở rộng các cảnh hành động hoặc cao trào bằng cách mô tả kỹ hơn các diễn biến.
+        
+  4.  **DỪNG LẠI KHI ĐẠT GẦN MỤC TIÊU:** Khi truyện đã được mở rộng và có độ dài ước tính gần ${minLength} (nhưng vẫn dưới ${maxLength}), hãy chuyển sang tinh chỉnh nhẹ nhàng để đạt được khoảng ${currentTargetLengthNum} từ. **TUYỆT ĐỐI KHÔNG KÉO DÀI QUÁ TAY** làm truyện dài hơn ${maxLength} từ.
+    
+- **Nếu truyện đã trong khoảng ${minLength}-${maxLength} từ:** Tập trung vào việc tinh chỉnh văn phong, làm rõ ý, đảm bảo mạch lạc.
 
-**CHIẾN LƯỢC BIÊN TẬP BẮT BUỘC ĐỂ ĐẠT MỤC TIÊU ĐỘ DÀI:**
--   **NẾU CẦN RÚT NGẮN (BE RUTHLESS):**
-    -   **CẮT BỎ KHÔNG THƯƠNG TIẾC:** Loại bỏ các đoạn mô tả dài dòng, các đoạn hội thoại phụ không trực tiếp thúc đẩy cốt truyện, các tình tiết hoặc nhân vật phụ ít quan trọng.
-    -   **CÔ ĐỌNG HÓA:** Viết lại các câu dài, phức tạp thành các câu ngắn gọn, súc tích hơn. Thay vì mô tả một hành động trong 3 câu, hãy làm nó trong 1 câu.
-    -   **TÓM LƯỢC:** Thay vì kể chi tiết một sự kiện kéo dài, hãy tóm tắt nó lại. Ví dụ: thay vì kể chi tiết 5 phút nhân vật đi từ A đến B, chỉ cần nói "Sau một hồi di chuyển, anh đã đến B".
-    -   **Sự hi sinh là cần thiết:** Bạn phải chấp nhận hi sinh một số chi tiết và sự bay bổng của văn phong để đạt được mục tiêu độ dài. Việc này là BẮT BUỘC.
--   **NẾU CẦN MỞ RỘNG:**
-    -   **THÊM MÔ TẢ GIÁC QUAN:** Thêm chi tiết về hình ảnh, âm thanh, mùi vị, cảm giác để làm cảnh vật sống động hơn.
-    -   **KÉO DÀI HỘI THOẠI:** Thêm các câu đối đáp, biểu cảm, suy nghĩ nội tâm của nhân vật trong lúc hội thoại.
-    -   **CHI TIẾT HÓA HÀNH ĐỘNG:** Mô tả hành động của nhân vật một cách chi tiết hơn (show, don't tell).
-
-**YÊU CẦU PHỤ (PRIORITY #2 - Only after satisfying Priority #1):**
--   **Bám sát Dàn Ý:** Giữ lại các NÚT THẮT và CAO TRÀO chính từ "Dàn Ý Gốc".
--   **Nhất quán:** Duy trì sự nhất quán về tên nhân vật, địa điểm, và logic cơ bản của câu chuyện.
-
-**DÀN Ý GỐC (để tham khảo cốt truyện chính):**
+    
+**YÊU CẦU VỀ CHẤT LƯỢNG (SAU KHI ĐẢM BẢO ĐỘ DÀI):**
+    
+1.  **Tính Nhất Quán:** Kiểm tra và đảm bảo tính logic của cốt truyện, sự nhất quán của nhân vật (tên, tính cách, hành động, mối quan hệ), bối cảnh, và mạch truyện.
+    
+2.  **Mạch Lạc & Hấp Dẫn:** Đảm bảo câu chuyện trôi chảy, dễ hiểu, và giữ được sự hấp dẫn.
+    
+3.  **Bám sát Dàn Ý Gốc:** Việc biên tập không được làm thay đổi các NÚT THẮT, CAO TRÀO QUAN TRỌNG, hoặc Ý NGHĨA CHÍNH của câu chuyện được mô tả trong "Dàn Ý Gốc".
+    
+**DÀN Ý GỐC (Để đối chiếu khi biên tập, KHÔNG được viết lại dàn ý):**
+    
 ---
+    
 ${storyOutline}
+    
 ---
-
-**TRUYỆN GỐC CẦN BIÊN TẬP (bằng ${outputLanguageLabel}):**
+    
+**TRUYỆN GỐC CẦN BIÊN TẬP (được cung cấp bằng ${outputLanguageLabel}):**
+    
 ---
+    
 ${fullStory}
+    
 ---
-
-**NHIỆM VỤ CUỐI CÙNG:**
-Hãy trả về TOÀN BỘ câu chuyện đã được biên tập lại bằng ngôn ngữ ${outputLanguageLabel}, với độ dài **TUYỆT ĐỐI** phải nằm trong khoảng **${minLength} đến ${maxLength} từ**. Không thêm lời bình, giới thiệu, hay tiêu đề. Bắt đầu ngay bây giờ.`;
+    
+Hãy trả về TOÀN BỘ câu chuyện đã được biên tập hoàn chỉnh bằng ngôn ngữ ${outputLanguageLabel}.
+    ĐẢM BẢO ĐỘ DÀI CUỐI CÙNG nằm trong khoảng ${minLength} đến ${maxLength} từ.
+    Không thêm bất kỳ lời bình, giới thiệu, hay tiêu đề nào.`;
 
         const finalResult = await retryApiCall(() => generateText(editPrompt, undefined, false, apiSettings), 3, true);
         const finalStory = (finalResult.text ?? '').trim();
@@ -784,42 +811,66 @@ Hãy trả về TOÀN BỘ câu chuyện đã được biên tập lại bằng 
             diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
         }
 
-        const editPrompt = `Bạn là một AI Biên tập viên chuyên nghiệp với nhiệm vụ **TUYỆT ĐỐI** là điều chỉnh độ dài của văn bản theo yêu cầu.
+        const editPrompt = `Bạn là một biên tập viên truyện chuyên nghiệp. Nhiệm vụ của bạn là biên tập lại toàn bộ "Truyện Gốc" dưới đây để đáp ứng các yêu cầu sau:
+    
+**YÊU CẦU QUAN TRỌNG NHẤT VÀ ĐẦU TIÊN: ĐỘ DÀI CUỐI CÙNG CỦA TRUYỆN SAU KHI BIÊN TẬP PHẢI nằm trong khoảng từ ${minLength} đến ${maxLength} từ. MỤC TIÊU LÝ TƯỞNG là khoảng ${currentTargetLengthNum} từ.**
+    
+Truyện gốc bạn nhận được hiện có khoảng ${estimatedCurrentWordCount} từ.
+    
+${actionVerb ? `Yêu cầu Điều chỉnh Rõ ràng: Bạn cần ${actionVerb} ${diffDescription} cho truyện này.` : "Truyện đang trong khoảng độ dài chấp nhận được, hãy tập trung vào chất lượng."}
 
-**MỆNH LỆNH TỐI THƯỢNG (PRIORITY #1 - NON-NEGOTIABLE):**
-Truyện cuối cùng **PHẢI** có độ dài trong khoảng từ **${minLength} đến ${maxLength} từ**. Mục tiêu lý tưởng là **${currentTargetLengthNum} từ**.
--   Truyện gốc hiện tại có khoảng **${estimatedCurrentWordCount} từ**.
--   Mệnh lệnh của bạn là: **${actionVerb} ${diffDescription}**. Đây là nhiệm vụ quan trọng nhất, phải được ưu tiên trên tất cả các yếu-tố-khác.
+    
+**CÁCH THỨC ĐIỀU CHỈNH ĐỘ DÀI (Nếu cần):**
+    
+- **Nếu truyện quá dài (hiện tại ${estimatedCurrentWordCount} > ${maxLength} từ):** BẠN BẮT BUỘC PHẢI RÚT NGẮN NÓ. TUYỆT ĐỐI KHÔNG LÀM NÓ DÀI THÊM.
+        
+  1.  Cô đọng văn phong: Loại bỏ từ ngữ thừa, câu văn rườm rà, diễn đạt súc tích hơn.
+        
+  2.  Tóm lược các đoạn mô tả chi tiết không ảnh hưởng LỚN đến cốt truyện hoặc cảm xúc chính.
+        
+  3.  Nếu vẫn còn quá dài, xem xét gộp các cảnh phụ ít quan trọng hoặc cắt tỉa tình tiết không thiết yếu.
+        
+  4.  **DỪNG LẠI KHI ĐẠT GẦN MỤC TIÊU:** Khi truyện đã được rút ngắn và có độ dài ước tính gần ${maxLength} (nhưng vẫn trên ${minLength}), hãy chuyển sang tinh chỉnh nhẹ nhàng để đạt được khoảng ${currentTargetLengthNum} từ. **TUYỆT ĐỐI KHÔNG CẮT QUÁ TAY** làm truyện ngắn hơn ${minLength} từ.
+    
+- **Nếu truyện quá ngắn (hiện tại ${estimatedCurrentWordCount} < ${minLength} từ):** BẠN BẮT BUỘC PHẢI MỞ RỘNG NÓ. TUYỆT ĐỐI KHÔNG LÀM NÓ NGẮN ĐI.
+        
+  1.  Thêm chi tiết mô tả (cảm xúc nhân vật, không gian, thời gian, hành động nhỏ).
+        
+  2.  Kéo dài các đoạn hội thoại quan trọng, thêm phản ứng, suy nghĩ của nhân vật.
+        
+  3.  Mở rộng các cảnh hành động hoặc cao trào bằng cách mô tả kỹ hơn các diễn biến.
+        
+  4.  **DỪNG LẠI KHI ĐẠT GẦN MỤC TIÊU:** Khi truyện đã được mở rộng và có độ dài ước tính gần ${minLength} (nhưng vẫn dưới ${maxLength}), hãy chuyển sang tinh chỉnh nhẹ nhàng để đạt được khoảng ${currentTargetLengthNum} từ. **TUYỆT ĐỐI KHÔNG KÉO DÀI QUÁ TAY** làm truyện dài hơn ${maxLength} từ.
+    
+- **Nếu truyện đã trong khoảng ${minLength}-${maxLength} từ:** Tập trung vào việc tinh chỉnh văn phong, làm rõ ý, đảm bảo mạch lạc.
 
-**CHIẾN LƯỢC BIÊN TẬP BẮT BUỘC ĐỂ ĐẠT MỤC TIÊU ĐỘ DÀI:**
--   **NẾU CẦN RÚT NGẮN (BE RUTHLESS):**
-    -   **CẮT BỎ KHÔNG THƯƠNG TIẾC:** Loại bỏ các đoạn mô tả dài dòng, các đoạn hội thoại phụ không trực tiếp thúc đẩy cốt truyện, các tình tiết hoặc nhân vật phụ ít quan trọng.
-    -   **CÔ ĐỌNG HÓA:** Viết lại các câu dài, phức tạp thành các câu ngắn gọn, súc tích hơn.
-    -   **TÓM LƯỢC:** Thay vì kể chi tiết một sự kiện, hãy tóm tắt nó lại.
-    -   **Sự hi sinh là cần thiết:** Bạn phải chấp nhận hi sinh một số chi tiết và sự bay bổng của văn phong để đạt được mục tiêu độ dài. Việc này là BẮT BUỘC.
--   **NẾU CẦN MỞ RỘNG:**
-    -   **THÊM MÔ TẢ GIÁC QUAN:** Thêm chi tiết về hình ảnh, âm thanh, mùi vị, cảm giác.
-    -   **KÉO DÀI HỘI THOẠI:** Thêm các câu đối đáp, suy nghĩ nội tâm của nhân vật.
-    -   **CHI TIẾT HÓA HÀNH ĐỘNG:** Mô tả hành động của nhân vật một cách chi tiết hơn.
-
-**YÊU CẦU PHỤ (PRIORITY #2 - Only after satisfying Priority #1):**
--   **Bám sát Chủ đề & Tiêu đề:** Đảm bảo câu chuyện cuối cùng phản ánh đúng "Tiêu đề" và phù hợp với tinh thần chung của "Các truyện mẫu" đã được cung cấp làm ADN.
--   **Nhất quán:** Duy trì sự nhất quán về tên nhân vật, địa điểm, và logic cơ bản của câu chuyện.
-
+    
+**YÊU CẦU VỀ CHẤT LƯỢNG (SAU KHI ĐẢM BẢO ĐỘ DÀI):**
+    
+1.  **Tính Nhất Quán:** Kiểm tra và đảm bảo tính logic của cốt truyện, sự nhất quán của nhân vật (tên, tính cách, hành động, mối quan hệ), bối cảnh, và mạch truyện.
+    
+2.  **Mạch Lạc & Hấp Dẫn:** Đảm bảo câu chuyện trôi chảy, dễ hiểu, và giữ được sự hấp dẫn.
+    
+3.  **Bám sát Chủ đề & Tiêu đề:** Đảm bảo câu chuyện cuối cùng phản ánh đúng "Tiêu đề" và phù hợp với tinh thần chung của "Các truyện mẫu" đã được cung cấp làm ADN.
+    
 **THÔNG TIN THAM KHẢO:**
 - **TIÊU ĐỀ TRUYỆN:** ${selectedTitle}
 - **CÁC TRUYỆN MẪU (ADN):** (một phần)
 ---
 ${sourceStories.substring(0, 2000)}...
 ---
-
-**TRUYỆN GỐC CẦN BIÊN TẬP (bằng ${outputLanguageLabel}):**
+    
+**TRUYỆN GỐC CẦN BIÊN TẬP (được cung cấp bằng ${outputLanguageLabel}):**
+    
 ---
+    
 ${fullStory}
+    
 ---
-
-**NHIỆM VỤ CUỐI CÙNG:**
-Hãy trả về TOÀN BỘ câu chuyện đã được biên tập lại bằng ngôn ngữ ${outputLanguageLabel}, với độ dài **TUYỆT ĐỐI** phải nằm trong khoảng **${minLength} đến ${maxLength} từ**. Không thêm lời bình, giới thiệu, hay tiêu đề. Bắt đầu ngay bây giờ.`;
+    
+Hãy trả về TOÀN BỘ câu chuyện đã được biên tập hoàn chỉnh bằng ngôn ngữ ${outputLanguageLabel}.
+    ĐẢM BẢO ĐỘ DÀI CUỐI CÙNG nằm trong khoảng ${minLength} đến ${maxLength} từ.
+    Không thêm bất kỳ lời bình, giới thiệu, hay tiêu đề nào.`;
 
         const finalResult = await retryApiCall(() => generateText(editPrompt, undefined, false, apiSettings), 3, true);
         const finalStory = (finalResult.text ?? '').trim();
