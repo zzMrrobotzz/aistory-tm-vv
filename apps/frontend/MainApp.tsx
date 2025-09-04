@@ -132,6 +132,17 @@ const MainApp: React.FC = () => {
     storyProgress: 0, 
     storyLoadingMessage: null,
     singleStoryEditProgress: null,
+    // --- Prompt-Based Story Tab (promptBasedStory) ---
+    promptBasedTitle: '',
+    promptForOutline: '',
+    promptForWriting: '',
+    generatedStoryFromPrompt: '',
+    keyElementsFromPromptStory: null,
+    hasPromptStoryBeenEdited: false,
+    promptStoryError: null,
+    promptStoryProgress: 0,
+    promptStoryLoadingMessage: null,
+    promptStoryEditProgress: null,
     storyInputForHook: '', 
     hookLanguage: HOOK_LANGUAGE_OPTIONS[0].value, 
     hookStyle: HOOK_STYLE_OPTIONS[0].value,
@@ -188,6 +199,7 @@ const MainApp: React.FC = () => {
           generatedStory: '',        // Explicitly clear output
           generatedHooks: '',
           generatedLesson: '',
+          generatedStoryFromPrompt: '', // Clear prompt-based story output
           // storyInputForHook, storyInputForLesson, hookStructure, ctaChannelForLesson will be retained from parsedState if present
           // generatedBatchStories removed
         };
