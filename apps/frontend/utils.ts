@@ -32,11 +32,20 @@ export function isSubscribed(user: UserProfile | null): boolean {
     if (!user) {
       return false;
     }
+    
+    // Allow users with API keys to use the service (free tier with own API keys)
+    // This supports the "Users sử dụng API key riêng" model mentioned in CLAUDE.md
     if (user.subscriptionType === 'free') {
-      return false;
+      // For free users, they can still use the service if they have API keys configured
+      // The actual API usage will be validated by the backend checkAndTrackRequest
+      return true;
     }
+    
+    // For paid subscriptions, check expiration
     if (user.subscriptionExpiresAt) {
       return new Date(user.subscriptionExpiresAt) > new Date();
     }
-    return false;
+    
+    // Default to allowing access for logged-in users (API key validation happens at backend)
+    return true;
 }
