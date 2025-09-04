@@ -2237,6 +2237,8 @@ ${storyToEdit}
                     </div>
                 </div>
             )}
+
+            {renderMainButton()}
          </div>
       )}
 
