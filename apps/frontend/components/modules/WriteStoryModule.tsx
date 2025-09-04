@@ -65,6 +65,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     targetLength, writingStyle, customWritingStyle, outputLanguage, referenceViralStoryForStyle,
     // Single Story tab
     storyOutline, generatedStory, keyElementsFromSingleStory, hasSingleStoryBeenEditedSuccessfully, storyError, storyProgress, storyLoadingMessage, singleStoryEditProgress,
+    // Prompt-Based Story tab
+    promptBasedTitle, promptForOutline, promptForWriting, generatedStoryFromPrompt, keyElementsFromPromptStory, hasPromptStoryBeenEdited, promptStoryError, promptStoryProgress, promptStoryLoadingMessage, promptStoryEditProgress,
     // Hook Generator tab
     storyInputForHook, // New field
     hookLanguage, hookStyle, customHookStyle, hookLength, hookCount, ctaChannel, hookStructure, // Added hookStructure
@@ -818,6 +820,8 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       // Update specific loading message based on active tab
       if (activeWriteTab === 'singleStory') {
         updateState({ storyLoadingMessage: "Đang hủy viết truyện..." });
+      } else if (activeWriteTab === 'promptBasedStory') {
+        updateState({ promptStoryLoadingMessage: "Đang hủy..." });
       } else if (activeWriteTab === 'hookGenerator') {
         updateState({ hookLoadingMessage: "Đang hủy tạo hook..." });
       } else if (activeWriteTab === 'lessonGenerator') {
@@ -1218,6 +1222,234 @@ Provide ONLY the numbered hooks, no additional explanations.`;
     }
   };
 
+  // NEW: Handler for "Write Story from Prompt"
+  const handleGenerateStoryFromPrompt = async () => {
+    if (!promptBasedTitle.trim() || !promptForOutline.trim() || !promptForWriting.trim()) {
+      updateState({ promptStoryError: 'Vui lòng nhập đầy đủ Tiêu đề, Prompt Dàn Ý, và Prompt Viết Truyện.' });
+      return;
+    }
+
+    // Check usage before proceeding
+    const usageCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.STORY_GENERATION, 1);
+    if (!usageCheck.allowed) {
+      updateState({ promptStoryError: usageCheck.message || 'Bạn đã đạt giới hạn tạo truyện.' });
+      return;
+    }
+
+    const abortCtrl = new AbortController();
+    setCurrentAbortController(abortCtrl);
+
+    updateState({
+      promptStoryError: null,
+      generatedStoryFromPrompt: '',
+      promptStoryProgress: 0,
+      promptStoryLoadingMessage: 'Bước 1/3: Đang tạo dàn ý theo prompt...',
+      keyElementsFromPromptStory: null,
+      hasPromptStoryBeenEdited: false,
+      promptStoryEditProgress: null,
+    });
+    
+    const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+
+    try {
+      // Step 1: Generate Outline from Prompt
+      const outlineGenerationPrompt = `Dựa trên yêu cầu sau, hãy tạo một dàn ý chi tiết cho một câu chuyện có tiêu đề "${promptBasedTitle}".
+      
+      Yêu cầu của người dùng:
+      ---
+      ${promptForOutline}
+      ---
+      
+      Dàn ý phải được viết bằng ngôn ngữ ${outputLanguageLabel} và phải logic, có cấu trúc rõ ràng.`;
+      
+      const outlineResult = await generateText(outlineGenerationPrompt, undefined, false, apiSettings);
+      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const generatedOutline = (outlineResult.text || '').trim();
+      if (!generatedOutline) throw new Error("Không thể tạo dàn ý từ prompt được cung cấp.");
+
+      // Step 2: Write Story from Outline and Prompt
+      let fullStory = '';
+      let capturedKeyElements: string | null = null;
+      const CHUNK_WORD_COUNT = 1000;
+      const currentTargetLengthNum = parseInt(targetLength);
+      const numChunks = Math.ceil(currentTargetLengthNum / CHUNK_WORD_COUNT);
+      
+      for (let i = 0; i < numChunks; i++) {
+        if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        updateState({ promptStoryLoadingMessage: `Bước 2/3: Đang viết phần ${i + 1}/${numChunks}...`, promptStoryProgress: Math.round(((i + 1) / numChunks) * 100) });
+        
+        const context = fullStory.length > 2000 ? '...\n' + fullStory.slice(-2000) : fullStory;
+        
+        let writePrompt = `Bạn là một nhà văn AI. Dựa vào "Dàn ý tổng thể" và "Yêu cầu Viết truyện" dưới đây, hãy viết tiếp câu chuyện một cách liền mạch BẰNG NGÔN NGỮ ${outputLanguageLabel}.
+        
+        **Tiêu đề truyện:** "${promptBasedTitle}"
+        **Yêu cầu Viết truyện của người dùng:** 
+        ---
+        ${promptForWriting}
+        ---
+        **Dàn ý tổng thể (NGUỒN DUY NHẤT CHO NỘI DUNG TRUYỆN):**
+        ---
+        ${generatedOutline}
+        ---`;
+
+        if (i === 0) {
+          writePrompt += `\n**YÊU CẦU QUAN TRỌNG Trước Khi Viết Phần 1: Xác định và khóa các yếu tố cốt lõi (tên nhân vật, địa điểm) từ dàn ý. Sau khi viết xong phần 1, thêm vào CUỐI CÙNG một dòng ĐẶC BIỆT theo định dạng: [KEY_ELEMENTS]Tên nhân vật 1, Tên nhân vật 2; Địa điểm A[/KEY_ELEMENTS].**`;
+        } else if (capturedKeyElements) {
+          writePrompt += `\n**YẾU TỐ CỐT LÕI (BẮT BUỘC TUÂN THỦ NGHIÊM NGẶT):**\n${capturedKeyElements}`;
+        }
+
+        writePrompt += `\n**Nội dung đã viết (ngữ cảnh):**\n${context || "Đây là phần đầu tiên."}
+        \n**Yêu cầu hiện tại:** Viết phần tiếp theo của câu chuyện. Chỉ viết nội dung, không lặp lại, không tiêu đề.`;
+
+        if (i > 0) await delay(4500, abortCtrl.signal);
+        const result = await generateText(writePrompt, undefined, false, apiSettings);
+        if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        let currentChunkText = result.text;
+        
+        if (typeof currentChunkText !== 'string') {
+            console.warn('API response for story chunk did not contain valid text. Assuming empty chunk.', result);
+            currentChunkText = '';
+        }
+
+        if (i === 0) {
+            const keyElementsMatch = currentChunkText.match(/\[KEY_ELEMENTS\]([\s\S]*?)\[\/KEY_ELEMENTS\]/);
+            if (keyElementsMatch && keyElementsMatch[1]) {
+                capturedKeyElements = keyElementsMatch[1].trim();
+                updateState({ keyElementsFromPromptStory: capturedKeyElements });
+                currentChunkText = currentChunkText.replace(keyElementsMatch[0], '').trim();
+            }
+        }
+        fullStory += (fullStory ? '\n\n' : '') + currentChunkText;
+        updateState({ generatedStoryFromPrompt: fullStory });
+      }
+      
+      // Step 3: Auto-Edit
+      if (fullStory.trim()) {
+        await handleEditStoryFromPrompt(fullStory, generatedOutline, capturedKeyElements, abortCtrl);
+      } else {
+        throw new Error("Không thể tạo nội dung truyện.");
+      }
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        updateState({ promptStoryError: `Quá trình đã bị hủy.`, promptStoryLoadingMessage: 'Đã hủy.', promptStoryProgress: 0 });
+      } else {
+        updateState({ promptStoryError: `Đã xảy ra lỗi: ${e.message}`, promptStoryLoadingMessage: 'Lỗi!', promptStoryProgress: 0 });
+      }
+    } finally {
+      setCurrentAbortController(null);
+      setTimeout(() => {
+        setModuleState(prev => {
+          const msg = prev.promptStoryLoadingMessage;
+          if (msg?.includes('hủy') || msg?.includes('Lỗi') || msg?.includes('Hoàn tất')) {
+            return { ...prev, promptStoryLoadingMessage: null };
+          }
+          return prev;
+        });
+      }, 3000);
+    }
+  };
+
+  // NEW: Edit handler for Prompt-Based Story
+  const handleEditStoryFromPrompt = async (
+    storyToEdit: string, 
+    outline: string, 
+    keyElements: string | null,
+    externalAbortController?: AbortController
+  ) => {
+    const abortCtrl = externalAbortController || new AbortController();
+    if (!externalAbortController) setCurrentAbortController(abortCtrl);
+
+    updateState({
+      promptStoryLoadingMessage: 'Bước 3/3: Đang biên tập và tối ưu hóa...',
+      promptStoryEditProgress: 30,
+      hasPromptStoryBeenEdited: false,
+      promptStoryError: null
+    });
+
+    const currentTargetLengthNum = parseInt(targetLength);
+    const minLength = Math.round(currentTargetLengthNum * 0.9);
+    const maxLength = Math.round(currentTargetLengthNum * 1.1);
+    const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    const estimatedCurrentWordCount = storyToEdit.split(/\s+/).filter(Boolean).length;
+    let actionVerb = "";
+    let diffDescription = "";
+    if (estimatedCurrentWordCount > maxLength) {
+        actionVerb = "RÚT NGẮN";
+        diffDescription = `khoảng ${estimatedCurrentWordCount - currentTargetLengthNum} từ`;
+    } else if (estimatedCurrentWordCount < minLength) {
+        actionVerb = "MỞ RỘNG";
+        diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
+    }
+    
+    const finalEditPrompt = `Bạn là một biên tập viên AI cực kỳ tỉ mỉ và chính xác. Nhiệm vụ của bạn là biên tập lại "Truyện Gốc" theo 2 ưu tiên sau, theo đúng thứ tự:
+
+**ƯU TIÊN #1 - TUYỆT ĐỐI (Logic & Nhất quán):**
+1.  **KIỂM TRA TÊN:** Rà soát TOÀN BỘ truyện. Đảm bảo tên nhân vật, địa điểm phải nhất quán 100% từ đầu đến cuối.
+2.  **NGUỒN CHÂN LÝ:** ${keyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau đây làm nguồn chân lý DUY NHẤT cho các tên: "${keyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên nhân vật/địa điểm từ đầu truyện và đảm bảo chúng được sử dụng nhất quán đến cuối cùng.'}
+3.  **SỬA LỖI LOGIC:** Sửa mọi lỗi logic, tình tiết mâu thuẫn, hoặc "plot hole".
+4.  **BÁM SÁT CHỦ ĐỀ:** Việc biên tập không được làm thay đổi ý nghĩa chính của câu chuyện được gợi ý bởi "Tiêu đề" và tinh thần của "Các truyện mẫu".
+
+**ƯU TIÊN #2 - QUAN TRỌNG (Độ dài & Văn phong):**
+Sau khi đã đảm bảo Ưu tiên #1, hãy điều chỉnh độ dài của truyện để nằm trong khoảng từ ${minLength} đến ${maxLength} từ (lý tưởng là ~${currentTargetLengthNum} từ).
+-   Truyện hiện có ~${estimatedCurrentWordCount} từ. ${actionVerb ? `Bạn cần ${actionVerb} ${diffDescription}.` : "Tập trung vào chất lượng."}
+-   **Cách điều chỉnh độ dài:** Nếu quá dài, hãy cô đọng văn phong. Nếu quá ngắn, hãy thêm chi tiết.
+-   **Nâng cao văn phong:** Loại bỏ các câu, từ ngữ trùng lặp. Cải thiện sự mạch lạc.
+
+**DÀN Ý GỐC (để đối chiếu):**
+---
+${outline}
+---
+
+**TRUYỆN GỐC CẦN BIÊN TẬP (bằng ${outputLanguageLabel}):**
+---
+${storyToEdit}
+---
+
+**ĐẦU RA YÊU CẦU:**
+-   TOÀN BỘ câu chuyện đã được biên tập lại, đáp ứng ĐẦY ĐỦ các yêu cầu trên, bằng ngôn ngữ ${outputLanguageLabel}.
+-   Không thêm lời bình, giới thiệu, hay tiêu đề.`;
+
+    try {
+      const result = await generateText(finalEditPrompt, undefined, false, apiSettings);
+      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const editedStory = result.text;
+      updateState({
+        generatedStoryFromPrompt: editedStory,
+        promptStoryLoadingMessage: '✅ Hoàn tất!',
+        promptStoryEditProgress: 100,
+        hasPromptStoryBeenEdited: true
+      });
+      
+      // Add to history
+      HistoryStorage.addItem(MODULE_KEYS.WRITE_STORY, {
+        title: `Truyện theo prompt: ${promptBasedTitle}`,
+        content: editedStory,
+        contentType: 'text',
+        restoreContext: { 
+            activeWriteTab: 'promptBasedStory',
+            promptBasedTitle, 
+            promptForOutline, 
+            promptForWriting 
+        }
+      });
+      
+      // Log usage
+      logStoryGenerated(1);
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+         updateState({ promptStoryError: 'Biên tập đã bị hủy.', promptStoryLoadingMessage: 'Đã hủy biên tập.', promptStoryEditProgress: null });
+      } else {
+        updateState({ 
+            promptStoryError: `Lỗi khi biên tập: ${e.message}`, 
+            promptStoryLoadingMessage: 'Lỗi biên tập.', 
+            promptStoryEditProgress: null
+        });
+      }
+    } finally {
+      if (!externalAbortController) setCurrentAbortController(null);
+    }
+  };
+
 
   const handleGenerateLesson = async () => {
     if (!storyInputForLesson.trim()) {
@@ -1329,11 +1561,12 @@ Provide ONLY the numbered hooks, no additional explanations.`;
     </button>
   );
   
-  const anyLoadingOperation = storyLoadingMessage !== null || hookLoadingMessage !== null || lessonLoadingMessage !== null || singleStoryEditProgress !== null; 
+  const anyLoadingOperation = storyLoadingMessage !== null || hookLoadingMessage !== null || lessonLoadingMessage !== null || singleStoryEditProgress !== null || promptStoryLoadingMessage !== null || promptStoryEditProgress !== null; 
   const feedbackContainerMinHeight = "60px"; 
   const spinnerFeedbackContainerHeight = "h-20"; 
 
   const currentLoadingMessage = activeWriteTab === 'singleStory' ? storyLoadingMessage :
+                                activeWriteTab === 'promptBasedStory' ? promptStoryLoadingMessage :
                                 activeWriteTab === 'hookGenerator' ? hookLoadingMessage :
                                 activeWriteTab === 'lessonGenerator' ? lessonLoadingMessage : null;
 
@@ -1346,6 +1579,10 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       buttonText = "✍️ Viết & Biên Tập Truyện";
       actionHandler = handleWriteStory;
       disabled = disabled || !storyOutline.trim();
+    } else if (activeWriteTab === 'promptBasedStory') {
+      buttonText = "🎨 Tạo Truyện Theo Prompt";
+      actionHandler = handleGenerateStoryFromPrompt;
+      disabled = disabled || !promptBasedTitle.trim() || !promptForOutline.trim() || !promptForWriting.trim();
     } else if (activeWriteTab === 'hookGenerator') {
       buttonText = "💡 Tạo Hooks";
       actionHandler = handleGenerateHooks;
@@ -1515,6 +1752,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
 
       <div className="mb-6 flex flex-wrap gap-1 border-b-2 border-gray-300" role="tablist" aria-label="Chức năng Viết">
         <TabButton tabId="singleStory" label="Viết Truyện Đơn" icon="✍️"/>
+        <TabButton tabId="promptBasedStory" label="Viết Truyện Theo Prompt" icon="🎨"/>
         <TabButton tabId="hookGenerator" label="Tạo Hooks" icon="💡"/>
         <TabButton tabId="lessonGenerator" label="Đúc Kết Bài Học" icon="🧐"/>
       </div>
@@ -1860,6 +2098,145 @@ Provide ONLY the numbered hooks, no additional explanations.`;
                     }}
                 />
             </div>
+         </div>
+      )}
+
+      {activeWriteTab === 'promptBasedStory' && (
+         <div role="tabpanel" id="prompt-based-story-panel" className="animate-fadeIn space-y-6">
+            <h3 className="text-xl font-semibold text-gray-800">🎨 Viết Truyện Theo Prompt</h3>
+             <InfoBox>
+                <p>Tính năng này cho phép bạn tạo truyện thông qua 2 bước với prompt tùy chỉnh: Tạo outline từ prompt đầu tiên, sau đó viết truyện dựa trên outline và prompt thứ hai.</p>
+                <p className="mt-1"><strong>Quy trình:</strong> Prompt tạo outline → Tạo outline → Prompt viết truyện → Viết truyện theo từng phần → Tự động chỉnh sửa</p>
+            </InfoBox>
+
+            <div className="grid grid-cols-1 gap-6">
+                {/* Title Input */}
+                <div>
+                    <label htmlFor="promptBasedTitle" className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề truyện:</label>
+                    <input
+                        type="text"
+                        id="promptBasedTitle"
+                        value={promptBasedTitle}
+                        onChange={(e) => updateState({ promptBasedTitle: e.target.value })}
+                        placeholder="Nhập tiêu đề cho truyện của bạn..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+
+                {/* Outline Prompt Input */}
+                <div>
+                    <label htmlFor="promptForOutline" className="block text-sm font-medium text-gray-700 mb-1">Prompt tạo outline:</label>
+                    <textarea
+                        id="promptForOutline"
+                        value={promptForOutline}
+                        onChange={(e) => updateState({ promptForOutline: e.target.value })}
+                        placeholder="Mô tả chi tiết về truyện bạn muốn viết (nhân vật, tình huống, thể loại, độ dài...)&#10;Ví dụ: Viết một câu chuyện tình yêu giữa hai người trẻ gặp nhau trong thư viện, có yếu tố hài hước và kết thúc có hậu."
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[100px]"
+                    />
+                </div>
+
+                {/* Writing Prompt Input */}
+                <div>
+                    <label htmlFor="promptForWriting" className="block text-sm font-medium text-gray-700 mb-1">Prompt viết truyện:</label>
+                    <textarea
+                        id="promptForWriting"
+                        value={promptForWriting}
+                        onChange={(e) => updateState({ promptForWriting: e.target.value })}
+                        placeholder="Hướng dẫn cách viết truyện (phong cách, ngôi kể, độ dài, yêu cầu đặc biệt...)&#10;Ví dụ: Viết bằng ngôi thứ nhất, phong cách nhẹ nhàng, tập trung vào cảm xúc nhân vật, độ dài khoảng 800-1000 từ."
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[100px]"
+                    />
+                </div>
+            </div>
+
+            {/* Progress Display */}
+            {promptStoryProgress > 0 && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-blue-900">
+                            {promptStoryProgress === 33 ? "🔍 Đang tạo outline..." :
+                             promptStoryProgress === 66 ? "✍️ Đang viết truyện..." :
+                             promptStoryProgress === 100 ? "🎯 Đang tự động chỉnh sửa..." : "⏳ Chuẩn bị..."}
+                        </span>
+                        <span className="text-sm font-medium text-blue-900">{promptStoryProgress}%</span>
+                    </div>
+                    <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+                            style={{ width: `${promptStoryProgress}%` }}
+                        ></div>
+                    </div>
+                    {promptStoryLoadingMessage && (
+                        <p className="text-sm text-blue-800 mt-2">{promptStoryLoadingMessage}</p>
+                    )}
+                </div>
+            )}
+
+            {/* Error Display */}
+            {promptStoryError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                        <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                        <span className="text-red-800">{promptStoryError}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Generated Story Display */}
+            {generatedStoryFromPrompt && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-lg font-semibold text-green-800">📖 Truyện đã tạo</h4>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(generatedStoryFromPrompt);
+                                    // You might want to add a toast notification here
+                                }}
+                                className="px-3 py-1 text-xs font-medium text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors"
+                            >
+                                📋 Copy
+                            </button>
+                            {hasPromptStoryBeenEdited && (
+                                <button
+                                    onClick={() => {
+                                        if (confirm('Bạn có chắc muốn chỉnh sửa lại truyện này không?')) {
+                                            handleEditStoryFromPrompt(generatedStoryFromPrompt, keyElementsFromPromptStory, keyElementsFromPromptStory);
+                                        }
+                                    }}
+                                    disabled={promptStoryEditProgress !== null}
+                                    className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    ✏️ Sửa lại
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Edit Progress */}
+                    {promptStoryEditProgress !== null && (
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-blue-600 font-medium">Đang chỉnh sửa...</span>
+                                <span className="text-xs text-blue-600 font-medium">{promptStoryEditProgress}%</span>
+                            </div>
+                            <div className="w-full bg-blue-200 rounded-full h-1">
+                                <div 
+                                    className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                                    style={{ width: `${promptStoryEditProgress}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded border p-4 max-h-96 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed font-sans">
+                            {generatedStoryFromPrompt}
+                        </pre>
+                    </div>
+                </div>
+            )}
          </div>
       )}
 
