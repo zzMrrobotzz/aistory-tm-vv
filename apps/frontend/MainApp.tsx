@@ -6,6 +6,7 @@ import {
   ActiveModule, ApiSettings, ApiProvider,
   CreativeLabModuleState, 
   WriteStoryModuleState, RewriteModuleState, AnalysisModuleState, TtsModuleState,
+  PromptStoryQueueItem, // Added for queue system
   TranslateModuleState, // Added
   YoutubeSeoModuleState, /* ImageByHookModuleState, */ // Removed
   ContentStrategyModuleState, /* ImageByHookEngine, */ // Removed
@@ -143,6 +144,17 @@ const MainApp: React.FC = () => {
     promptStoryProgress: 0,
     promptStoryLoadingMessage: null,
     promptStoryEditProgress: null,
+    // --- Prompt-Based Story Queue System ---
+    promptStoryQueue: [],
+    promptStoryQueueSystem: {
+      isEnabled: false,
+      isPaused: false,
+      isProcessing: false,
+      currentItem: null,
+      completedCount: 0,
+      totalCount: 0,
+      averageProcessingTime: 180, // 3 minutes default (3-step process)
+    },
     storyInputForHook: '', 
     hookLanguage: HOOK_LANGUAGE_OPTIONS[0].value, 
     hookStyle: HOOK_STYLE_OPTIONS[0].value,

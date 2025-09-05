@@ -174,6 +174,21 @@ export interface BatchOutlineItem {
 
 export type WriteStoryActiveTab = 'singleStory' | 'promptBasedStory' | 'hookGenerator' | 'lessonGenerator'; // Added 'promptBasedStory'
 
+// Queue system for Prompt-Based Story generation
+export interface PromptStoryQueueItem {
+  id: string;
+  title: string;
+  promptForOutline: string;
+  promptForWriting: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  result?: string;
+  error?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  processingTime?: number;
+}
+
 export interface WriteStoryModuleState {
   activeWriteTab: WriteStoryActiveTab;
 
@@ -205,6 +220,18 @@ export interface WriteStoryModuleState {
   promptStoryProgress: number;
   promptStoryLoadingMessage: string | null;
   promptStoryEditProgress: number | null;
+
+  // --- Prompt-Based Story Queue System ---
+  promptStoryQueue: PromptStoryQueueItem[];
+  promptStoryQueueSystem: {
+    isEnabled: boolean;
+    isPaused: boolean;
+    isProcessing: boolean;
+    currentItem: PromptStoryQueueItem | null;
+    completedCount: number;
+    totalCount: number;
+    averageProcessingTime: number;
+  };
 
   // --- Hook Generator Tab (hookGenerator) ---
   storyInputForHook: string; // New field for hook generator story input

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApiSettings, WriteStoryModuleState, WriteStoryActiveTab, BatchOutlineItem, UserProfile, WriteStoryQueueItem, HookQueueItem } from '../../types';
+import { ApiSettings, WriteStoryModuleState, WriteStoryActiveTab, BatchOutlineItem, UserProfile, WriteStoryQueueItem, HookQueueItem, PromptStoryQueueItem } from '../../types';
 import { 
     WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS, HOOK_STYLE_OPTIONS, 
     HOOK_LENGTH_OPTIONS, STORY_LENGTH_OPTIONS, 
@@ -1583,6 +1583,349 @@ ${storyToEdit}
        setCurrentAbortController(null);
        setTimeout(() => setModuleState(prev => (prev.lessonLoadingMessage?.includes("hoàn tất") || prev.lessonLoadingMessage?.includes("Lỗi") || prev.lessonLoadingMessage?.includes("Đã hủy")) ? {...prev, lessonLoadingMessage: null} : prev), 3000);
     }
+  };
+
+  // ====== PROMPT-BASED STORY QUEUE SYSTEM ======
+
+  // Add item to queue
+  const addToPromptStoryQueue = (title: string, promptForOutline: string, promptForWriting: string) => {
+    const newItem: PromptStoryQueueItem = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      title: title.trim() || `Truyện ${Date.now()}`,
+      promptForOutline: promptForOutline.trim(),
+      promptForWriting: promptForWriting.trim(),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    updateState(prev => ({
+      promptStoryQueue: [...prev.promptStoryQueue, newItem],
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        totalCount: prev.promptStoryQueue.length + 1
+      }
+    }));
+
+    return newItem.id;
+  };
+
+  // Remove item from queue
+  const removeFromPromptStoryQueue = (itemId: string) => {
+    updateState(prev => ({
+      promptStoryQueue: prev.promptStoryQueue.filter(item => item.id !== itemId),
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        totalCount: prev.promptStoryQueue.filter(item => item.id !== itemId).length
+      }
+    }));
+  };
+
+  // Clear completed items from queue
+  const clearCompletedFromPromptStoryQueue = () => {
+    updateState(prev => ({
+      promptStoryQueue: prev.promptStoryQueue.filter(item => 
+        item.status !== 'completed' && item.status !== 'failed'
+      ),
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        totalCount: prev.promptStoryQueue.filter(item => 
+          item.status !== 'completed' && item.status !== 'failed'
+        ).length
+      }
+    }));
+  };
+
+  // Process single queue item
+  const processPromptStoryQueueItem = async (item: PromptStoryQueueItem) => {
+    const startTime = Date.now();
+    
+    // Update item status to processing
+    updateState(prev => ({
+      promptStoryQueue: prev.promptStoryQueue.map(qItem =>
+        qItem.id === item.id 
+          ? { ...qItem, status: 'processing', startedAt: new Date().toISOString() }
+          : qItem
+      ),
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        currentItem: { ...item, status: 'processing', startedAt: new Date().toISOString() },
+        isProcessing: true
+      }
+    }));
+
+    try {
+      // Set current prompt values for processing
+      updateState({
+        promptBasedTitle: item.title,
+        promptForOutline: item.promptForOutline,
+        promptForWriting: item.promptForWriting,
+        promptStoryError: null,
+        generatedStoryFromPrompt: '',
+        promptStoryProgress: 0,
+        hasPromptStoryBeenEdited: false,
+        promptStoryEditProgress: null,
+      });
+
+      // Process the story using existing handler
+      await processPromptStoryGeneration(item.title, item.promptForOutline, item.promptForWriting);
+      
+      const processingTime = Date.now() - startTime;
+
+      // Mark as completed and save result
+      updateState(prev => {
+        const updatedQueue = prev.promptStoryQueue.map(qItem =>
+          qItem.id === item.id 
+            ? { 
+                ...qItem, 
+                status: 'completed', 
+                result: prev.generatedStoryFromPrompt,
+                completedAt: new Date().toISOString(),
+                processingTime: Math.round(processingTime / 1000)
+              }
+            : qItem
+        );
+
+        const newCompletedCount = prev.promptStoryQueueSystem.completedCount + 1;
+        const newAverageTime = Math.round(
+          (prev.promptStoryQueueSystem.averageProcessingTime * prev.promptStoryQueueSystem.completedCount + processingTime) / newCompletedCount / 1000
+        );
+
+        return {
+          promptStoryQueue: updatedQueue,
+          promptStoryQueueSystem: {
+            ...prev.promptStoryQueueSystem,
+            currentItem: null,
+            completedCount: newCompletedCount,
+            averageProcessingTime: newAverageTime
+          }
+        };
+      });
+
+    } catch (error: any) {
+      // Mark as failed
+      updateState(prev => ({
+        promptStoryQueue: prev.promptStoryQueue.map(qItem =>
+          qItem.id === item.id 
+            ? { 
+                ...qItem, 
+                status: 'failed', 
+                error: error.message || 'Unknown error',
+                completedAt: new Date().toISOString()
+              }
+            : qItem
+        ),
+        promptStoryQueueSystem: {
+          ...prev.promptStoryQueueSystem,
+          currentItem: null
+        }
+      }));
+    }
+  };
+
+  // Helper function to extract the core story generation logic
+  const processPromptStoryGeneration = async (title: string, outlinePrompt: string, writingPrompt: string) => {
+    // Check usage before proceeding
+    const usageCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.STORY_GENERATION, 1);
+    if (!usageCheck.allowed) {
+      throw new Error(usageCheck.message || 'Bạn đã đạt giới hạn tạo truyện.');
+    }
+
+    const abortCtrl = new AbortController();
+    setCurrentAbortController(abortCtrl);
+
+    try {
+      // Step 1: Generate outline
+      updateState({
+        promptStoryLoadingMessage: 'Bước 1/3: Đang tạo dàn ý theo prompt...',
+        promptStoryProgress: 33
+      });
+
+      const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+      const outlineGenerationPrompt = `Hãy tạo một dàn ý chi tiết cho câu chuyện dựa trên prompt sau:
+
+      "${outlinePrompt}"
+
+      Yêu cầu:
+      - Tạo dàn ý có cấu trúc rõ ràng với mở đầu, thân bài và kết thúc
+      - Bao gồm nhân vật chính, bối cảnh và các sự kiện quan trọng
+      - Đảm bảo logic và tính nhất quán trong câu chuyện
+      ---
+      
+      Dàn ý phải được viết bằng ngôn ngữ ${outputLanguageLabel} và phải logic, có cấu trúc rõ ràng.`;
+      
+      const outlineResult = await retryApiCall(
+        () => generateText(outlineGenerationPrompt, undefined, false, apiSettings),
+        3,
+        true // isQueueMode = true for queue processing
+      );
+      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      
+      const generatedOutline = (outlineResult.text || '').trim();
+      if (!generatedOutline) throw new Error("Không thể tạo dàn ý từ prompt được cung cấp.");
+
+      // Step 2: Write story
+      updateState({
+        promptStoryLoadingMessage: 'Bước 2/3: Đang viết truyện theo dàn ý...',
+        promptStoryProgress: 66
+      });
+
+      const writePrompt = `Dựa trên dàn ý sau, hãy viết một câu chuyện hoàn chỉnh:
+
+      **DÀN Ý:**
+      ${generatedOutline}
+
+      **HƯỚNG DẪN VIẾT:**
+      ${writingPrompt}
+
+      **YÊU CẦU:**
+      - Viết câu chuyện hoàn chỉnh, có đầu có cuối
+      - Tuân thủ dàn ý đã cho
+      - Áp dụng hướng dẫn viết được cung cấp
+      - Sử dụng ngôn ngữ ${outputLanguageLabel}
+      - Tạo nội dung hấp dẫn và có ý nghĩa`;
+
+      const storyResult = await retryApiCall(
+        () => generateText(writePrompt, undefined, false, apiSettings),
+        3,
+        true // isQueueMode = true for queue processing
+      );
+      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      
+      let generatedStory = (storyResult.text || '').trim();
+      if (!generatedStory) throw new Error("Không thể viết truyện từ dàn ý được tạo.");
+
+      // Step 3: Auto-edit
+      updateState({
+        promptStoryLoadingMessage: 'Bước 3/3: Đang tự động chỉnh sửa...',
+        promptStoryProgress: 100
+      });
+
+      const finalEditPrompt = `Hãy chỉnh sửa và cải thiện câu chuyện sau theo 2 mức độ ưu tiên:
+
+      **MỨC ĐỘ 1 - LOGIC & NHẤT QUÁN (Ưu tiên cao):**
+      - Kiểm tra và sửa các lỗi logic trong cốt truyện
+      - Đảm bảo tính nhất quán của nhân vật và bối cảnh
+      - Sửa các mâu thuẫn về thời gian, địa điểm
+      - Cải thiện tính liền mạch giữa các đoạn
+
+      **MỨC ĐỘ 2 - PHONG CÁCH & ĐỘ DÀI (Ưu tiên thấp):**
+      - Cải thiện văn phong và cách diễn đạt
+      - Điều chỉnh độ dài phù hợp
+      - Tăng tính hấp dẫn và cảm xúc
+
+      **TRUYỆN CẦN CHỈNH SỬA:**
+      ${generatedStory}
+
+      **ĐẦU RA YÊU CẦU:**
+      - TOÀN BỘ câu chuyện đã được biên tập lại, đáp ứng ĐẦY ĐỦ các yêu cầu trên, bằng ngôn ngữ ${outputLanguageLabel}.
+      - Không thêm lời bình, giới thiệu, hay tiêu đề.`;
+
+      const editResult = await retryApiCall(
+        () => generateText(finalEditPrompt, undefined, false, apiSettings),
+        3,
+        true // isQueueMode = true for queue processing
+      );
+      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      
+      const editedStory = editResult.text;
+      updateState({
+        generatedStoryFromPrompt: editedStory,
+        promptStoryLoadingMessage: '✅ Hoàn tất!',
+        hasPromptStoryBeenEdited: true
+      });
+
+      // Save to history
+      HistoryStorage.saveToHistory(
+        MODULE_KEYS.WRITE_STORY,
+        `Truyện theo prompt: ${title}`,
+        editedStory,
+        {
+          restoreContext: { 
+            activeWriteTab: 'promptBasedStory',
+            promptBasedTitle: title,
+            promptForOutline: outlinePrompt,
+            promptForWriting: writingPrompt
+          }
+        }
+      );
+
+      // Log usage
+      logStoryGenerated(1);
+
+      return editedStory;
+
+    } finally {
+      setCurrentAbortController(null);
+      setTimeout(() => {
+        updateState(prev => 
+          (prev.promptStoryLoadingMessage?.includes("✅") || 
+           prev.promptStoryLoadingMessage?.includes("Lỗi") || 
+           prev.promptStoryLoadingMessage?.includes("Đã hủy")) 
+            ? { ...prev, promptStoryLoadingMessage: null } 
+            : prev
+        );
+      }, 3000);
+    }
+  };
+
+  // Start queue processing
+  const startPromptStoryQueueProcessing = async () => {
+    const { promptStoryQueue, promptStoryQueueSystem } = moduleState;
+    
+    if (promptStoryQueueSystem.isProcessing || promptStoryQueueSystem.isPaused) return;
+    
+    updateState(prev => ({
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        isEnabled: true,
+        isProcessing: true
+      }
+    }));
+
+    // Process items one by one
+    const pendingItems = promptStoryQueue.filter(item => item.status === 'pending');
+    
+    for (const item of pendingItems) {
+      const currentState = moduleState;
+      if (!currentState.promptStoryQueueSystem.isEnabled || currentState.promptStoryQueueSystem.isPaused) {
+        break;
+      }
+      
+      await processPromptStoryQueueItem(item);
+      
+      // Add delay between items to prevent rate limiting
+      await delay(2000);
+    }
+
+    updateState(prev => ({
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        isProcessing: false
+      }
+    }));
+  };
+
+  // Pause/Resume queue
+  const togglePromptStoryQueuePause = () => {
+    updateState(prev => ({
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        isPaused: !prev.promptStoryQueueSystem.isPaused
+      }
+    }));
+  };
+
+  // Stop queue processing
+  const stopPromptStoryQueueProcessing = () => {
+    updateState(prev => ({
+      promptStoryQueueSystem: {
+        ...prev.promptStoryQueueSystem,
+        isEnabled: false,
+        isProcessing: false,
+        isPaused: false,
+        currentItem: null
+      }
+    }));
   };
 
   const copyToClipboard = (text: string, buttonId: string) => {
