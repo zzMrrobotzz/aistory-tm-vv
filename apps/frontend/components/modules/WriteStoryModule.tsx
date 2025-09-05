@@ -16,7 +16,7 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle, Loader2, X } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
-import { logApiCall, logStoryGenerated } from '../../services/usageService';
+import { logApiCall, logStoryGenerated, logTextRewritten } from '../../services/usageService';
 import { checkAndTrackRequest, getRequestStatus, REQUEST_ACTIONS, RequestCheckResult } from '../../services/requestTrackingService';
 // Keep local counter as fallback
 import { getTimeUntilReset } from '../../services/localRequestCounter';
@@ -1545,6 +1545,7 @@ ${storyToEdit}
       
       // Log usage
       logStoryGenerated(1);
+      logTextRewritten('write-story', 1); // Log prompt-based story as text rewrite
     } catch (e: any) {
       if (e.name === 'AbortError') {
          updateState({ promptStoryError: 'Biên tập đã bị hủy.', promptStoryLoadingMessage: 'Đã hủy biên tập.', promptStoryEditProgress: null });
@@ -1929,6 +1930,7 @@ ${storyToEdit}
 
       // Log usage
       logStoryGenerated(1);
+      logTextRewritten('write-story', 1); // Log prompt-based story queue processing as text rewrite
 
       return editedStory;
 
