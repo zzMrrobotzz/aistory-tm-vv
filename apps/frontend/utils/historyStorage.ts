@@ -102,6 +102,7 @@ export const HistoryStorage = {
 // Module keys for different components
 export const MODULE_KEYS = {
   WRITE_STORY: 'write_story',
+  PROMPT_BASED_STORY: 'prompt_based_story',
   BATCH_STORY_WRITING: 'batch_story_writing',
   REWRITE: 'rewrite',
   BATCH_REWRITE: 'batch_rewrite',

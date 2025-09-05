@@ -1504,7 +1504,7 @@ ${storyToEdit}
 
       // Add to history with quality analysis
       HistoryStorage.saveToHistory(
-        MODULE_KEYS.WRITE_STORY,
+        MODULE_KEYS.PROMPT_BASED_STORY,
         `Truyện theo prompt: ${promptBasedTitle}`,
         editedStory,
         {
@@ -1864,7 +1864,7 @@ ${storyToEdit}
 
       // Save to history with quality analysis
       HistoryStorage.saveToHistory(
-        MODULE_KEYS.WRITE_STORY,
+        MODULE_KEYS.PROMPT_BASED_STORY,
         `Truyện theo prompt: ${title}`,
         editedStory,
         {
@@ -2687,7 +2687,7 @@ ${story}
                         <span className="text-sm font-medium text-blue-900">
                             {promptStoryProgress === 33 ? "🔍 Đang tạo outline..." :
                              promptStoryProgress === 66 ? "✍️ Đang viết truyện..." :
-                             promptStoryProgress === 100 ? "🎯 Đang tự động chỉnh sửa..." : "⏳ Chuẩn bị..."}
+                             promptStoryProgress === 100 ? "✅ Hoàn tất!" : "⏳ Chuẩn bị..."}
                         </span>
                         <span className="text-sm font-medium text-blue-900">{promptStoryProgress}%</span>
                     </div>
@@ -2767,6 +2767,19 @@ ${story}
                     </div>
                 </div>
             )}
+
+            {/* History Panel for Prompt-Based Story */}
+            <div className="mt-6">
+                <HistoryPanel 
+                    moduleKey={MODULE_KEYS.PROMPT_BASED_STORY}
+                    onSelectHistory={(content) => {
+                        updateState({ 
+                            generatedStoryFromPrompt: content,
+                            hasPromptStoryBeenEdited: true 
+                        });
+                    }}
+                />
+            </div>
 
             {renderMainButton()}
          </div>
