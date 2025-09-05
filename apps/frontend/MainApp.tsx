@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { onlineService } from './services/onlineService';
 import AnnouncementBanner from './components/AnnouncementBanner';
+import AnnouncementPopup from './components/AnnouncementPopup';
 import { getAnnouncements } from './services/settingsService';
 import {
   ActiveModule, ApiSettings, ApiProvider,
@@ -76,6 +77,7 @@ const MainApp: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.Dashboard);
   const [announcements, setAnnouncements] = useState<string[]>([]);
+  const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
   // API Settings are now centralized in Settings module
   // Removed elevenLabsApiKeys state
   const [apiSettings, setApiSettings] = useState<ApiSettings>({
@@ -810,6 +812,17 @@ const MainApp: React.FC = () => {
       try {
         const announcementTexts = await getAnnouncements();
         setAnnouncements(announcementTexts);
+        
+        // Show popup if there are announcements and user hasn't seen them today
+        if (announcementTexts.length > 0) {
+          const today = new Date().toISOString().split('T')[0];
+          const lastShownDate = localStorage.getItem('lastAnnouncementDate');
+          
+          if (lastShownDate !== today) {
+            setShowAnnouncementPopup(true);
+            localStorage.setItem('lastAnnouncementDate', today);
+          }
+        }
       } catch (error) {
         console.error('Error loading announcements:', error);
       }
@@ -1144,6 +1157,20 @@ const MainApp: React.FC = () => {
     }
   }, [activeModule, currentUser]);
 
+  // Show announcement popup when user logs in
+  useEffect(() => {
+    if (currentUser && announcements.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const lastShownDate = localStorage.getItem('lastAnnouncementDate');
+      
+      // Show popup if user logs in and hasn't seen announcements today
+      if (lastShownDate !== today) {
+        setShowAnnouncementPopup(true);
+        localStorage.setItem('lastAnnouncementDate', today);
+      }
+    }
+  }, [currentUser, announcements]);
+
   // Start online tracking when user enters the app
   useEffect(() => {
     let isSubscribed = true;
@@ -1369,6 +1396,13 @@ const MainApp: React.FC = () => {
         {/* Support Chatbot */}
         <SupportChatbot apiSettings={apiSettings} />
       </div>
+      
+      {/* Announcement Popup */}
+      {showAnnouncementPopup && (
+        <AnnouncementPopup 
+          onClose={() => setShowAnnouncementPopup(false)}
+        />
+      )}
     </div>
   );
 };
