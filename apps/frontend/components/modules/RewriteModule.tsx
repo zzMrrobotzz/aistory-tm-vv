@@ -129,7 +129,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   
   // Usage tracking state from backend
-  const [usageStats, setUsageStats] = useState({ current: 0, limit: 999999, remaining: 999999, percentage: 0, isBlocked: false } as any);
+  const [usageStats, setUsageStats] = useState({ current: 0, limit: 5000, remaining: 5000, percentage: 0, isBlocked: false } as any);
   
   // Fetch usage from backend and poll every minute (reset at midnight handled by backend)
   useEffect(() => {

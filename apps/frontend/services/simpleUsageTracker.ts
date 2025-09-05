@@ -11,7 +11,7 @@ interface SimpleUsageData {
 }
 
 const STORAGE_KEY = 'simple-usage-tracker';
-const DEFAULT_LIMIT = 999999;
+const DEFAULT_LIMIT = 5000;
 
 // Get today's date in Vietnam timezone
 const getTodayVietnam = (): string => {

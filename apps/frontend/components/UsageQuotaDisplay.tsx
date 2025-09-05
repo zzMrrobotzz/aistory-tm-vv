@@ -88,8 +88,8 @@ const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({
       const fallbackStatus: UsageStatus = {
         canProceed: true,
         totalUsage: 0,
-        usageLimit: 999999,
-        remainingRequests: 999999,
+        usageLimit: 5000,
+        remainingRequests: 5000,
         percentage: 0,
         subscription: 'Unknown',
         moduleBreakdown: [],

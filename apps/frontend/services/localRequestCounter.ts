@@ -8,7 +8,7 @@ interface DailyRequestData {
 }
 
 const STORAGE_KEY = 'daily-request-counter';
-const DAILY_LIMIT = 999999;
+const DAILY_LIMIT = 5000;
 const BACKEND_SYNC_KEY = 'request-counter-last-sync';
 
 // Import auth service for backend sync
