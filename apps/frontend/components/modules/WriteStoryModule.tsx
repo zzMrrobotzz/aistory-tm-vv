@@ -1219,7 +1219,14 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       // Save to history when story is completed
       if (editedStory.trim()) {
         const storyTitle = storyOutline.split('\n')[0]?.trim() || 'Truyện không tiêu đề';
-        HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY, storyTitle, editedStory);
+        
+        // Analyze story quality
+        updateState({ storyLoadingMessage: 'Đang phân tích chất lượng truyện...' });
+        const qualityStats = await analyzeStoryQuality(editedStory, storyTitle);
+        
+        HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY, storyTitle, editedStory, {
+          storyQualityStats: qualityStats
+        });
       }
       
       // Log usage statistics for story generation
@@ -1483,12 +1490,20 @@ ${storyToEdit}
         hasPromptStoryBeenEdited: true
       });
       
-      // Add to history
+      // Analyze story quality
+      updateState({
+        promptStoryLoadingMessage: 'Đang phân tích chất lượng truyện...',
+      });
+
+      const qualityStats = await analyzeStoryQuality(editedStory, promptBasedTitle);
+
+      // Add to history with quality analysis
       HistoryStorage.saveToHistory(
         MODULE_KEYS.WRITE_STORY,
         `Truyện theo prompt: ${promptBasedTitle}`,
         editedStory,
         {
+          storyQualityStats: qualityStats,
           restoreContext: { 
             activeWriteTab: 'promptBasedStory',
             promptBasedTitle, 
@@ -1834,12 +1849,20 @@ ${storyToEdit}
         hasPromptStoryBeenEdited: true
       });
 
-      // Save to history
+      // Analyze story quality
+      updateState({
+        promptStoryLoadingMessage: 'Đang phân tích chất lượng truyện...',
+      });
+
+      const qualityStats = await analyzeStoryQuality(editedStory, title);
+
+      // Save to history with quality analysis
       HistoryStorage.saveToHistory(
         MODULE_KEYS.WRITE_STORY,
         `Truyện theo prompt: ${title}`,
         editedStory,
         {
+          storyQualityStats: qualityStats,
           restoreContext: { 
             activeWriteTab: 'promptBasedStory',
             promptBasedTitle: title,
@@ -1926,6 +1949,99 @@ ${storyToEdit}
         currentItem: null
       }
     }));
+  };
+
+  // ====== STORY QUALITY ANALYSIS SYSTEM ======
+
+  const analyzeStoryQuality = async (story: string, title: string = '') => {
+    if (!story || story.length < 100) return null; // Skip analysis for very short stories
+    
+    try {
+      const analysisPrompt = `Hãy phân tích chất lượng của câu chuyện sau đây theo các tiêu chí:
+
+**CÂUYỆN CẦN PHÂN TÍCH:**
+${story}
+
+**YÊU CẦU PHÂN TÍCH:**
+
+1. **TÍNH NHẤT QUÁN NHÂN VẬT (0-100):**
+   - Nhân vật có được xây dựng nhất quán về tính cách, hành động?
+   - Có mâu thuẫn nào trong cách thể hiện nhân vật không?
+   
+2. **TÍNH LOGIC CỐT TRUYỆN (0-100):**
+   - Cốt truyện có logic, hợp lý không?
+   - Các sự kiện có liên kết với nhau một cách tự nhiên?
+   
+3. **TÍNH NHẤT QUÁN THỜI GIAN & BỐI CẢNH (0-100):**
+   - Thời gian trong truyện có nhất quán không?
+   - Bối cảnh có được duy trì xuyên suốt không?
+   
+4. **TÍNH HOÀN THIỆN (0-100):**
+   - Câu chuyện có đầy đủ mở đầu, thân, kết không?
+   - Các chi tiết có được kết thúc thỏa đáng không?
+
+**ĐỊNH DẠNG ĐẦU RA YÊU CẦU:**
+\`\`\`json
+{
+  "consistencyScore": [số từ 0-100],
+  "logicScore": [số từ 0-100], 
+  "timelineConsistencyScore": [số từ 0-100],
+  "completenessScore": [số từ 0-100],
+  "overallQualityScore": [trung bình của 4 điểm trên],
+  "analysis": {
+    "characterConsistency": "[Nhận xét ngắn gọn về tính nhất quán nhân vật]",
+    "plotCoherence": "[Nhận xét ngắn gọn về tính logic cốt truyện]", 
+    "timelineConsistency": "[Nhận xét ngắn gọn về tính nhất quán thời gian/bối cảnh]",
+    "settingConsistency": "[Nhận xét ngắn gọn về tính nhất quán bối cảnh]",
+    "overallAssessment": "[Đánh giá tổng quan ngắn gọn]"
+  }
+}
+\`\`\`
+
+**CHÚ Ý:** Chỉ trả về JSON, không thêm text khác.`;
+
+      const result = await generateText(analysisPrompt, undefined, false, apiSettings, 'story-analysis');
+      
+      try {
+        // Extract JSON from response
+        let jsonStr = result.text.trim();
+        if (jsonStr.includes('```json')) {
+          jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
+        } else if (jsonStr.includes('```')) {
+          jsonStr = jsonStr.split('```')[1].trim();
+        }
+        
+        const qualityData = JSON.parse(jsonStr);
+        
+        // Validate structure
+        if (typeof qualityData.consistencyScore === 'number' &&
+            typeof qualityData.completenessScore === 'number' &&
+            typeof qualityData.overallQualityScore === 'number' &&
+            qualityData.analysis && 
+            typeof qualityData.analysis.characterConsistency === 'string') {
+          
+          return {
+            consistencyScore: Math.round(qualityData.consistencyScore || 0),
+            completenessScore: Math.round(qualityData.completenessScore || 0),
+            overallQualityScore: Math.round(qualityData.overallQualityScore || 0),
+            analysis: {
+              characterConsistency: qualityData.analysis.characterConsistency || 'Không có nhận xét',
+              plotCoherence: qualityData.analysis.plotCoherence || 'Không có nhận xét',
+              timelineConsistency: qualityData.analysis.timelineConsistency || 'Không có nhận xét',
+              settingConsistency: qualityData.analysis.settingConsistency || 'Không có nhận xét',
+              overallAssessment: qualityData.analysis.overallAssessment || 'Không có đánh giá'
+            }
+          };
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse quality analysis JSON:', parseError);
+      }
+      
+    } catch (error: any) {
+      console.error('Story quality analysis failed:', error);
+    }
+    
+    return null;
   };
 
   const copyToClipboard = (text: string, buttonId: string) => {
