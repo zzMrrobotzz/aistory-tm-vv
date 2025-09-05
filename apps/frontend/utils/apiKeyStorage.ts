@@ -7,6 +7,12 @@ export interface StoredApiKey {
   createdAt: string;
   lastUsed?: string;
   isActive: boolean;
+  // Daily usage tracking
+  dailyUsage?: {
+    date: string; // YYYY-MM-DD format
+    requests: number; // Number of requests used today
+    limit: number; // Daily limit (default 1500 for free tier)
+  };
 }
 
 const API_KEYS_STORAGE_KEY = 'ai_story_api_keys';
@@ -154,6 +160,80 @@ export const ApiKeyStorage = {
       ApiKeyStorage.updateApiKey(activeKey.id, { 
         lastUsed: new Date().toISOString() 
       });
+    }
+  },
+
+  // Track daily API usage
+  trackDailyUsage: (keyId: string, requestCount: number = 1): void => {
+    const keys = ApiKeyStorage.getAllKeys();
+    const keyIndex = keys.findIndex(k => k.id === keyId);
+    
+    if (keyIndex === -1) return;
+    
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const apiKey = keys[keyIndex];
+    
+    // Initialize or reset daily usage if new day
+    if (!apiKey.dailyUsage || apiKey.dailyUsage.date !== today) {
+      apiKey.dailyUsage = {
+        date: today,
+        requests: requestCount,
+        limit: 1500 // Default free tier limit
+      };
+    } else {
+      // Add to today's usage
+      apiKey.dailyUsage.requests += requestCount;
+    }
+    
+    // Update last used
+    apiKey.lastUsed = new Date().toISOString();
+    
+    try {
+      localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(keys));
+    } catch (error) {
+      console.error('Failed to track daily usage:', error);
+    }
+  },
+
+  // Get daily usage percentage for a key
+  getDailyUsagePercentage: (keyId: string): number => {
+    const keys = ApiKeyStorage.getAllKeys();
+    const apiKey = keys.find(k => k.id === keyId);
+    
+    if (!apiKey?.dailyUsage) return 0;
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Reset if different day
+    if (apiKey.dailyUsage.date !== today) return 0;
+    
+    return Math.round((apiKey.dailyUsage.requests / apiKey.dailyUsage.limit) * 100);
+  },
+
+  // Reset all daily usage (called at midnight or app start)
+  resetDailyUsage: (): void => {
+    const keys = ApiKeyStorage.getAllKeys();
+    const today = new Date().toISOString().split('T')[0];
+    
+    let hasUpdates = false;
+    
+    keys.forEach(apiKey => {
+      if (apiKey.dailyUsage && apiKey.dailyUsage.date !== today) {
+        apiKey.dailyUsage = {
+          date: today,
+          requests: 0,
+          limit: apiKey.dailyUsage.limit || 1500
+        };
+        hasUpdates = true;
+      }
+    });
+    
+    if (hasUpdates) {
+      try {
+        localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(keys));
+      } catch (error) {
+        console.error('Failed to reset daily usage:', error);
+      }
     }
   }
 };

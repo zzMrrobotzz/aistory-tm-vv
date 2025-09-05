@@ -17,6 +17,8 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
   });
 
   useEffect(() => {
+    // Reset daily usage on component mount (handles day changes)
+    ApiKeyStorage.resetDailyUsage();
     loadApiKeys();
   }, []);
 
@@ -79,6 +81,25 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
   const maskApiKey = (key: string): string => {
     if (key.length <= 8) return '*'.repeat(key.length);
     return key.substring(0, 4) + '*'.repeat(key.length - 8) + key.substring(key.length - 4);
+  };
+
+  const getDailyUsageInfo = (apiKey: StoredApiKey) => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!apiKey.dailyUsage || apiKey.dailyUsage.date !== today) {
+      return { used: 0, limit: 1500, percentage: 0 };
+    }
+    
+    const { requests, limit } = apiKey.dailyUsage;
+    const percentage = Math.round((requests / limit) * 100);
+    
+    return { used: requests, limit, percentage };
+  };
+
+  const getUsageBarColor = (percentage: number) => {
+    if (percentage < 70) return 'bg-green-500';
+    if (percentage < 90) return 'bg-yellow-500';
+    return 'bg-red-500';
   };
 
   const formatDate = (dateString: string) => {
@@ -265,6 +286,37 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
                       </button>
                     </div>
                     
+                    {/* Daily Usage Progress Bar */}
+                    {(() => {
+                      const { used, limit, percentage } = getDailyUsageInfo(apiKey);
+                      return (
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-gray-700">
+                              Requests hôm nay
+                            </span>
+                            <span className={`text-xs font-medium ${
+                              percentage > 90 ? 'text-red-600' : 
+                              percentage > 70 ? 'text-yellow-600' : 'text-green-600'
+                            }`}>
+                              {used}/{limit} ({percentage}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all duration-300 ${getUsageBarColor(percentage)}`}
+                              style={{ width: `${Math.min(percentage, 100)}%` }}
+                            />
+                          </div>
+                          {percentage > 90 && (
+                            <div className="flex items-center mt-1 text-xs text-red-600">
+                              <span>⚠️ Sắp hết quota ngày hôm nay</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    
                     <div className="flex items-center space-x-4 text-xs text-gray-500">
                       <span className="flex items-center space-x-1">
                         <Clock className="w-3 h-3" />
@@ -280,22 +332,36 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2 ml-4">
-                    {!apiKey.isActive && (
+                  <div className="flex flex-col items-end space-y-2 ml-4">
+                    <div className="flex items-center space-x-2">
+                      {!apiKey.isActive && (
+                        <button
+                          onClick={() => handleSetActive(apiKey.id)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          Sử dụng
+                        </button>
+                      )}
+                      
                       <button
-                        onClick={() => handleSetActive(apiKey.id)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        onClick={() => handleDeleteApiKey(apiKey.id)}
+                        className="text-red-600 hover:text-red-800 p-1"
+                        title="Xóa API key"
                       >
-                        Sử dụng
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>
                     
+                    {/* Demo Button to Test Usage Tracking */}
                     <button
-                      onClick={() => handleDeleteApiKey(apiKey.id)}
-                      className="text-red-600 hover:text-red-800 p-1"
-                      title="Xóa API key"
+                      onClick={() => {
+                        ApiKeyStorage.trackDailyUsage(apiKey.id, 10);
+                        loadApiKeys(); // Reload to show updated usage
+                      }}
+                      className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded border text-gray-600"
+                      title="Thêm 10 requests để test"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      +10 requests (test)
                     </button>
                   </div>
                 </div>
