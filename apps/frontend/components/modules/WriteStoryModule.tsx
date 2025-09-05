@@ -1407,7 +1407,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
         setModuleState(prev => {
           const msg = prev.promptStoryLoadingMessage;
           if (msg?.includes('hủy') || msg?.includes('Lỗi') || msg?.includes('Hoàn tất')) {
-            return { ...prev, promptStoryLoadingMessage: null };
+            return { ...prev, promptStoryLoadingMessage: null, promptStoryEditProgress: null };
           }
           return prev;
         });
