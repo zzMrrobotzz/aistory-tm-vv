@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\frontend/**)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -68,12 +68,24 @@ export const generateText = async (
     ApiKeyStorage.updateLastUsed('deepseek');
     const text = await deepseekService.generateText(prompt, systemInstruction, effectiveApiSettings.apiKey);
     result = { text, groundingChunks: undefined };
+    
+    // Track daily usage for DeepSeek API key
+    const activeDeepSeekKey = ApiKeyStorage.getActiveKey('deepseek');
+    if (activeDeepSeekKey) {
+      ApiKeyStorage.trackDailyUsage(activeDeepSeekKey.id, 1);
+    }
   } else {
     // Default to Gemini for all other cases
     if (effectiveApiSettings?.apiKey) {
       ApiKeyStorage.updateLastUsed('gemini');
     }
     result = await geminiService.generateText(prompt, systemInstruction, useGoogleSearch, effectiveApiSettings?.apiKey);
+    
+    // Track daily usage for Gemini API key
+    const activeGeminiKey = ApiKeyStorage.getActiveKey('gemini');
+    if (activeGeminiKey) {
+      ApiKeyStorage.trackDailyUsage(activeGeminiKey.id, 1);
+    }
   }
 
   // Record usage after successful API call (for restricted modules only)
@@ -149,12 +161,24 @@ export const generateTextWithJsonOutput = async <T,>(
       ? `${systemInstruction}\n\n${prompt}` 
       : prompt;
     result = await deepseekService.generateTextWithJsonOutput<T>(combinedPrompt, effectiveApiSettings.apiKey);
+    
+    // Track daily usage for DeepSeek API key
+    const activeDeepSeekKey = ApiKeyStorage.getActiveKey('deepseek');
+    if (activeDeepSeekKey) {
+      ApiKeyStorage.trackDailyUsage(activeDeepSeekKey.id, 1);
+    }
   } else {
     // Default to Gemini for all other cases
     if (effectiveApiSettings?.apiKey) {
       ApiKeyStorage.updateLastUsed('gemini');
     }
     result = await geminiService.generateTextWithJsonOutput<T>(prompt, systemInstruction, effectiveApiSettings?.apiKey);
+    
+    // Track daily usage for Gemini API key
+    const activeGeminiKey = ApiKeyStorage.getActiveKey('gemini');
+    if (activeGeminiKey) {
+      ApiKeyStorage.trackDailyUsage(activeGeminiKey.id, 1);
+    }
   }
 
   // Record usage after successful API call (for restricted modules only)

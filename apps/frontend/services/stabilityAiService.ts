@@ -1,4 +1,6 @@
 
+import { ApiKeyStorage } from '../utils/apiKeyStorage';
+
 const STABILITY_API_BASE_URL = "https://api.stability.ai/v2/stable-image";
 
 export const generateStabilityImage = async (
@@ -54,6 +56,13 @@ export const generateStabilityImage = async (
         }
         console.error("Stability AI image generation failed:", errorDetails);
         throw new Error(errorDetails);
+    }
+    
+    // Track daily usage for Stability AI API key
+    const activeStabilityKey = ApiKeyStorage.getActiveKey('stability');
+    if (activeStabilityKey) {
+        ApiKeyStorage.trackDailyUsage(activeStabilityKey.id, 1);
+        ApiKeyStorage.updateLastUsed('stability');
     }
     
     return response.blob();
@@ -112,6 +121,13 @@ export const refineStabilityImage = async (
         }
         console.error("Stability AI image refinement failed:", errorDetails);
         throw new Error(errorDetails);
+    }
+    
+    // Track daily usage for Stability AI API key
+    const activeStabilityKey = ApiKeyStorage.getActiveKey('stability');
+    if (activeStabilityKey) {
+        ApiKeyStorage.trackDailyUsage(activeStabilityKey.id, 1);
+        ApiKeyStorage.updateLastUsed('stability');
     }
     
     return response.blob();

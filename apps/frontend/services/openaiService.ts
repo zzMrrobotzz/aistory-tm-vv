@@ -1,5 +1,6 @@
 // OpenAI DALL-E Image Generation Service
 import { dataUrlToBlob } from '../utils';
+import { ApiKeyStorage } from '../utils/apiKeyStorage';
 
 interface DallEResponse {
     created: number;
@@ -117,6 +118,13 @@ export const generateDallEImage = async (
         const responseData: DallEResponse = await response.json();
 
         if (responseData.data && responseData.data.length > 0 && responseData.data[0].b64_json) {
+            // Track daily usage for OpenAI API key
+            const activeOpenAIKey = ApiKeyStorage.getActiveKey('openai');
+            if (activeOpenAIKey) {
+                ApiKeyStorage.trackDailyUsage(activeOpenAIKey.id, 1);
+                ApiKeyStorage.updateLastUsed('openai');
+            }
+            
             // Store revised_prompt if available (useful for display)
             // This function is part of a module, it should return the image.
             // The revised_prompt handling should be in the module component.
@@ -172,6 +180,14 @@ export const generateOpenAiSpeech = async (
         if (!response.ok) {
             throw await handleOpenAIError(response, signal);
         }
+        
+        // Track daily usage for OpenAI API key
+        const activeOpenAIKey = ApiKeyStorage.getActiveKey('openai');
+        if (activeOpenAIKey) {
+            ApiKeyStorage.trackDailyUsage(activeOpenAIKey.id, 1);
+            ApiKeyStorage.updateLastUsed('openai');
+        }
+        
         // The response body is the audio file itself
         return response.blob();
     } catch (error) {
@@ -239,6 +255,13 @@ export const editDallEImage = async (
 
         const responseData: DallEResponse = await response.json();
         if (responseData.data && responseData.data.length > 0 && responseData.data[0].b64_json) {
+            // Track daily usage for OpenAI API key
+            const activeOpenAIKey = ApiKeyStorage.getActiveKey('openai');
+            if (activeOpenAIKey) {
+                ApiKeyStorage.trackDailyUsage(activeOpenAIKey.id, 1);
+                ApiKeyStorage.updateLastUsed('openai');
+            }
+            
             return `data:image/png;base64,${responseData.data[0].b64_json}`;
         } else {
             console.error("No image data received from DALL-E edits API. Response:", responseData);

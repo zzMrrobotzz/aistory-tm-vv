@@ -1,5 +1,6 @@
 import { ELEVENLABS_API_URL } from '../constants';
 import { ElevenLabsVoice } from '../types';
+import { ApiKeyStorage } from '../utils/apiKeyStorage';
 
 interface ElevenLabsUser {
     subscription: {
@@ -84,6 +85,13 @@ export const generateElevenLabsSpeech = async (
     });
 
     if (!response.ok) throw await handleElevenLabsError(response, signal);
+    
+    // Track daily usage for ElevenLabs API key
+    const activeElevenLabsKey = ApiKeyStorage.getActiveKey('elevenlabs');
+    if (activeElevenLabsKey) {
+        ApiKeyStorage.trackDailyUsage(activeElevenLabsKey.id, 1);
+        ApiKeyStorage.updateLastUsed('elevenlabs');
+    }
     
     return response.blob();
 };
