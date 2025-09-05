@@ -813,15 +813,9 @@ const MainApp: React.FC = () => {
         const announcementTexts = await getAnnouncements();
         setAnnouncements(announcementTexts);
         
-        // Show popup if there are announcements and user hasn't seen them today
+        // Show popup if there are announcements - always show on page load
         if (announcementTexts.length > 0) {
-          const today = new Date().toISOString().split('T')[0];
-          const lastShownDate = localStorage.getItem('lastAnnouncementDate');
-          
-          if (lastShownDate !== today) {
-            setShowAnnouncementPopup(true);
-            localStorage.setItem('lastAnnouncementDate', today);
-          }
+          setShowAnnouncementPopup(true);
         }
       } catch (error) {
         console.error('Error loading announcements:', error);
@@ -1160,14 +1154,8 @@ const MainApp: React.FC = () => {
   // Show announcement popup when user logs in
   useEffect(() => {
     if (currentUser && announcements.length > 0) {
-      const today = new Date().toISOString().split('T')[0];
-      const lastShownDate = localStorage.getItem('lastAnnouncementDate');
-      
-      // Show popup if user logs in and hasn't seen announcements today
-      if (lastShownDate !== today) {
-        setShowAnnouncementPopup(true);
-        localStorage.setItem('lastAnnouncementDate', today);
-      }
+      // Always show popup when user logs in if there are announcements
+      setShowAnnouncementPopup(true);
     }
   }, [currentUser, announcements]);
 
