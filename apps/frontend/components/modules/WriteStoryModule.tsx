@@ -21,6 +21,57 @@ import { checkAndTrackRequest, getRequestStatus, REQUEST_ACTIONS, RequestCheckRe
 // Keep local counter as fallback
 import { getTimeUntilReset } from '../../services/localRequestCounter';
 
+// Retry logic with exponential backoff for API calls (imported from RewriteModule)
+const retryApiCall = async (
+  apiFunction: () => Promise<any>,
+  maxRetries: number = 3,
+  isQueueMode: boolean = false
+): Promise<any> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await apiFunction();
+    } catch (error: any) {
+      console.log('Retry logic - Error details:', { 
+        message: error?.message, 
+        status: error?.status, 
+        code: error?.code,
+        attempt: i + 1 
+      });
+      
+      const isServerError = error?.message?.includes('500') || 
+                           error?.message?.includes('Internal Server Error') ||
+                           error?.message?.includes('ServerError') ||
+                           error?.status === 500 ||
+                           error?.code === 500;
+                           
+      const is503Error = error?.message?.includes('503') ||
+                         error?.message?.includes('Service Unavailable') ||
+                         error?.status === 503 ||
+                         error?.code === 503;
+      
+      if ((isServerError || is503Error) && i < maxRetries - 1) {
+        // Special handling for 503 errors - longer delays (1min, 2min, 4min)
+        let backoffDelay;
+        if (is503Error) {
+          const baseDelay503 = 60000; // 1 minute base delay for 503
+          backoffDelay = baseDelay503 * Math.pow(2, i);
+          console.warn(`🚨 503 SERVICE UNAVAILABLE: Extended retry (attempt ${i + 1}/${maxRetries}), waiting ${Math.round(backoffDelay/1000)}s... [Queue mode: ${isQueueMode}]`);
+        } else {
+          // Regular 500 errors - shorter delays
+          const baseDelay = isQueueMode ? 6000 : 4000;
+          backoffDelay = baseDelay * Math.pow(2, i);
+          console.warn(`🔄 RETRY: API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms... [Queue mode: ${isQueueMode}]`);
+        }
+        await delay(backoffDelay);
+        continue;
+      }
+      console.error(`❌ FINAL FAILURE: All ${maxRetries} retry attempts failed. Error:`, error);
+      throw error;
+    }
+  }
+  throw new Error('All retry attempts failed');
+};
+
 interface WriteStoryModuleProps {
   apiSettings: ApiSettings;
   moduleState: WriteStoryModuleState;
@@ -1262,7 +1313,11 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       
       Dàn ý phải được viết bằng ngôn ngữ ${outputLanguageLabel} và phải logic, có cấu trúc rõ ràng.`;
       
-      const outlineResult = await generateText(outlineGenerationPrompt, undefined, false, apiSettings);
+      const outlineResult = await retryApiCall(
+        () => generateText(outlineGenerationPrompt, undefined, false, apiSettings),
+        3,
+        false // isQueueMode = false for prompt-based story
+      );
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const generatedOutline = (outlineResult.text || '').trim();
       if (!generatedOutline) throw new Error("Không thể tạo dàn ý từ prompt được cung cấp.");
@@ -1302,7 +1357,11 @@ Provide ONLY the numbered hooks, no additional explanations.`;
         \n**Yêu cầu hiện tại:** Viết phần tiếp theo của câu chuyện. Chỉ viết nội dung, không lặp lại, không tiêu đề.`;
 
         if (i > 0) await delay(4500, abortCtrl.signal);
-        const result = await generateText(writePrompt, undefined, false, apiSettings);
+        const result = await retryApiCall(
+          () => generateText(writePrompt, undefined, false, apiSettings),
+          3,
+          false // isQueueMode = false for prompt-based story
+        );
         if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         let currentChunkText = result.text;
         
@@ -1410,7 +1469,11 @@ ${storyToEdit}
 -   Không thêm lời bình, giới thiệu, hay tiêu đề.`;
 
     try {
-      const result = await generateText(finalEditPrompt, undefined, false, apiSettings);
+      const result = await retryApiCall(
+        () => generateText(finalEditPrompt, undefined, false, apiSettings),
+        3,
+        false // isQueueMode = false for prompt-based story editing
+      );
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const editedStory = result.text;
       updateState({
