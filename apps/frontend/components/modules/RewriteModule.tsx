@@ -14,9 +14,8 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import UpgradePrompt from '../UpgradePrompt';
 import { logApiCall, logTextRewritten } from '../../services/usageService';
-// Keep local counter as fallback for time until reset
-import { getTimeUntilReset } from '../../services/localRequestCounter';
-import { getUserUsageStatus } from '../../services/rateLimitService';
+// Feature usage tracking instead of request counting
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 // Retry logic with exponential backoff for API calls
 const retryApiCall = async (
@@ -128,27 +127,18 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
   const hasActiveSubscription = isSubscribed(currentUser);
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Usage tracking state from backend
-  const [usageStats, setUsageStats] = useState({ current: 0, limit: 5000, remaining: 5000, percentage: 0, isBlocked: false } as any);
+  // Feature usage tracking state (local)
+  const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStats());
   
-  // Fetch usage from backend and poll every minute (reset at midnight handled by backend)
+  // Update usage stats when component mounts and every minute for reset handling
   useEffect(() => {
-    const fetchUsage = async () => {
-      try {
-        const data = await getUserUsageStatus();
-        setUsageStats({
-          current: data.totalUsage,
-          limit: data.usageLimit,
-          remaining: data.remainingRequests,
-          percentage: data.percentage,
-          isBlocked: !data.canProceed
-        });
-      } catch (e) {
-        // keep previous usage on error
-      }
+    const updateStats = () => {
+      const stats = featureUsageTracker.getUsageStats();
+      setUsageStats(stats);
     };
-    fetchUsage();
-    const interval = setInterval(fetchUsage, 60000);
+    
+    updateStats();
+    const interval = setInterval(updateStats, 60000); // Check every minute for midnight reset
     return () => clearInterval(interval);
   }, []);
 
@@ -745,6 +735,16 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             return;
         }
 
+        // Check feature usage limit before processing
+        if (!featureUsageTracker.canUse(FEATURE_IDS.REWRITE)) {
+            const stats = featureUsageTracker.getUsageStats();
+            setModuleState(prev => ({ 
+                ...prev, 
+                error: `🚫 Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.` 
+            }));
+            return;
+        }
+
 
         setModuleState(prev => ({ ...prev, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false }));
         
@@ -891,6 +891,10 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             
             logApiCall('rewrite', numChunks);
             logTextRewritten('rewrite', 1);
+            
+            // Track feature usage (1 successful rewrite = 1 use)
+            const updatedStats = featureUsageTracker.trackUsage(FEATURE_IDS.REWRITE, 'Viết Lại');
+            setUsageStats(updatedStats);
             
             // Progress already reset above, no need for additional timeout
         } catch (e) {
@@ -1050,12 +1054,12 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                             </span>
                             <div>
                                 <h3 className={`font-semibold ${usageStats.isBlocked ? 'text-red-800' : 'text-green-800'}`}>
-                                    Sử dụng hôm nay: {usageStats.current}/{usageStats.limit}
+                                    Đã sử dụng: {usageStats.totalUses}/{usageStats.dailyLimit} lượt
                                 </h3>
                                 <p className={`text-sm ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
                                     {usageStats.isBlocked 
                                         ? `Đã đạt giới hạn! Reset vào 00:00 ngày mai.`
-                                        : `Còn lại ${usageStats.remaining} requests (${usageStats.percentage}% đã dùng)`
+                                        : `Còn lại ${usageStats.remaining} lượt sử dụng (${usageStats.percentage}% đã dùng)`
                                     }
                                 </p>
                             </div>
