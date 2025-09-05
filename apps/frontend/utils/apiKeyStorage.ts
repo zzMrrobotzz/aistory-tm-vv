@@ -178,7 +178,7 @@ export const ApiKeyStorage = {
       apiKey.dailyUsage = {
         date: today,
         requests: requestCount,
-        limit: 1500 // Default free tier limit
+        limit: 5000 // Default free tier limit
       };
     } else {
       // Add to today's usage
@@ -222,7 +222,7 @@ export const ApiKeyStorage = {
         apiKey.dailyUsage = {
           date: today,
           requests: 0,
-          limit: apiKey.dailyUsage.limit || 1500
+          limit: apiKey.dailyUsage.limit || 5000
         };
         hasUpdates = true;
       }

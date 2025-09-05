@@ -87,7 +87,7 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
     const today = new Date().toISOString().split('T')[0];
     
     if (!apiKey.dailyUsage || apiKey.dailyUsage.date !== today) {
-      return { used: 0, limit: 1500, percentage: 0 };
+      return { used: 0, limit: 5000, percentage: 0 };
     }
     
     const { requests, limit } = apiKey.dailyUsage;
@@ -352,17 +352,6 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
                       </button>
                     </div>
                     
-                    {/* Demo Button to Test Usage Tracking */}
-                    <button
-                      onClick={() => {
-                        ApiKeyStorage.trackDailyUsage(apiKey.id, 10);
-                        loadApiKeys(); // Reload to show updated usage
-                      }}
-                      className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded border text-gray-600"
-                      title="Thêm 10 requests để test"
-                    >
-                      +10 requests (test)
-                    </button>
                   </div>
                 </div>
               </div>
