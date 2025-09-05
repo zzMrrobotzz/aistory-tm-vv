@@ -46,8 +46,8 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
       data: {
         usage: {
           current: 0,
-          limit: 999999,
-          remaining: 999999,
+          limit: 5000,
+          remaining: 5000,
           percentage: 0,
           isBlocked: false,
           moduleUsage: [],
@@ -56,7 +56,7 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
         },
         config: {
           isEnabled: false,
-          dailyLimit: 999999,
+          dailyLimit: 5000,
           restrictedModules: [],
           resetTime: '00:00',
           timezone: 'Asia/Ho_Chi_Minh'
@@ -158,8 +158,8 @@ router.post('/record-usage', authenticateUser, updateUserActivity, extractUserId
       message: 'Usage recording disabled - unlimited mode',
       data: {
         current: 0,
-        limit: 999999,
-        remaining: 999999,
+        limit: 5000,
+        remaining: 5000,
         isBlocked: false
       }
     });
