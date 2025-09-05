@@ -1497,6 +1497,11 @@ ${storyToEdit}
 
       const qualityStats = await analyzeStoryQuality(editedStory, promptBasedTitle);
 
+      // Update final completion status
+      updateState({
+        promptStoryLoadingMessage: '✅ Hoàn tất tất cả!',
+      });
+
       // Add to history with quality analysis
       HistoryStorage.saveToHistory(
         MODULE_KEYS.WRITE_STORY,
@@ -1527,6 +1532,7 @@ ${storyToEdit}
       }
     } finally {
       if (!externalAbortController) setCurrentAbortController(null);
+      setTimeout(() => setModuleState(prev => (prev.promptStoryLoadingMessage?.includes("Hoàn tất") || prev.promptStoryLoadingMessage?.includes("Lỗi biên tập") || prev.promptStoryLoadingMessage?.includes("Đã hủy biên tập")) ? {...prev, promptStoryLoadingMessage: null, promptStoryEditProgress: null} : prev), 3000);
     }
   };
 
