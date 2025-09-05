@@ -208,12 +208,47 @@ const MainApp: React.FC = () => {
         return {
           ...initialWriteStoryState, // Start with defaults for output fields
           ...parsedState,            // Override with saved settings
-          generatedStory: '',        // Explicitly clear output
+          // Explicitly clear all output fields
+          generatedStory: '',        
           generatedHooks: '',
           generatedLesson: '',
-          generatedStoryFromPrompt: '', // Clear prompt-based story output
+          generatedStoryFromPrompt: '',
+          // Force clear all loading states to prevent stuck loading
+          storyLoadingMessage: null,
+          hookLoadingMessage: null,
+          lessonLoadingMessage: null,
+          promptStoryLoadingMessage: null,
+          singleStoryEditProgress: null,
+          promptStoryEditProgress: null,
+          // Clear error states and processing flags
+          storyError: null,
+          hookError: null,
+          lessonError: null,
+          promptStoryError: null,
+          storyProgress: 0,
+          promptStoryProgress: 0,
+          hasSingleStoryBeenEditedSuccessfully: false,
+          hasPromptStoryBeenEdited: false,
+          // Force reset all queue systems to prevent stuck processing
+          storyQueueSystem: {
+            ...initialWriteStoryState.storyQueueSystem,
+            isProcessing: false,
+            isPaused: false,
+            currentItem: null,
+          },
+          hookQueueSystem: {
+            ...initialWriteStoryState.hookQueueSystem,
+            isProcessing: false,
+            isPaused: false,
+            currentItem: null,
+          },
+          promptStoryQueueSystem: {
+            ...initialWriteStoryState.promptStoryQueueSystem,
+            isProcessing: false,
+            isPaused: false,
+            currentItem: null,
+          },
           // storyInputForHook, storyInputForLesson, hookStructure, ctaChannelForLesson will be retained from parsedState if present
-          // generatedBatchStories removed
         };
       } catch (error) {
         console.error("Error parsing saved WriteStoryModuleState:", error);
