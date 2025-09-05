@@ -1484,17 +1484,19 @@ ${storyToEdit}
       });
       
       // Add to history
-      HistoryStorage.addItem(MODULE_KEYS.WRITE_STORY, {
-        title: `Truyện theo prompt: ${promptBasedTitle}`,
-        content: editedStory,
-        contentType: 'text',
-        restoreContext: { 
+      HistoryStorage.saveToHistory(
+        MODULE_KEYS.WRITE_STORY,
+        `Truyện theo prompt: ${promptBasedTitle}`,
+        editedStory,
+        {
+          restoreContext: { 
             activeWriteTab: 'promptBasedStory',
             promptBasedTitle, 
             promptForOutline, 
             promptForWriting 
+          }
         }
-      });
+      );
       
       // Log usage
       logStoryGenerated(1);
