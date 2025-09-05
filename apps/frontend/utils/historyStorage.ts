@@ -32,6 +32,14 @@ export interface HistoryItem {
       customRewriteStyle?: string;
       adaptContext: boolean;
     };
+    storySettings?: {
+      targetLength: string;
+      outputLanguage: string;
+      writingStyle: string;
+      customWritingStyle?: string;
+      promptForOutline: string;
+      promptForWriting: string;
+    };
   };
 }
 

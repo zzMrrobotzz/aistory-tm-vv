@@ -1502,13 +1502,38 @@ ${storyToEdit}
         promptStoryLoadingMessage: '✅ Hoàn tất tất cả!',
       });
 
-      // Add to history with quality analysis
+      // Calculate word statistics
+      const originalWords = outline ? outline.split(/\s+/).filter(Boolean).length : 0;
+      const finalWords = editedStory.split(/\s+/).filter(Boolean).length;
+      const wordsExpansion = finalWords - originalWords;
+      const expansionRatio = originalWords > 0 ? Math.round((finalWords / originalWords) * 100) / 100 : 0;
+
+      const wordStats = {
+        originalWords, // từ gốc (outline)
+        rewrittenWords: finalWords, // từ cuối cùng (story)  
+        wordsChanged: wordsExpansion, // từ thay đổi (tăng/giảm)
+        changePercentage: originalWords > 0 ? Math.round(((wordsExpansion / originalWords) * 100) * 10) / 10 : 0 // % thay đổi
+      };
+
+      // Story settings information
+      const storySettings = {
+        targetLength: targetLength,
+        outputLanguage: outputLanguage,
+        writingStyle: writingStyle,
+        customWritingStyle: customWritingStyle || undefined,
+        promptForOutline: promptForOutline,
+        promptForWriting: promptForWriting
+      };
+
+      // Add to history with complete analysis
       HistoryStorage.saveToHistory(
         MODULE_KEYS.PROMPT_BASED_STORY,
         `Truyện theo prompt: ${promptBasedTitle}`,
         editedStory,
         {
           storyQualityStats: qualityStats,
+          wordStats: wordStats,
+          storySettings: storySettings,
           restoreContext: { 
             activeWriteTab: 'promptBasedStory',
             promptBasedTitle, 
@@ -1862,13 +1887,37 @@ ${storyToEdit}
 
       const qualityStats = await analyzeStoryQuality(editedStory, title);
 
-      // Save to history with quality analysis
+      // Calculate word statistics for queue processing
+      const originalWords = generatedOutline ? generatedOutline.split(/\s+/).filter(Boolean).length : 0;
+      const finalWords = editedStory.split(/\s+/).filter(Boolean).length;
+      const wordsExpansion = finalWords - originalWords;
+
+      const wordStats = {
+        originalWords, // từ gốc (outline)
+        rewrittenWords: finalWords, // từ cuối cùng (story)  
+        wordsChanged: wordsExpansion, // từ thay đổi (tăng/giảm)
+        changePercentage: originalWords > 0 ? Math.round(((wordsExpansion / originalWords) * 100) * 10) / 10 : 0 // % thay đổi
+      };
+
+      // Story settings information for queue
+      const storySettings = {
+        targetLength: targetLength,
+        outputLanguage: outputLanguage,
+        writingStyle: writingStyle,
+        customWritingStyle: customWritingStyle || undefined,
+        promptForOutline: outlinePrompt,
+        promptForWriting: writingPrompt
+      };
+
+      // Save to history with complete analysis
       HistoryStorage.saveToHistory(
         MODULE_KEYS.PROMPT_BASED_STORY,
         `Truyện theo prompt: ${title}`,
         editedStory,
         {
           storyQualityStats: qualityStats,
+          wordStats: wordStats,
+          storySettings: storySettings,
           restoreContext: { 
             activeWriteTab: 'promptBasedStory',
             promptBasedTitle: title,
