@@ -184,8 +184,8 @@ router.post('/track-usage', async (req, res) => {
     }
     
     // Check if need to reset daily (Vietnam timezone)
-    const today = new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}).split(',')[0];
-    const todayISO = new Date(today).toISOString().split('T')[0];
+    const vietnamToday = new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}).split(',')[0];
+    const todayISO = new Date(vietnamToday).toISOString().split('T')[0];
     if (global.featureTracking.lastReset !== todayISO) {
       global.featureTracking = {
         totalUsage: 0,
