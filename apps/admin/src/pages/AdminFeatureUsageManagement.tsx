@@ -160,6 +160,7 @@ const AdminFeatureUsageManagement: React.FC = () => {
             headers: {
               'Content-Type': 'application/json',
             },
+            body: JSON.stringify({ action: 'reset' })
           });
 
           if (!response.ok) {

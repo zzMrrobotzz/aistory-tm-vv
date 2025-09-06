@@ -204,8 +204,24 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// GET /api/admin/feature-settings/test-reset - Test route for debugging
+router.get('/test-reset', (req, res) => {
+  console.log('🔥 DEBUG: test-reset GET route called successfully');
+  res.json({
+    success: true,
+    message: 'Test route working',
+    method: 'GET',
+    path: '/test-reset'
+  });
+});
+
 // POST /api/admin/feature-settings/reset-all-usage - Reset session usage counter (emergency)
 router.post('/reset-all-usage', async (req, res) => {
+  console.log('🔥 DEBUG: reset-all-usage route called');
+  console.log('🔥 DEBUG: req.method =', req.method);
+  console.log('🔥 DEBUG: req.body =', JSON.stringify(req.body));
+  console.log('🔥 DEBUG: req.headers =', JSON.stringify(req.headers, null, 2));
+  
   try {
     const adminUser = req.user?.username || 'webadmin';
     const today = new Date().toISOString().split('T')[0];
