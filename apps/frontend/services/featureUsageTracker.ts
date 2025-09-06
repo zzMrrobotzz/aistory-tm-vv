@@ -90,12 +90,20 @@ const getDefaultFallbackData = (): FeatureUsageData => {
 
 const trackWithBackend = async (featureId: string, featureName: string): Promise<boolean> => {
   try {
-    // Simplified tracking without auth token
+    // Get auth token for user identification
+    const token = localStorage.getItem('userToken') || localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Add auth token if available for proper user tracking
+    if (token) {
+      headers['x-auth-token'] = token;
+    }
+    
     const response = await fetch(`${API_URL}/features/track-usage`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({
         featureId,
         featureName

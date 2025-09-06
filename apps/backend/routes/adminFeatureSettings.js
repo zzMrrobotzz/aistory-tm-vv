@@ -225,7 +225,7 @@ router.get('/stats', async (req, res) => {
         );
         
         return {
-          userId: userId.length > 15 ? userId.substring(0, 15) + '...' : userId, // Truncate long IPs
+          userId: userId, // Now shows username instead of IP or ObjectId
           totalUsage: userData.total,
           topFeature: topFeature.featureId ? {
             featureId: topFeature.featureId,

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateUser } = require('../middleware/adminAuth');
-const { updateUserActivity } = require('../middleware/activityTracker');
+const auth = require('../middleware/auth'); // User auth middleware
 const FeatureUsage = require('../models/FeatureUsage');
 const User = require('../models/User');
 const FeatureSettings = require('../models/FeatureSettings');
@@ -150,8 +149,8 @@ router.get('/usage-status', async (req, res) => {
   }
 });
 
-// POST /api/features/track-usage - Track feature usage (no auth required, webadmin sync mode)
-router.post('/track-usage', async (req, res) => {
+// POST /api/features/track-usage - Track feature usage (with auth for proper user tracking)
+router.post('/track-usage', auth, async (req, res) => {
   try {
     const { featureId, featureName } = req.body;
     const today = getVietnamDate();
@@ -199,8 +198,23 @@ router.post('/track-usage', async (req, res) => {
       console.log(`🔄 Reset daily tracking for ${todayISO} (both systems synced)`);
     }
     
-    // Extract user ID (simplified - use IP as identifier since no auth)
-    const userId = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'anonymous';
+    // Extract user info from authenticated token
+    const userId = req.user?.id || 'anonymous';
+    let userIdentifier = userId;
+    let userName = 'Anonymous';
+    
+    // Get user details for better admin display
+    if (userId !== 'anonymous') {
+      try {
+        const user = await User.findById(userId);
+        if (user) {
+          userName = user.username || user.email || `User-${userId.substring(0,8)}`;
+          userIdentifier = userName; // Use username instead of ObjectId for admin display
+        }
+      } catch (userError) {
+        console.warn('Failed to fetch user details:', userError.message);
+      }
+    }
     
     // Update tracking (sync both old and new systems)
     global.featureTracking.totalUsage += 1;
@@ -215,18 +229,19 @@ router.post('/track-usage', async (req, res) => {
       };
     }
     global.featureTracking.featureBreakdown[featureId].count += 1;
-    global.featureTracking.featureBreakdown[featureId].users.add(userId);
+    global.featureTracking.featureBreakdown[featureId].users.add(userIdentifier);
     
-    // Update user breakdown
-    if (!global.featureTracking.userBreakdown[userId]) {
-      global.featureTracking.userBreakdown[userId] = {
+    // Update user breakdown using userIdentifier for display
+    if (!global.featureTracking.userBreakdown[userIdentifier]) {
+      global.featureTracking.userBreakdown[userIdentifier] = {
         total: 0,
-        features: {}
+        features: {},
+        userId: userId // Keep userId for reference if needed
       };
     }
-    global.featureTracking.userBreakdown[userId].total += 1;
-    global.featureTracking.userBreakdown[userId].features[featureId] = 
-      (global.featureTracking.userBreakdown[userId].features[featureId] || 0) + 1;
+    global.featureTracking.userBreakdown[userIdentifier].total += 1;
+    global.featureTracking.userBreakdown[userIdentifier].features[featureId] = 
+      (global.featureTracking.userBreakdown[userIdentifier].features[featureId] || 0) + 1;
     
     const currentUsage = global.featureTracking.totalUsage;
     const enhancedStats = {
@@ -239,7 +254,7 @@ router.post('/track-usage', async (req, res) => {
       lastActivity: new Date()
     };
     
-    console.log(`✅ Enhanced tracking: ${currentUsage}/${dailyLimit} (${featureId}) by user ${userId.substring(0,10)}...`);
+    console.log(`✅ Enhanced tracking: ${currentUsage}/${dailyLimit} (${featureId}) by user ${userIdentifier}`);
     
     res.json({
       success: true,
