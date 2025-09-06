@@ -56,6 +56,13 @@ const UsageStatsModule: React.FC<UsageStatsModuleProps> = ({ currentUser }) => {
   useEffect(() => {
     if (currentUser) {
       loadUsageStats();
+      
+      // Auto-sync usage stats every 5 seconds to keep in sync with other modules
+      const interval = setInterval(() => {
+        loadUsageStats();
+      }, 5000);
+      
+      return () => clearInterval(interval);
     }
   }, [currentUser]);
 
@@ -169,7 +176,7 @@ const UsageStatsModule: React.FC<UsageStatsModuleProps> = ({ currentUser }) => {
             <Activity className="w-5 h-5 mr-2 text-blue-600" />
             Trạng Thái Usage Hiện Tại
           </h3>
-          <UsageQuotaDisplay showDetails={true} />
+          <UsageQuotaDisplay usageStats={usageStats} showDetails={true} />
         </div>
 
         {/* Usage Overview */}
