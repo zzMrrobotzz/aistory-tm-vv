@@ -36,6 +36,13 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  bonusDailyLimit: {
+    type: Number,
+    default: 0,
+    min: 0,
+    // Bonus daily feature usage limit added to global limit
+    // Total limit = global limit + bonusDailyLimit
+  },
   lastLoginAt: {
     type: Date,
   },

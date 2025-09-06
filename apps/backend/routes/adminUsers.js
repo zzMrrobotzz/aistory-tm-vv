@@ -328,6 +328,48 @@ router.put('/:id/status', /* isAdmin, */ async (req, res) => {
   }
 });
 
+// @route   PUT /api/admin/users/:id/bonus-limit
+// @desc    Update user bonus daily limit  
+// @access  Admin only
+router.put('/:id/bonus-limit', /* isAdmin, */ async (req, res) => {
+  try {
+    const { bonusDailyLimit } = req.body;
+    
+    if (typeof bonusDailyLimit !== 'number' || bonusDailyLimit < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid bonus limit amount' });
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { 
+        bonusDailyLimit: bonusDailyLimit,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    console.log(`✅ Admin updated bonus daily limit for user ${user.username}: +${bonusDailyLimit}`);
+    
+    res.json({
+      success: true,
+      message: `Updated bonus daily limit to +${bonusDailyLimit}`,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        bonusDailyLimit: user.bonusDailyLimit
+      }
+    });
+  } catch (err) {
+    console.error('Error updating user bonus limit:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
 // @route   PUT /api/admin/users/:id/subscription
 // @desc    Update user subscription
 // @access  Admin only
