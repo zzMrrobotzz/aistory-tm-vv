@@ -24,6 +24,13 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
     ApiKeyStorage.resetDailyUsage();
     loadApiKeys();
     loadUsageStats();
+
+    // Auto-sync usage stats every 10 seconds to keep in sync with other modules
+    const interval = setInterval(() => {
+      loadUsageStats();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const loadUsageStats = async () => {

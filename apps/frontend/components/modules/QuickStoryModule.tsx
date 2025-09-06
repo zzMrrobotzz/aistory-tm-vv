@@ -10,6 +10,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import UpgradePrompt from '../UpgradePrompt';
+import UsageQuotaDisplay from '../UsageQuotaDisplay';
 import { Trash2, PlusCircle, Square, Play, Trash, Clipboard, ClipboardCheck, ChevronsRight, BookCopy, Zap, Save, Download, Loader2 } from 'lucide-react';
 
 // Advanced retry logic with exponential backoff for API calls (from RewriteModule)
@@ -124,7 +125,7 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     // Helper: check feature usage limit with backend sync
     const checkFeatureUsage = async () => {
         try {
-            const canUse = await featureUsageTracker.canUseFeature();
+            const canUse = featureUsageTracker.canUse();
             const stats = await featureUsageTracker.getUsageStats();
             setUsageStats(stats);
             
@@ -1024,40 +1025,7 @@ ${fullStory}
                 <p className="mt-2"><strong>Sáng tạo Truyện Kế Tiếp:</strong> Cung cấp các truyện mẫu cùng chủ đề để AI học "ADN viral", sau đó gợi ý tiêu đề mới và viết một câu chuyện tiếp theo với văn phong đồng nhất.</p>
             </InfoBox>
             
-            {/* Daily Usage Counter */}
-            <div className={`p-4 rounded-lg border ${usageStats.isBlocked ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                        <span className={`text-2xl mr-2 ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
-                            {usageStats.isBlocked ? '🚫' : '📊'}
-                        </span>
-                        <div>
-                            <h3 className={`font-semibold ${usageStats.isBlocked ? 'text-red-800' : 'text-green-800'}`}>
-                                Sử dụng hôm nay: {usageStats.current}/{usageStats.limit}
-                            </h3>
-                            <p className={`text-sm ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
-                                {usageStats.isBlocked 
-                                    ? `Đã đạt giới hạn! Reset vào 00:00 ngày mai.`
-                                    : `Còn lại ${usageStats.remaining} requests (${usageStats.percentage}% đã dùng)`
-                                }
-                            </p>
-                        </div>
-                    </div>
-                    <div className={`text-2xl font-bold ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
-                        {usageStats.percentage}%
-                    </div>
-                </div>
-                {/* Progress Bar */}
-                <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                            usageStats.percentage >= 90 ? 'bg-red-500' : 
-                            usageStats.percentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
-                        }`}
-                        style={{ width: `${Math.min(100, usageStats.percentage)}%` }}
-                    ></div>
-                </div>
-            </div>
+            <UsageQuotaDisplay usageStats={usageStats} />
             
             {!hasActiveSubscription && <UpgradePrompt />}
 
