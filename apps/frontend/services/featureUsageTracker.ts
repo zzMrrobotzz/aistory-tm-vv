@@ -1,5 +1,7 @@
-// Feature Usage Tracker - Tracks actual feature usage (not requests)
+// Feature Usage Tracker - Tracks actual feature usage with backend sync
 // Each successful feature usage counts as 1 use (e.g., 1 rewrite = 1 use)
+
+const API_URL = 'https://aistory-backend.onrender.com/api';
 
 interface FeatureUsageData {
   date: string; // YYYY-MM-DD
@@ -17,7 +19,134 @@ interface FeatureUsageData {
 }
 
 const STORAGE_KEY = 'feature-usage-tracker';
+const BACKEND_SYNC_KEY = 'feature-usage-last-sync';
 const DEFAULT_DAILY_LIMIT = 300; // 300 feature uses per day
+
+// Backend sync functions
+const getAuthToken = (): string | null => {
+  return localStorage.getItem('userToken');
+};
+
+const syncWithBackend = async (): Promise<FeatureUsageData | null> => {
+  try {
+    const token = getAuthToken();
+    if (!token) {
+      console.warn('No auth token, skipping backend sync');
+      return null;
+    }
+
+    const response = await fetch(`${API_URL}/features/usage-status`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      console.warn('Backend sync failed:', response.status, response.statusText);
+      return null;
+    }
+
+    const backendData = await response.json();
+    if (backendData.success && backendData.data.usage) {
+      const usage = backendData.data.usage;
+      const today = getTodayVietnam();
+      
+      const syncedData: FeatureUsageData = {
+        date: today,
+        totalUses: usage.totalUses || 0,
+        dailyLimit: usage.dailyLimit || DEFAULT_DAILY_LIMIT,
+        remaining: usage.remaining || 0,
+        percentage: usage.percentage || 0,
+        isBlocked: usage.isBlocked || false,
+        featureBreakdown: usage.featureBreakdown || {}
+      };
+
+      // Save synced data to localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(syncedData));
+      localStorage.setItem(BACKEND_SYNC_KEY, new Date().toISOString());
+      
+      console.log(`🔄 Synced with backend: ${syncedData.totalUses}/${syncedData.dailyLimit}`);
+      return syncedData;
+    }
+  } catch (error) {
+    console.warn('Backend sync failed, using local data:', error);
+  }
+  
+  return null;
+};
+
+const trackWithBackend = async (featureId: string, featureName: string): Promise<boolean> => {
+  try {
+    const token = getAuthToken();
+    if (!token) {
+      console.warn('No auth token, skipping backend tracking');
+      return false;
+    }
+
+    const response = await fetch(`${API_URL}/features/track-usage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        featureId,
+        featureName
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.usage) {
+        // Update local storage with backend data
+        const today = getTodayVietnam();
+        const usage = data.usage;
+        
+        const updatedData: FeatureUsageData = {
+          date: today,
+          totalUses: usage.totalUses || 0,
+          dailyLimit: usage.dailyLimit || DEFAULT_DAILY_LIMIT,
+          remaining: usage.remaining || 0,
+          percentage: usage.percentage || 0,
+          isBlocked: usage.isBlocked || false,
+          featureBreakdown: usage.featureBreakdown || {}
+        };
+        
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedData));
+        console.log(`✅ Backend tracked: ${updatedData.totalUses}/${updatedData.dailyLimit} (${featureId})`);
+        return true;
+      }
+    } else if (response.status === 429) {
+      // Rate limit exceeded
+      const errorData = await response.json();
+      console.warn('⚠️ Backend rate limit exceeded:', errorData.message);
+      if (errorData.usage) {
+        // Update local data with backend limits
+        const today = getTodayVietnam();
+        const usage = errorData.usage;
+        
+        const blockedData: FeatureUsageData = {
+          date: today,
+          totalUses: usage.totalUses || 0,
+          dailyLimit: usage.dailyLimit || DEFAULT_DAILY_LIMIT,
+          remaining: usage.remaining || 0,
+          percentage: usage.percentage || 100,
+          isBlocked: true,
+          featureBreakdown: usage.featureBreakdown || {}
+        };
+        
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(blockedData));
+      }
+      return false;
+    }
+  } catch (error) {
+    console.warn('Backend tracking failed:', error);
+  }
+  
+  return false;
+};
 
 // Get today's date in Vietnam timezone
 const getTodayVietnam = (): string => {
@@ -26,8 +155,60 @@ const getTodayVietnam = (): string => {
   return vietnamTime.toISOString().split('T')[0];
 };
 
-// Get current feature usage data
-export const getFeatureUsageStats = (): FeatureUsageData => {
+// Get current feature usage data with backend sync
+export const getFeatureUsageStats = async (): Promise<FeatureUsageData> => {
+  try {
+    // Check if we should sync with backend (every 2 minutes or if no recent sync)
+    const lastSync = localStorage.getItem(BACKEND_SYNC_KEY);
+    const shouldSync = !lastSync || 
+      (new Date().getTime() - new Date(lastSync).getTime()) > (2 * 60 * 1000);
+    
+    if (shouldSync) {
+      const syncedData = await syncWithBackend();
+      if (syncedData) return syncedData;
+    }
+    
+    // Fallback to local data
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const today = getTodayVietnam();
+    
+    if (stored) {
+      const data = JSON.parse(stored);
+      if (data.date === today) {
+        return data;
+      }
+    }
+    
+    // Return fresh data for today
+    const freshData: FeatureUsageData = {
+      date: today,
+      totalUses: 0,
+      dailyLimit: DEFAULT_DAILY_LIMIT,
+      remaining: DEFAULT_DAILY_LIMIT,
+      percentage: 0,
+      isBlocked: false,
+      featureBreakdown: {}
+    };
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(freshData));
+    return freshData;
+    
+  } catch (error) {
+    console.warn('Error loading feature usage data:', error);
+    return {
+      date: getTodayVietnam(),
+      totalUses: 0,
+      dailyLimit: DEFAULT_DAILY_LIMIT,
+      remaining: DEFAULT_DAILY_LIMIT,
+      percentage: 0,
+      isBlocked: false,
+      featureBreakdown: {}
+    };
+  }
+};
+
+// Synchronous version for immediate UI updates
+export const getFeatureUsageStatsSync = (): FeatureUsageData => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     const today = getTodayVietnam();
@@ -67,15 +248,27 @@ export const getFeatureUsageStats = (): FeatureUsageData => {
   }
 };
 
-// Check if user can use a feature
+// Check if user can use a feature (sync version for immediate checks)
 export const canUseFeature = (featureId?: string): boolean => {
-  const data = getFeatureUsageStats();
+  const data = getFeatureUsageStatsSync();
   return data.totalUses < data.dailyLimit;
 };
 
 // Track feature usage - call this when feature is successfully used
-export const trackFeatureUsage = (featureId: string, featureName?: string): FeatureUsageData => {
-  const data = getFeatureUsageStats();
+export const trackFeatureUsage = async (featureId: string, featureName?: string): Promise<FeatureUsageData> => {
+  const effectiveFeatureName = featureName || FEATURE_NAMES[featureId as keyof typeof FEATURE_NAMES] || featureId;
+  
+  // Try backend tracking first
+  const backendTracked = await trackWithBackend(featureId, effectiveFeatureName);
+  
+  if (backendTracked) {
+    // Backend tracking successful, return updated data
+    return getFeatureUsageStatsSync();
+  }
+  
+  // Backend failed, fallback to local tracking
+  console.warn('Backend tracking failed, using local fallback');
+  const data = getFeatureUsageStatsSync();
   
   if (data.totalUses < data.dailyLimit) {
     // Increment total usage
@@ -97,7 +290,7 @@ export const trackFeatureUsage = (featureId: string, featureName?: string): Feat
     
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      console.log(`✅ Feature usage tracked: ${data.totalUses}/${data.dailyLimit} (${featureId})`);
+      console.log(`✅ Local feature usage tracked: ${data.totalUses}/${data.dailyLimit} (${featureId})`);
     } catch (error) {
       console.warn('Error saving feature usage data:', error);
     }
@@ -186,6 +379,7 @@ export const FEATURE_NAMES = {
 
 export default {
   getUsageStats: getFeatureUsageStats,
+  getUsageStatsSync: getFeatureUsageStatsSync,
   canUse: canUseFeature,
   trackUsage: trackFeatureUsage,
   reset: resetFeatureUsage,

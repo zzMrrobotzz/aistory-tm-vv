@@ -127,18 +127,24 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({
   const hasActiveSubscription = isSubscribed(currentUser);
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Feature usage tracking state (local)
-  const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStats());
+  // Feature usage tracking state (local + backend sync)
+  const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStatsSync());
   
-  // Update usage stats when component mounts and every minute for reset handling
+  // Update usage stats when component mounts and every minute for reset handling + backend sync
   useEffect(() => {
-    const updateStats = () => {
-      const stats = featureUsageTracker.getUsageStats();
-      setUsageStats(stats);
+    const updateStats = async () => {
+      try {
+        const stats = await featureUsageTracker.getUsageStats(); // This syncs with backend
+        setUsageStats(stats);
+      } catch (error) {
+        // Fallback to sync version
+        const stats = featureUsageTracker.getUsageStatsSync();
+        setUsageStats(stats);
+      }
     };
     
     updateStats();
-    const interval = setInterval(updateStats, 60000); // Check every minute for midnight reset
+    const interval = setInterval(updateStats, 120000); // Check every 2 minutes for backend sync
     return () => clearInterval(interval);
   }, []);
 
@@ -892,9 +898,16 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             logApiCall('rewrite', numChunks);
             logTextRewritten('rewrite', 1);
             
-            // Track feature usage (1 successful rewrite = 1 use)
-            const updatedStats = featureUsageTracker.trackUsage(FEATURE_IDS.REWRITE, 'Viết Lại');
-            setUsageStats(updatedStats);
+            // Track feature usage (1 successful rewrite = 1 use) - async with backend sync
+            try {
+                const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.REWRITE, 'Viết Lại');
+                setUsageStats(updatedStats);
+            } catch (error) {
+                console.warn('Failed to track usage:', error);
+                // Update local stats anyway
+                const localStats = featureUsageTracker.getUsageStatsSync();
+                setUsageStats(localStats);
+            }
             
             // Progress already reset above, no need for additional timeout
         } catch (e) {
