@@ -148,20 +148,29 @@ router.get('/usage-status', async (req, res) => {
   }
 });
 
-// POST /api/features/track-usage - Track feature usage
-router.post('/track-usage', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
+// POST /api/features/track-usage - Track feature usage (no auth required, webadmin sync mode)
+router.post('/track-usage', async (req, res) => {
   try {
-    const userId = req.userId;
     const { featureId, featureName } = req.body;
     const today = getVietnamDate();
     
-    console.log(`📝 Tracking feature usage: ${featureId} for user ${userId}`);
+    console.log(`📝 Tracking feature usage: ${featureId} (webadmin sync mode)`);
     
     if (!featureId || !featureName) {
       return res.status(400).json({
         success: false,
         message: 'featureId và featureName là bắt buộc'
       });
+    }
+    
+    // Get current daily limit from webadmin settings
+    let dailyLimit = DEFAULT_DAILY_LIMIT;
+    try {
+      dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+      console.log(`📊 Retrieved daily limit from webadmin: ${dailyLimit}`);
+    } catch (settingsError) {
+      console.warn('⚠️ FeatureSettings query failed, using default:', DEFAULT_DAILY_LIMIT);
+      dailyLimit = DEFAULT_DAILY_LIMIT;
     }
     
     // Simple in-memory counter per session (not persistent)
@@ -215,55 +224,42 @@ router.post('/track-usage', authenticateUser, updateUserActivity, extractUserId,
   }
 });
 
-// POST /api/features/check-usage - Check if feature can be used (without tracking)
-router.post('/check-usage', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
+// POST /api/features/check-usage - Check if feature can be used (webadmin sync mode)
+router.post('/check-usage', async (req, res) => {
   try {
-    const userId = req.userId;
     const { featureId } = req.body;
     const today = getVietnamDate();
     
-    console.log(`🔍 Checking feature usage: ${featureId} for user ${userId}`);
+    console.log(`🔍 Checking feature usage: ${featureId} (webadmin sync mode)`);
     
-    // Get user info
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    // Get current daily limit from webadmin settings
+    let dailyLimit = DEFAULT_DAILY_LIMIT;
+    try {
+      dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+      console.log(`📊 Retrieved daily limit from webadmin: ${dailyLimit}`);
+    } catch (settingsError) {
+      console.warn('⚠️ FeatureSettings query failed, using default:', DEFAULT_DAILY_LIMIT);
+      dailyLimit = DEFAULT_DAILY_LIMIT;
     }
     
-    // Find feature usage record for today
-    let usageRecord = await FeatureUsage.findOne({ userId, date: today });
-    
-    if (!usageRecord) {
-      // Create new record for today - get limit from settings
-      const subscriptionType = user.subscriptionType || 'free';
-      const dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
-      
-      usageRecord = new FeatureUsage({
-        userId,
-        username: user.username,
-        email: user.email,
-        date: today,
-        dailyLimit,
-        subscriptionType,
-        totalUses: 0,
-        featureBreakdown: [],
-        usageHistory: []
-      });
-      
-      await usageRecord.save();
-    }
-    
-    const canUse = usageRecord.canUseFeature();
-    const stats = usageRecord.getUsageStats();
+    // Check session usage count
+    const currentUsage = global.sessionUsageCount || 0;
+    const canUse = currentUsage < dailyLimit;
+    const stats = {
+      current: currentUsage,
+      dailyLimit: dailyLimit,
+      remaining: Math.max(0, dailyLimit - currentUsage),
+      percentage: Math.round((currentUsage / dailyLimit) * 100),
+      isBlocked: !canUse,
+      featureBreakdown: {},
+      lastActivity: new Date()
+    };
     
     res.json({
       success: true,
       canUse,
       blocked: !canUse,
-      message: canUse ? 'Feature can be used' : `Đã đạt giới hạn ${usageRecord.dailyLimit} lượt sử dụng/ngày`,
+      message: canUse ? 'Feature can be used' : `Đã đạt giới hạn ${dailyLimit} lượt sử dụng/ngày`,
       usage: stats
     });
     
@@ -277,36 +273,37 @@ router.post('/check-usage', authenticateUser, updateUserActivity, extractUserId,
   }
 });
 
-// GET /api/features/usage-history - Get feature usage history
-router.get('/usage-history', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
+// GET /api/features/usage-history - Get feature usage history (webadmin sync mode)
+router.get('/usage-history', async (req, res) => {
   try {
-    const userId = req.userId;
     const { days = 7 } = req.query;
     
-    console.log(`📊 Getting feature usage history for user ${userId} (${days} days)`);
+    console.log(`📊 Getting feature usage history (webadmin sync mode, ${days} days)`);
+    
+    // Get current daily limit from webadmin settings
+    let dailyLimit = DEFAULT_DAILY_LIMIT;
+    try {
+      dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+    } catch (settingsError) {
+      console.warn('⚠️ FeatureSettings query failed, using default:', DEFAULT_DAILY_LIMIT);
+      dailyLimit = DEFAULT_DAILY_LIMIT;
+    }
     
     // Calculate date range
     const today = getVietnamDate();
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - parseInt(days));
     
-    // Get usage records
-    const records = await FeatureUsage.find({
-      userId,
-      date: { 
-        $gte: startDate.toISOString().split('T')[0], 
-        $lte: today 
-      }
-    }).sort({ date: -1 });
-    
-    const history = records.map(record => ({
-      date: record.date,
-      totalUses: record.totalUses,
-      dailyLimit: record.dailyLimit,
-      percentage: Math.round((record.totalUses / record.dailyLimit) * 100),
-      featureBreakdown: record.featureBreakdown,
-      usageHistory: record.usageHistory
-    }));
+    // Return session-based history (simplified for now)
+    const currentUsage = global.sessionUsageCount || 0;
+    const history = [{
+      date: today,
+      totalUses: currentUsage,
+      dailyLimit: dailyLimit,
+      percentage: Math.round((currentUsage / dailyLimit) * 100),
+      featureBreakdown: {},
+      usageHistory: []
+    }];
     
     res.json({
       success: true,
