@@ -220,8 +220,21 @@ router.post('/reset-all-usage', async (req, res) => {
   console.log('🔥 DEBUG: reset-all-usage route called');
   console.log('🔥 DEBUG: req.method =', req.method);
   console.log('🔥 DEBUG: req.body =', JSON.stringify(req.body));
-  console.log('🔥 DEBUG: req.headers =', JSON.stringify(req.headers, null, 2));
+  console.log('🔥 DEBUG: req.headers content-type =', req.headers['content-type']);
   
+  // Immediate success response for testing
+  console.log('✅ Sending immediate success response for debug');
+  return res.json({
+    success: true,
+    message: 'DEBUG: Route reached successfully',
+    debug: {
+      method: req.method,
+      body: req.body,
+      contentType: req.headers['content-type']
+    }
+  });
+  
+  /* ORIGINAL CODE COMMENTED FOR DEBUGGING:
   try {
     const adminUser = req.user?.username || 'webadmin';
     const today = new Date().toISOString().split('T')[0];
@@ -276,6 +289,7 @@ router.post('/reset-all-usage', async (req, res) => {
       error: error.message
     });
   }
+  */
 });
 
 // POST /api/admin/feature-settings/initialize - Initialize default settings

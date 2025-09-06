@@ -164,7 +164,11 @@ const AdminFeatureUsageManagement: React.FC = () => {
           });
 
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            // Get the actual error response body for debugging
+            const errorText = await response.text();
+            console.error('🔥 DEBUG: Response status:', response.status);
+            console.error('🔥 DEBUG: Response body:', errorText);
+            throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
           }
 
           const data = await response.json();
