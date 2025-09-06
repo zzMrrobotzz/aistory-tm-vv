@@ -173,29 +173,74 @@ router.post('/track-usage', async (req, res) => {
       dailyLimit = DEFAULT_DAILY_LIMIT;
     }
     
-    // Simple in-memory counter per session (not persistent)
-    if (!global.sessionUsageCount) {
-      global.sessionUsageCount = 0;
+    // Enhanced tracking system with detailed breakdown
+    if (!global.featureTracking) {
+      global.featureTracking = {
+        totalUsage: 0,
+        featureBreakdown: {}, // { featureId: { count: number, users: Set<userId> } }
+        userBreakdown: {}, // { userId: { total: number, features: { featureId: count } } }
+        lastReset: new Date().toISOString().split('T')[0]
+      };
     }
-    global.sessionUsageCount += 1;
     
-    const currentUsage = global.sessionUsageCount;
-    const mockUsageStats = {
+    // Check if need to reset daily (Vietnam timezone)
+    const today = new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}).split(',')[0];
+    const todayISO = new Date(today).toISOString().split('T')[0];
+    if (global.featureTracking.lastReset !== todayISO) {
+      global.featureTracking = {
+        totalUsage: 0,
+        featureBreakdown: {},
+        userBreakdown: {},
+        lastReset: todayISO
+      };
+      console.log(`🔄 Reset daily tracking for ${todayISO}`);
+    }
+    
+    // Extract user ID (simplified - use IP as identifier since no auth)
+    const userId = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'anonymous';
+    
+    // Update tracking
+    global.featureTracking.totalUsage += 1;
+    
+    // Update feature breakdown
+    if (!global.featureTracking.featureBreakdown[featureId]) {
+      global.featureTracking.featureBreakdown[featureId] = {
+        featureName: featureName,
+        count: 0,
+        users: new Set()
+      };
+    }
+    global.featureTracking.featureBreakdown[featureId].count += 1;
+    global.featureTracking.featureBreakdown[featureId].users.add(userId);
+    
+    // Update user breakdown
+    if (!global.featureTracking.userBreakdown[userId]) {
+      global.featureTracking.userBreakdown[userId] = {
+        total: 0,
+        features: {}
+      };
+    }
+    global.featureTracking.userBreakdown[userId].total += 1;
+    global.featureTracking.userBreakdown[userId].features[featureId] = 
+      (global.featureTracking.userBreakdown[userId].features[featureId] || 0) + 1;
+    
+    const currentUsage = global.featureTracking.totalUsage;
+    const enhancedStats = {
       current: currentUsage,
       dailyLimit: dailyLimit,
       remaining: Math.max(0, dailyLimit - currentUsage),
       percentage: Math.round((currentUsage / dailyLimit) * 100),
       isBlocked: currentUsage >= dailyLimit,
-      featureBreakdown: {},
+      featureBreakdown: global.featureTracking.featureBreakdown,
       lastActivity: new Date()
     };
     
-    console.log(`✅ Feature usage tracked (session): ${currentUsage}/${dailyLimit} (${featureId})`);
+    console.log(`✅ Enhanced tracking: ${currentUsage}/${dailyLimit} (${featureId}) by user ${userId.substring(0,10)}...`);
     
     res.json({
       success: true,
-      message: 'Feature usage tracked successfully (session mode)',
-      usage: mockUsageStats
+      message: 'Feature usage tracked successfully (enhanced tracking)',
+      usage: enhancedStats
     });
     
   } catch (error) {

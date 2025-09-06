@@ -30,6 +30,16 @@ interface UsageStats {
     totalUses: number;
     userCount: number;
   }>;
+  topUsers: Array<{
+    userId: string;
+    totalUsage: number;
+    topFeature: {
+      featureId: string;
+      featureName: string;
+      count: number;
+    } | null;
+    featuresUsed: number;
+  }>;
   weeklyTrend: Array<{
     _id: string;
     totalUsage: number;
@@ -223,6 +233,46 @@ const AdminFeatureUsageManagement: React.FC = () => {
     },
   ];
 
+  const topUsersColumns = [
+    {
+      title: 'Người Dùng',
+      dataIndex: 'userId',
+      key: 'userId',
+      render: (text: string, record: any, index: number) => (
+        <div>
+          <Tag color={index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'orange' : 'default'}>
+            #{index + 1}
+          </Tag>
+          <Text code>{text}</Text>
+        </div>
+      )
+    },
+    {
+      title: 'Tổng Sử Dụng',
+      dataIndex: 'totalUsage',
+      key: 'totalUsage',
+      render: (value: number) => <Text strong>{value}</Text>
+    },
+    {
+      title: 'Tính Năng Yêu Thích',
+      key: 'topFeature',
+      render: (record: any) => (
+        record.topFeature ? (
+          <div>
+            <Tag color="green">{record.topFeature.featureName}</Tag>
+            <Text type="secondary">({record.topFeature.count} lần)</Text>
+          </div>
+        ) : <Text type="secondary">-</Text>
+      )
+    },
+    {
+      title: 'Số Tính Năng',
+      dataIndex: 'featuresUsed',
+      key: 'featuresUsed',
+      render: (value: number) => <Text>{value}</Text>
+    }
+  ];
+
   const weeklyTrendColumns = [
     {
       title: 'Ngày',
@@ -375,6 +425,24 @@ const AdminFeatureUsageManagement: React.FC = () => {
                 rowKey="_id"
                 pagination={false}
                 size="small"
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Top Users Analytics */}
+        <Row gutter={[16, 16]} className="mt-4">
+          <Col span={24}>
+            <Card title="Top Người Dùng Hoạt Động" loading={statsLoading}>
+              <Table
+                dataSource={usageStats?.topUsers || []}
+                columns={topUsersColumns}
+                rowKey="userId"
+                pagination={false}
+                size="small"
+                locale={{
+                  emptyText: 'Chưa có dữ liệu người dùng'
+                }}
               />
             </Card>
           </Col>

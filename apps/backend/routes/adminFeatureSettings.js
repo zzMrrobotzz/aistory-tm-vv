@@ -57,11 +57,19 @@ router.post('/reset-all-usage', async (req, res) => {
     
     console.log(`🚨 Admin ${adminUser} resetting session usage counter for ${today}`);
     
-    // Reset the global session counter (current tracking system)
-    const previousCount = global.sessionUsageCount || 0;
-    global.sessionUsageCount = 0;
+    // Reset the enhanced tracking system
+    const previousCount = global.featureTracking?.totalUsage || global.sessionUsageCount || 0;
     
-    console.log(`✅ Reset session usage counter from ${previousCount} to 0`);
+    // Reset both old and new tracking systems
+    global.sessionUsageCount = 0;
+    global.featureTracking = {
+      totalUsage: 0,
+      featureBreakdown: {},
+      userBreakdown: {},
+      lastReset: today
+    };
+    
+    console.log(`✅ Reset enhanced tracking system from ${previousCount} to 0`);
     
     // Also reset any database records if they exist (legacy cleanup)
     let dbResetCount = 0;
@@ -168,83 +176,84 @@ router.post('/:key', async (req, res) => {
   }
 });
 
-// GET /api/admin/feature-settings/stats - Get feature usage statistics (session-based)
+// GET /api/admin/feature-settings/stats - Get enhanced feature usage statistics
 router.get('/stats', async (req, res) => {
   try {
-    console.log('📈 Admin getting feature usage statistics (session-based)...');
+    console.log('📈 Admin getting enhanced feature usage statistics...');
     
     const currentLimit = await FeatureSettings.getSetting('feature_daily_limit', 300);
-    const currentUsage = global.sessionUsageCount || 0;
+    const tracking = global.featureTracking || { totalUsage: 0, featureBreakdown: {}, userBreakdown: {} };
+    const currentUsage = tracking.totalUsage;
     const today = new Date().toISOString().split('T')[0];
     
-    // Session-based statistics (simplified but real)
+    // Enhanced statistics
     const isBlocked = currentUsage >= currentLimit;
     const utilizationRate = currentLimit > 0 ? Math.round((currentUsage / currentLimit) * 100) : 0;
+    const totalUsers = Object.keys(tracking.userBreakdown).length;
     
-    // Create realistic session-based stats
-    const sessionStats = {
-      totalUsers: currentUsage > 0 ? 1 : 0, // Simplified: 1 active session if usage > 0
+    // Calculate user stats
+    const userUsages = Object.values(tracking.userBreakdown).map(user => user.total);
+    const averageUsage = totalUsers > 0 ? Math.round(userUsages.reduce((a, b) => a + b, 0) / totalUsers) : 0;
+    const maxUsage = userUsages.length > 0 ? Math.max(...userUsages) : 0;
+    const blockedUsers = userUsages.filter(usage => usage >= currentLimit).length;
+    
+    const enhancedStats = {
+      totalUsers: totalUsers,
       totalUsage: currentUsage,
-      averageUsage: currentUsage,
-      maxUsage: currentUsage,
-      blockedUsers: isBlocked ? 1 : 0,
+      averageUsage: averageUsage,
+      maxUsage: maxUsage,
+      blockedUsers: blockedUsers,
       utilizationRate: utilizationRate
     };
     
-    // Mock feature breakdown based on common usage patterns
-    const featureBreakdown = [];
-    if (currentUsage > 0) {
-      // Distribute usage across common features
-      const rewriteUsage = Math.ceil(currentUsage * 0.4); // 40% rewrite
-      const writeStoryUsage = Math.ceil(currentUsage * 0.3); // 30% write-story  
-      const quickStoryUsage = currentUsage - rewriteUsage - writeStoryUsage; // remainder
-      
-      if (rewriteUsage > 0) {
-        featureBreakdown.push({
-          _id: 'rewrite',
-          featureName: 'Viết Lại',
-          totalUses: rewriteUsage,
-          userCount: 1
-        });
-      }
-      
-      if (writeStoryUsage > 0) {
-        featureBreakdown.push({
-          _id: 'write-story',
-          featureName: 'Viết Truyện',
-          totalUses: writeStoryUsage,
-          userCount: 1
-        });
-      }
-      
-      if (quickStoryUsage > 0) {
-        featureBreakdown.push({
-          _id: 'quick-story',
-          featureName: 'Tạo Truyện Nhanh',
-          totalUses: quickStoryUsage,
-          userCount: 1
-        });
-      }
-      
-      // Sort by usage
-      featureBreakdown.sort((a, b) => b.totalUses - a.totalUses);
-    }
+    // Real feature breakdown from tracking
+    const featureBreakdown = Object.entries(tracking.featureBreakdown).map(([featureId, data]) => ({
+      _id: featureId,
+      featureName: data.featureName,
+      totalUses: data.count,
+      userCount: data.users.size
+    })).sort((a, b) => b.totalUses - a.totalUses);
     
-    // Simple weekly trend (session data only available for today)
+    // Top users analysis
+    const topUsers = Object.entries(tracking.userBreakdown)
+      .map(([userId, userData]) => {
+        // Find user's most used feature
+        const userFeatures = Object.entries(userData.features);
+        const topFeature = userFeatures.reduce((max, [featureId, count]) => 
+          count > max.count ? { featureId, count } : max, 
+          { featureId: null, count: 0 }
+        );
+        
+        return {
+          userId: userId.length > 15 ? userId.substring(0, 15) + '...' : userId, // Truncate long IPs
+          totalUsage: userData.total,
+          topFeature: topFeature.featureId ? {
+            featureId: topFeature.featureId,
+            featureName: tracking.featureBreakdown[topFeature.featureId]?.featureName || topFeature.featureId,
+            count: topFeature.count
+          } : null,
+          featuresUsed: Object.keys(userData.features).length
+        };
+      })
+      .sort((a, b) => b.totalUsage - a.totalUsage)
+      .slice(0, 10); // Top 10 users
+    
+    // Simple weekly trend (enhanced data only available for today)
     const weeklyTrend = currentUsage > 0 ? [{
       _id: today,
       totalUsage: currentUsage,
-      userCount: 1
+      userCount: totalUsers
     }] : [];
     
-    console.log(`📊 Session stats: ${currentUsage}/${currentLimit} (${utilizationRate}%), blocked: ${isBlocked}`);
+    console.log(`📊 Enhanced stats: ${currentUsage}/${currentLimit} (${utilizationRate}%), users: ${totalUsers}, features: ${featureBreakdown.length}`);
     
     res.json({
       success: true,
       data: {
         currentLimit,
-        todayStats: sessionStats,
+        todayStats: enhancedStats,
         featureBreakdown,
+        topUsers, // New: Top user analytics
         weeklyTrend
       }
     });
