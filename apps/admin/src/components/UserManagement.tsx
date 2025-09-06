@@ -176,7 +176,7 @@ const UserManagement: React.FC = () => {
     if (!editingUser) return;
 
     try {
-      const response = await fetch(`/api/admin/users/${editingUser._id}/bonus-limit`, {
+      const response = await fetch(`https://aistory-backend.onrender.com/api/admin/users/${editingUser._id}/bonus-limit`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
