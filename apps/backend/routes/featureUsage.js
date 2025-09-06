@@ -75,19 +75,60 @@ router.get('/usage-status-debug', async (req, res) => {
   }
 });
 
-// Simplified route with webadmin sync but no user auth
-router.get('/usage-status', async (req, res) => {
-  try {
-    console.log('🔍 Getting feature usage status - WEBADMIN SYNC MODE');
-    
-    // Get current daily limit from webadmin settings
-    let dailyLimit = DEFAULT_DAILY_LIMIT;
+// Optional auth middleware - if token exists, decode user info
+const optionalAuth = async (req, res, next) => {
+  const token = req.header('x-auth-token');
+  if (token) {
     try {
-      dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
-      console.log(`📊 Retrieved daily limit from webadmin: ${dailyLimit}`);
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_user_secret');
+      req.user = decoded.user;
+    } catch (err) {
+      // Invalid token, continue without auth
+      req.user = null;
+    }
+  }
+  next();
+};
+
+// Route with optional auth to get user-specific limits
+router.get('/usage-status', optionalAuth, async (req, res) => {
+  try {
+    console.log('🔍 Getting feature usage status with optional user auth');
+    
+    // Get global daily limit from webadmin settings
+    let globalDailyLimit = DEFAULT_DAILY_LIMIT;
+    try {
+      globalDailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+      console.log(`📊 Retrieved global daily limit from webadmin: ${globalDailyLimit}`);
     } catch (settingsError) {
       console.warn('⚠️ FeatureSettings query failed, using default:', DEFAULT_DAILY_LIMIT);
-      dailyLimit = DEFAULT_DAILY_LIMIT;
+      globalDailyLimit = DEFAULT_DAILY_LIMIT;
+    }
+    
+    // Get user's bonus limit if authenticated
+    let bonusLimit = 0;
+    let totalDailyLimit = globalDailyLimit;
+    let userInfo = null;
+    
+    if (req.user?.id) {
+      try {
+        const user = await User.findById(req.user.id);
+        if (user) {
+          bonusLimit = user.bonusDailyLimit || 0;
+          totalDailyLimit = globalDailyLimit + bonusLimit;
+          userInfo = {
+            id: user._id,
+            username: user.username
+          };
+          
+          if (bonusLimit > 0) {
+            console.log(`🎁 User ${user.username} has bonus: +${bonusLimit}, Total: ${totalDailyLimit}`);
+          }
+        }
+      } catch (userError) {
+        console.warn('Failed to fetch user bonus limit:', userError.message);
+      }
     }
     
     // Get usage count from enhanced tracking system (fallback to old system)
@@ -97,10 +138,12 @@ router.get('/usage-status', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const syncedStats = {
       current: currentUsage,
-      dailyLimit: dailyLimit,
-      remaining: Math.max(0, dailyLimit - currentUsage),
-      percentage: Math.round((currentUsage / dailyLimit) * 100),
-      isBlocked: currentUsage >= dailyLimit,
+      dailyLimit: totalDailyLimit,
+      globalLimit: globalDailyLimit,
+      bonusLimit: bonusLimit,
+      remaining: Math.max(0, totalDailyLimit - currentUsage),
+      percentage: Math.round((currentUsage / totalDailyLimit) * 100),
+      isBlocked: currentUsage >= totalDailyLimit,
       featureBreakdown: [],
       lastActivity: new Date()
     };
@@ -133,7 +176,8 @@ router.get('/usage-status', async (req, res) => {
           isEnabled: true,
           resetTime: '00:00',
           timezone: 'Asia/Ho_Chi_Minh'
-        }
+        },
+        user: userInfo
       }
     });
     

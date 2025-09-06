@@ -30,12 +30,21 @@ const getAuthToken = (): string | null => {
 
 const syncWithBackend = async (): Promise<FeatureUsageData | null> => {
   try {
+    // Get auth token for user-specific limits
+    const token = getAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Add auth token if available for per-user limits
+    if (token) {
+      headers['x-auth-token'] = token;
+    }
+    
     // Try backend sync first
     const response = await fetch(`${API_URL}/features/usage-status`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       timeout: 5000 // 5 second timeout
     });
 
