@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateAdmin } = require('../middleware/adminAuth');
+const { isAdmin } = require('../middleware/adminAuth');
 const FeatureSettings = require('../models/FeatureSettings');
 const FeatureUsage = require('../models/FeatureUsage');
 
 // GET /api/admin/feature-settings - Get all feature settings
-router.get('/', authenticateAdmin, async (req, res) => {
+router.get('/', isAdmin, async (req, res) => {
   try {
     console.log('📊 Admin getting feature settings...');
     
@@ -46,7 +46,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
 });
 
 // POST /api/admin/feature-settings/:key - Update specific setting
-router.post('/:key', authenticateAdmin, async (req, res) => {
+router.post('/:key', isAdmin, async (req, res) => {
   try {
     const { key } = req.params;
     const { value, description, type = 'string', category = 'general' } = req.body;
@@ -107,7 +107,7 @@ router.post('/:key', authenticateAdmin, async (req, res) => {
 });
 
 // GET /api/admin/feature-settings/stats - Get feature usage statistics
-router.get('/stats', authenticateAdmin, async (req, res) => {
+router.get('/stats', isAdmin, async (req, res) => {
   try {
     console.log('📈 Admin getting feature usage statistics...');
     
@@ -206,7 +206,7 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
 });
 
 // POST /api/admin/feature-settings/reset-all-usage - Reset all users usage (emergency)
-router.post('/reset-all-usage', authenticateAdmin, async (req, res) => {
+router.post('/reset-all-usage', isAdmin, async (req, res) => {
   try {
     const adminUser = req.user?.username || 'admin';
     const today = new Date().toISOString().split('T')[0];
@@ -248,7 +248,7 @@ router.post('/reset-all-usage', authenticateAdmin, async (req, res) => {
 });
 
 // POST /api/admin/feature-settings/initialize - Initialize default settings
-router.post('/initialize', authenticateAdmin, async (req, res) => {
+router.post('/initialize', isAdmin, async (req, res) => {
   try {
     console.log('🔧 Admin initializing default feature settings...');
     
