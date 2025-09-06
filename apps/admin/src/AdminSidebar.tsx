@@ -1,6 +1,6 @@
 import React from 'react';
 import { AdminActiveModule } from './types';
-import { LayoutDashboard, KeyRound, CreditCard, ShieldAlert, Cloud, Settings, LogOut, Cpu, Database, Wifi, Banknote, Gift, Users, UserCheck, PlayCircle, HelpCircle, Timer, Palette } from 'lucide-react';
+import { LayoutDashboard, KeyRound, CreditCard, ShieldAlert, Cloud, Settings, LogOut, Cpu, Database, Wifi, Banknote, Gift, Users, UserCheck, PlayCircle, HelpCircle, Timer, Palette, BarChart3 } from 'lucide-react';
 import CustomIcon from './components/CustomIcon';
 
 interface AdminSidebarProps {
@@ -16,6 +16,7 @@ const NAVIGATION_ITEMS = [
   { id: 'tutorials', label: 'Hướng Dẫn', icon: PlayCircle },
   { id: 'supportContent', label: 'Nội Dung Hỗ Trợ', icon: HelpCircle },
   { id: 'rateLimiting', label: 'Quản Lý Rate Limiting', icon: Timer },
+  { id: 'featureUsageManagement', label: 'Giới Hạn Tính Năng', icon: BarChart3 },
   { id: 'keyManagement', label: 'Quản Lý Key', icon: KeyRound },
   { id: 'apiProviders', label: 'Quản Lý API Providers', icon: Cpu },
   { id: 'apiKeyPool', label: 'Quản lý Kho Key', icon: Database },

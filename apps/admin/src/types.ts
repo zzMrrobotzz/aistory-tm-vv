@@ -5,6 +5,7 @@ export type AdminActiveModule =
   | 'tutorials' // Quản lý hướng dẫn video
   | 'supportContent' // Quản lý nội dung hỗ trợ
   | 'rateLimiting' // Quản lý rate limiting
+  | 'featureUsageManagement' // Quản lý feature usage limits
   | 'keyManagement' // Hợp nhất user và key
   | 'apiProviders' // Quản lý API provider keys
   | 'apiKeyPool' // Quản lý kho API key

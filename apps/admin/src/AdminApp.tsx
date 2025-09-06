@@ -17,6 +17,7 @@ import AdminOnlineUsers from './pages/AdminOnlineUsers'; // Thêm mới
 import AdminTutorials from './pages/AdminTutorials'; // Quản lý hướng dẫn
 import AdminSupportContent from './pages/AdminSupportContent'; // Quản lý nội dung hỗ trợ
 import AdminRateLimiting from './pages/AdminRateLimiting'; // Quản lý rate limiting
+import AdminFeatureUsageManagement from './pages/AdminFeatureUsageManagement'; // Quản lý feature usage limits
 import AdminIconManager from './pages/AdminIconManager'; // Quản lý icons tùy chỉnh
 import { AdminActiveModule } from './types';
 
@@ -49,6 +50,8 @@ const AdminApp: React.FC = () => {
         return <AdminSupportContent />;
       case 'rateLimiting': // Quản lý rate limiting
         return <AdminRateLimiting />;
+      case 'featureUsageManagement': // Quản lý feature usage limits
+        return <AdminFeatureUsageManagement />;
       case 'apiProviders':
         return <AdminApiProviders />;
       case 'apiKeyPool':
