@@ -14,6 +14,7 @@ interface User {
   isActive?: boolean;
   subscriptionType?: string;
   subscriptionExpiresAt?: string;
+  bonusDailyLimit?: number;
   createdAt: string;
   lastLoginAt?: string;
   sessionInfo?: {
@@ -63,6 +64,10 @@ const UserManagement: React.FC = () => {
   const [newSubscriptionType, setNewSubscriptionType] = useState('free');
   const [newSubscriptionExpiry, setNewSubscriptionExpiry] = useState('');
   const [manualTrialDays, setManualTrialDays] = useState(3);
+
+  // Bonus Daily Limit Management
+  const [isBonusLimitModalVisible, setIsBonusLimitModalVisible] = useState(false);
+  const [newBonusLimit, setNewBonusLimit] = useState(0);
 
   const loadUsers = async (page = 1, search = searchText, status = statusFilter, onlineStatus = onlineStatusFilter) => {
     setLoading(true);
@@ -159,6 +164,38 @@ const UserManagement: React.FC = () => {
     }
     
     setIsSubscriptionModalVisible(true);
+  };
+
+  const handleEditBonusLimit = (user: User) => {
+    setEditingUser(user);
+    setNewBonusLimit(user.bonusDailyLimit || 0);
+    setIsBonusLimitModalVisible(true);
+  };
+
+  const handleUpdateBonusLimit = async () => {
+    if (!editingUser) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${editingUser._id}/bonus-limit`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ bonusDailyLimit: newBonusLimit }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      message.success(`Cập nhật bonus limit thành công! (+${newBonusLimit})`);
+      setIsBonusLimitModalVisible(false);
+      setEditingUser(null);
+      loadUsers(pagination.current);
+    } catch (error) {
+      message.error('Không thể cập nhật bonus limit');
+      console.error('Error updating bonus limit:', error);
+    }
   };
 
   const handleUpdateCredits = async () => {
@@ -260,6 +297,16 @@ const UserManagement: React.FC = () => {
           </Tag>
         );
       },
+    },
+    {
+      title: 'Bonus Limit',
+      dataIndex: 'bonusDailyLimit',
+      key: 'bonusDailyLimit',
+      render: (bonusLimit: number = 0) => (
+        <Tag color={bonusLimit > 0 ? 'blue' : 'default'}>
+          +{bonusLimit}
+        </Tag>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -391,6 +438,14 @@ const UserManagement: React.FC = () => {
               icon={<EditOutlined />}
               size="small"
               onClick={() => handleEditCredits(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Chỉnh sửa Bonus Limit">
+            <Button
+              type="dashed"
+              icon={<GlobalOutlined />}
+              size="small"
+              onClick={() => handleEditBonusLimit(record)}
             />
           </Tooltip>
           <Tooltip title={record.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}>
@@ -651,6 +706,46 @@ const UserManagement: React.FC = () => {
         </div>
         <p style={{ fontSize: '12px', color: '#666', marginTop: 8 }}>
           Lưu ý: Trong phiên bản mới, credits chỉ để hiển thị. Người dùng sử dụng subscription theo tháng.
+        </p>
+      </Modal>
+
+      {/* Edit Bonus Daily Limit Modal */}
+      <Modal
+        title={`Cộng thêm Bonus Limit - ${editingUser?.username}`}
+        visible={isBonusLimitModalVisible}
+        onOk={handleUpdateBonusLimit}
+        onCancel={() => {
+          setIsBonusLimitModalVisible(false);
+          setEditingUser(null);
+        }}
+        okText="Cập nhật"
+        cancelText="Hủy"
+      >
+        <div>
+          <p><strong>Global Limit:</strong> 555 lượt/ngày (từ webadmin)</p>
+          <p><strong>Current Bonus:</strong> +{editingUser?.bonusDailyLimit || 0}</p>
+          <p><strong>Current Total:</strong> {555 + (editingUser?.bonusDailyLimit || 0)} lượt/ngày</p>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <label>Bonus Limit mới:</label>
+          <InputNumber
+            value={newBonusLimit}
+            onChange={(value) => setNewBonusLimit(value || 0)}
+            min={0}
+            max={10000}
+            style={{ width: '100%', marginTop: 8 }}
+            addonBefore="+"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+          />
+        </div>
+        <div style={{ marginTop: 8, padding: '8px', background: '#f0f0f0', borderRadius: '4px' }}>
+          <strong>New Total: </strong>
+          <span style={{ color: '#1890ff' }}>
+            555 + {newBonusLimit} = {555 + newBonusLimit} lượt/ngày
+          </span>
+        </div>
+        <p style={{ fontSize: '12px', color: '#666', marginTop: 8 }}>
+          Bonus limit sẽ được cộng thêm vào global limit (555) để tạo thành total limit cho user này.
         </p>
       </Modal>
     </div>
