@@ -91,8 +91,10 @@ router.get('/usage-status', async (req, res) => {
       dailyLimit = DEFAULT_DAILY_LIMIT;
     }
     
-    // Get session usage count
-    const currentUsage = global.sessionUsageCount || 0;
+    // Get usage count from enhanced tracking system (fallback to old system)
+    const enhancedUsage = global.featureTracking?.totalUsage || 0;
+    const oldUsage = global.sessionUsageCount || 0;
+    const currentUsage = Math.max(enhancedUsage, oldUsage); // Use higher value for accuracy
     const today = new Date().toISOString().split('T')[0];
     const syncedStats = {
       current: currentUsage,
@@ -193,14 +195,16 @@ router.post('/track-usage', async (req, res) => {
         userBreakdown: {},
         lastReset: todayISO
       };
-      console.log(`🔄 Reset daily tracking for ${todayISO}`);
+      global.sessionUsageCount = 0; // Reset old system too
+      console.log(`🔄 Reset daily tracking for ${todayISO} (both systems synced)`);
     }
     
     // Extract user ID (simplified - use IP as identifier since no auth)
     const userId = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'anonymous';
     
-    // Update tracking
+    // Update tracking (sync both old and new systems)
     global.featureTracking.totalUsage += 1;
+    global.sessionUsageCount = global.featureTracking.totalUsage; // Keep old system in sync
     
     // Update feature breakdown
     if (!global.featureTracking.featureBreakdown[featureId]) {
@@ -287,8 +291,10 @@ router.post('/check-usage', async (req, res) => {
       dailyLimit = DEFAULT_DAILY_LIMIT;
     }
     
-    // Check session usage count
-    const currentUsage = global.sessionUsageCount || 0;
+    // Check usage count from enhanced tracking system (fallback to old system)
+    const enhancedUsage = global.featureTracking?.totalUsage || 0;
+    const oldUsage = global.sessionUsageCount || 0;
+    const currentUsage = Math.max(enhancedUsage, oldUsage); // Use higher value for accuracy
     const canUse = currentUsage < dailyLimit;
     const stats = {
       current: currentUsage,
