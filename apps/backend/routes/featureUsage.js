@@ -91,24 +91,26 @@ router.get('/usage-status', async (req, res) => {
       dailyLimit = DEFAULT_DAILY_LIMIT;
     }
     
+    // Get session usage count
+    const currentUsage = global.sessionUsageCount || 0;
     const today = new Date().toISOString().split('T')[0];
-    const defaultStats = {
-      current: 0,
+    const syncedStats = {
+      current: currentUsage,
       dailyLimit: dailyLimit,
-      remaining: dailyLimit,
-      percentage: 0,
-      isBlocked: false,
+      remaining: Math.max(0, dailyLimit - currentUsage),
+      percentage: Math.round((currentUsage / dailyLimit) * 100),
+      isBlocked: currentUsage >= dailyLimit,
       featureBreakdown: [],
       lastActivity: new Date()
     };
     
-    console.log('✅ Returning webadmin-synced response:', defaultStats);
+    console.log('✅ Returning webadmin-synced response:', syncedStats);
     
     
     
-    // Use webadmin-synced stats
-    const stats = defaultStats;
-    console.log(`✅ Using webadmin stats:`, stats);
+    // Use webadmin-synced stats with session count
+    const stats = syncedStats;
+    console.log(`✅ Using webadmin stats with session count:`, stats);
     
     // Calculate time until reset (midnight Vietnam time)
     const now = new Date();
@@ -162,36 +164,49 @@ router.post('/track-usage', authenticateUser, updateUserActivity, extractUserId,
       });
     }
     
-    // Simulate successful tracking without database
+    // Simple in-memory counter per session (not persistent)
+    if (!global.sessionUsageCount) {
+      global.sessionUsageCount = 0;
+    }
+    global.sessionUsageCount += 1;
+    
+    const currentUsage = global.sessionUsageCount;
     const mockUsageStats = {
-      current: 1, // Increment by 1
+      current: currentUsage,
       dailyLimit: dailyLimit,
-      remaining: dailyLimit - 1,
-      percentage: Math.round((1 / dailyLimit) * 100),
-      isBlocked: false,
+      remaining: Math.max(0, dailyLimit - currentUsage),
+      percentage: Math.round((currentUsage / dailyLimit) * 100),
+      isBlocked: currentUsage >= dailyLimit,
       featureBreakdown: {},
       lastActivity: new Date()
     };
     
-    console.log(`✅ Feature usage tracked (mock): 1/${dailyLimit} (${featureId})`);
+    console.log(`✅ Feature usage tracked (session): ${currentUsage}/${dailyLimit} (${featureId})`);
     
     res.json({
       success: true,
-      message: 'Feature usage tracked successfully (simplified mode)',
+      message: 'Feature usage tracked successfully (session mode)',
       usage: mockUsageStats
     });
     
   } catch (error) {
     console.error('❌ Error tracking feature usage:', error);
-    // Return successful response even on error to avoid 500
+    // Get webadmin limit for fallback
+    let fallbackLimit = DEFAULT_DAILY_LIMIT;
+    try {
+      fallbackLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+    } catch (settingsError) {
+      console.warn('⚠️ Settings failed in fallback, using default');
+    }
+    
     res.json({
       success: true,
       message: 'Feature usage tracked (fallback mode)',
       usage: {
         current: 1,
-        dailyLimit: DEFAULT_DAILY_LIMIT,
-        remaining: DEFAULT_DAILY_LIMIT - 1,
-        percentage: Math.round((1 / DEFAULT_DAILY_LIMIT) * 100),
+        dailyLimit: fallbackLimit,
+        remaining: fallbackLimit - 1,
+        percentage: Math.round((1 / fallbackLimit) * 100),
         isBlocked: false,
         featureBreakdown: {},
         lastActivity: new Date()

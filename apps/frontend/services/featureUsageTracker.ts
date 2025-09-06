@@ -90,17 +90,11 @@ const getDefaultFallbackData = (): FeatureUsageData => {
 
 const trackWithBackend = async (featureId: string, featureName: string): Promise<boolean> => {
   try {
-    const token = getAuthToken();
-    if (!token) {
-      console.warn('No auth token, skipping backend tracking');
-      return false;
-    }
-
+    // Simplified tracking without auth token
     const response = await fetch(`${API_URL}/features/track-usage`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         featureId,
@@ -127,6 +121,19 @@ const trackWithBackend = async (featureId: string, featureName: string): Promise
         
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedData));
         console.log(`✅ Backend tracked: ${updatedData.totalUses}/${updatedData.dailyLimit} (${featureId})`);
+        
+        // Force sync after tracking to get updated count
+        setTimeout(async () => {
+          try {
+            const syncedData = await syncWithBackend();
+            if (syncedData) {
+              console.log(`🔄 Re-synced after tracking: ${syncedData.totalUses}/${syncedData.dailyLimit}`);
+            }
+          } catch (error) {
+            console.warn('Post-track sync failed:', error);
+          }
+        }, 100);
+        
         return true;
       }
     } else if (response.status === 429) {
