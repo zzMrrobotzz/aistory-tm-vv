@@ -8,9 +8,10 @@ import {
     SCRIPT_STRUCTURE_OPTIONS
 } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
-import { checkAndTrackRequest, REQUEST_ACTIONS } from '../../services/requestTrackingService';
 import { isSubscribed } from '../../utils';
 import UpgradePrompt from '../UpgradePrompt';
+// Feature usage tracking instead of request counting  
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -39,28 +40,25 @@ const ShortFormScriptModule: React.FC<ShortFormScriptModuleProps> = ({
     // Subscription check
     const hasActiveSubscription = isSubscribed(currentUser);
     
-    // Usage tracking state
-    const [usageStats, setUsageStats] = useState({ current: 0, limit: 5000, remaining: 5000, percentage: 0, isBlocked: false } as any);
+    // Feature usage tracking state
+    const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStatsSync());
     
+    // Sync usage stats with backend
     useEffect(() => {
-        const fetchUsage = async () => {
-            try {
-                const result = await checkAndTrackRequest('module-access');
-                if (result?.usage) {
-                    setUsageStats({
-                        current: result.usage.current,
-                        limit: result.usage.limit,
-                        remaining: result.usage.remaining,
-                        percentage: result.usage.percentage,
-                        canUse: result.usage.current < result.usage.limit,
-                        isBlocked: !!result.blocked
-                    });
-                }
-            } catch (error) {
-                console.warn('Error loading usage stats:', error);
-            }
-        };
-        fetchUsage();
+      const syncUsageStats = async () => {
+        try {
+          const stats = await featureUsageTracker.getUsageStats(); // This syncs with backend
+          setUsageStats(stats);
+        } catch (error) {
+          const stats = featureUsageTracker.getUsageStatsSync();
+          setUsageStats(stats);
+        }
+      };
+      
+      syncUsageStats(); // Initial sync
+      const interval = setInterval(syncUsageStats, 2 * 60 * 1000); // Sync every 2 minutes
+      
+      return () => clearInterval(interval);
     }, []);
 
     const updateState = (updates: Partial<ShortFormScriptModuleState>) => {
@@ -105,25 +103,13 @@ const ShortFormScriptModule: React.FC<ShortFormScriptModuleProps> = ({
             return;
         }
         
-        // Check and track request with backend
-        const rateLimitCheck = await checkAndTrackRequest(REQUEST_ACTIONS.SHORT_FORM_SCRIPT);
-        if (!rateLimitCheck.success) {
-            updateState({ 
-                error: rateLimitCheck.message || 'Đã vượt quá giới hạn sử dụng hôm nay. Vui lòng nâng cấp gói hoặc thử lại vào ngày mai.'
-            });
-            return;
-        }
-        
-        // Update UI with latest usage stats from backend
-        if (rateLimitCheck?.usage) {
-            setUsageStats({
-                current: rateLimitCheck.usage.current,
-                limit: rateLimitCheck.usage.limit,
-                remaining: rateLimitCheck.usage.remaining,
-                percentage: rateLimitCheck.usage.percentage,
-                canUse: rateLimitCheck.usage.current < rateLimitCheck.usage.limit,
-                isBlocked: !!rateLimitCheck.blocked
-            });
+        // Check feature usage limit
+        const canUse = await featureUsageTracker.canUseFeature();
+        if (!canUse) {
+          const stats = await featureUsageTracker.getUsageStats();
+          const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
+          updateState({ error: errorMessage });
+          return;
         }
 
         updateState({ isLoading: true, error: null, progressMessage: 'Đang chuẩn bị...', generatedScript: '', groundingSources: [] });
@@ -191,6 +177,14 @@ Now, generate the complete script.
                 isLoading: false,
                 progressMessage: 'Tạo kịch bản thành công!',
             });
+
+            // Track feature usage successfully
+            try {
+                const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Kịch Bản Video Ngắn');
+                setUsageStats(updatedStats);
+            } catch (error) {
+                console.warn('Failed to track short script usage:', error);
+            }
 
             // Add to history
             addHistoryItem({
@@ -270,7 +264,7 @@ Now, generate the complete script.
                             <p className={`text-sm ${usageStats.isBlocked ? 'text-red-600' : 'text-green-600'}`}>
                                 {usageStats.isBlocked 
                                     ? `Đã đạt giới hạn! Reset vào 00:00 ngày mai.`
-                                    : `Còn lại ${usageStats.remaining} requests (${usageStats.percentage}% đã dùng)`
+                                    : `Còn lại ${usageStats.remaining} lượt sử dụng (${usageStats.percentage}% đã dùng)`
                                 }
                             </p>
                         </div>

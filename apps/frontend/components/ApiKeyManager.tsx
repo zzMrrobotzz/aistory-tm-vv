@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Key, Eye, EyeOff, Trash2, CheckCircle, Clock, Settings } from 'lucide-react';
 import { ApiKeyStorage, StoredApiKey, PROVIDER_NAMES, PROVIDER_COLORS } from '../utils/apiKeyStorage';
+// Feature usage tracking for unified display
+import featureUsageTracker from '../services/featureUsageTracker';
 
 interface ApiKeyManagerProps {
   onApiKeysChange?: () => void;
@@ -10,6 +12,7 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
   const [apiKeys, setApiKeys] = useState<StoredApiKey[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+  const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStatsSync());
   const [newKey, setNewKey] = useState({
     provider: 'openai' as StoredApiKey['provider'],
     name: '',
@@ -20,7 +23,18 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
     // Reset daily usage on component mount (handles day changes)
     ApiKeyStorage.resetDailyUsage();
     loadApiKeys();
+    loadUsageStats();
   }, []);
+
+  const loadUsageStats = async () => {
+    try {
+      const stats = await featureUsageTracker.getUsageStats();
+      setUsageStats(stats);
+    } catch (error) {
+      const fallbackStats = featureUsageTracker.getUsageStatsSync();
+      setUsageStats(fallbackStats);
+    }
+  };
 
   const loadApiKeys = () => {
     const keys = ApiKeyStorage.getAllKeys();
@@ -84,16 +98,12 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
   };
 
   const getDailyUsageInfo = (apiKey: StoredApiKey) => {
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (!apiKey.dailyUsage || apiKey.dailyUsage.date !== today) {
-      return { used: 0, limit: 5000, percentage: 0 };
-    }
-    
-    const { requests, limit } = apiKey.dailyUsage;
-    const percentage = Math.round((requests / limit) * 100);
-    
-    return { used: requests, limit, percentage };
+    // Use unified usage tracking system
+    return {
+      used: usageStats.current,
+      limit: usageStats.dailyLimit,
+      percentage: usageStats.percentage
+    };
   };
 
   const getUsageBarColor = (percentage: number) => {
@@ -293,7 +303,7 @@ const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ onApiKeysChange }) => {
                         <div className="mb-3">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-medium text-gray-700">
-                              Requests hôm nay
+                              Lượt sử dụng hôm nay
                             </span>
                             <span className={`text-xs font-medium ${
                               percentage > 90 ? 'text-red-600' : 

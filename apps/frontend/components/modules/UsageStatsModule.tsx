@@ -4,7 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { UserProfile } from '../../types';
 import ModuleContainer from '../ModuleContainer';
 import UsageQuotaDisplay from '../UsageQuotaDisplay';
-import { getUserUsageHistory, getUserUsageStatus } from '../../services/rateLimitService';
+// Feature usage tracking instead of rate limit service
+import featureUsageTracker from '../../services/featureUsageTracker';
 import { Activity, Calendar, TrendingUp, Clock, AlertTriangle } from 'lucide-react';
 
 interface UsageStatsModuleProps {
@@ -16,7 +17,7 @@ interface DailyUsage {
   totalUsage: number;
   moduleUsage: Array<{
     moduleId: string;
-    requestCount: number;
+    usageCount: number;
     weightedUsage: number;
   }>;
 }
@@ -25,117 +26,125 @@ interface UsageHistory {
   userId: string;
   dailyUsages: DailyUsage[];
   totalDays: number;
-  totalRequests: number;
+  totalUsage: number;
   averagePerDay: number;
 }
 
 const UsageStatsModule: React.FC<UsageStatsModuleProps> = ({ currentUser }) => {
-  const [usageHistory, setUsageHistory] = useState<UsageHistory | null>(null);
+  const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStatsSync());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const moduleNames = {
     'write-story': 'Viết Truyện',
-    'batch-story-writing': 'Viết Truyện Hàng Loạt',
+    'write-story-batch': 'Viết Truyện Hàng Loạt',
     'rewrite': 'Viết Lại',
-    'batch-rewrite': 'Viết Lại Hàng Loạt'
+    'rewrite-batch': 'Viết Lại Hàng Loạt',
+    'quick-story': 'Tạo Truyện Nhanh',
+    'short-form-script': 'Kịch Bản Video Ngắn'
   };
 
   const moduleColors = {
     'write-story': '#8884d8',
-    'batch-story-writing': '#82ca9d',
+    'write-story-batch': '#82ca9d',
     'rewrite': '#ffc658',
-    'batch-rewrite': '#ff7300'
+    'rewrite-batch': '#ff7300',
+    'quick-story': '#ff6b8a',
+    'short-form-script': '#4ecdc4'
   };
 
   useEffect(() => {
     if (currentUser) {
-      loadUsageHistory();
+      loadUsageStats();
     }
   }, [currentUser]);
 
-  const loadUsageHistory = async () => {
+  const loadUsageStats = async () => {
     try {
       setLoading(true);
       setError(null);
-      const history = await getUserUsageHistory(7); // Last 7 days
-      setUsageHistory(history.data);
+      const stats = await featureUsageTracker.getUsageStats();
+      setUsageStats(stats);
     } catch (err) {
-      console.error('Failed to load usage history:', err);
-      setError('Không thể tải lịch sử sử dụng');
+      console.error('Failed to load usage stats:', err);
+      setError('Không thể tải thống kê sử dụng');
+      // Fallback to sync stats
+      const fallbackStats = featureUsageTracker.getUsageStatsSync();
+      setUsageStats(fallbackStats);
     } finally {
       setLoading(false);
     }
   };
 
-  // Prepare chart data
-  const chartData = usageHistory?.dailyUsages.map(day => ({
-    date: new Date(day.date).toLocaleDateString('vi-VN', { 
-      month: 'short', 
-      day: 'numeric' 
-    }),
-    totalUsage: day.totalUsage,
-    ...day.moduleUsage.reduce((acc, module) => ({
-      ...acc,
-      [moduleNames[module.moduleId as keyof typeof moduleNames] || module.moduleId]: module.requestCount
-    }), {})
-  })) || [];
+  // Current usage data for display
+  const todayData = {
+    date: new Date().toLocaleDateString('vi-VN'),
+    totalUsage: usageStats.current,
+    limit: usageStats.dailyLimit,
+    remaining: usageStats.remaining,
+    percentage: usageStats.percentage
+  };
 
-  // Prepare pie chart data
-  const moduleUsageTotal = usageHistory?.dailyUsages.reduce((acc, day) => {
-    day.moduleUsage.forEach(module => {
-      const moduleName = moduleNames[module.moduleId as keyof typeof moduleNames] || module.moduleId;
-      acc[moduleName] = (acc[moduleName] || 0) + module.requestCount;
-    });
-    return acc;
-  }, {} as Record<string, number>) || {};
+  // Simple usage breakdown for current status
+  const usageBreakdown = [
+    {
+      name: 'Đã Sử Dụng',
+      value: usageStats.current,
+      color: usageStats.isBlocked ? '#ff4d4f' : usageStats.percentage > 80 ? '#faad14' : '#52c41a'
+    },
+    {
+      name: 'Còn Lại', 
+      value: usageStats.remaining,
+      color: '#f0f0f0'
+    }
+  ];
 
-  const pieData = Object.entries(moduleUsageTotal).map(([name, value]) => ({
-    name,
-    value,
-    color: moduleColors[Object.keys(moduleNames).find(key => 
-      moduleNames[key as keyof typeof moduleNames] === name
-    ) as keyof typeof moduleColors] || '#8884d8'
-  }));
-
-  // Table data for daily breakdown
-  const tableData = usageHistory?.dailyUsages.map((day, index) => ({
-    key: index,
-    date: new Date(day.date).toLocaleDateString('vi-VN'),
-    totalUsage: day.totalUsage,
-    modules: day.moduleUsage
-  })) || [];
+  // Usage status data for table
+  const statusData = [
+    {
+      key: 1,
+      metric: 'Lượt sử dụng hôm nay',
+      value: usageStats.current,
+      limit: usageStats.dailyLimit,
+      status: usageStats.isBlocked ? 'Đã hết' : 'Bình thường'
+    },
+    {
+      key: 2, 
+      metric: 'Còn lại',
+      value: usageStats.remaining,
+      limit: usageStats.dailyLimit,
+      status: usageStats.remaining > 50 ? 'Khá tốt' : usageStats.remaining > 20 ? 'Cảnh báo' : 'Sắp hết'
+    }
+  ];
 
   const columns = [
     {
-      title: 'Ngày',
-      dataIndex: 'date',
-      key: 'date',
-      sorter: (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      title: 'Metric',
+      dataIndex: 'metric',
+      key: 'metric'
     },
     {
-      title: 'Tổng Usage',
-      dataIndex: 'totalUsage',
-      key: 'totalUsage',
-      sorter: (a: any, b: any) => a.totalUsage - b.totalUsage,
-      render: (value: number) => <Tag color={value > 50 ? 'red' : value > 20 ? 'orange' : 'green'}>{value}</Tag>
+      title: 'Giá Trị',
+      dataIndex: 'value', 
+      key: 'value',
+      render: (value: number) => <Tag color={value === 0 ? 'red' : 'green'}>{value}</Tag>
     },
     {
-      title: 'Chi Tiết Modules',
-      dataIndex: 'modules',
-      key: 'modules',
-      render: (modules: any[]) => (
-        <div>
-          {modules.map(module => (
-            <div key={module.moduleId} style={{ fontSize: '12px', marginBottom: '2px' }}>
-              <strong>{moduleNames[module.moduleId as keyof typeof moduleNames] || module.moduleId}:</strong> {module.requestCount}
-              {module.weightedUsage !== module.requestCount && (
-                <span style={{ color: '#666' }}> (weight: {module.weightedUsage})</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )
+      title: 'Giới Hạn',
+      dataIndex: 'limit',
+      key: 'limit',
+      render: (limit: number) => <span>{limit}</span>
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => {
+        const color = status === 'Đã hết' ? 'red' : 
+                     status === 'Sắp hết' ? 'orange' : 
+                     status === 'Cảnh báo' ? 'yellow' : 'green';
+        return <Tag color={color}>{status}</Tag>;
+      }
     }
   ];
 
@@ -163,53 +172,55 @@ const UsageStatsModule: React.FC<UsageStatsModuleProps> = ({ currentUser }) => {
           <UsageQuotaDisplay showDetails={true} />
         </div>
 
-        {/* Overview Statistics */}
-        {usageHistory && (
-          <div>
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
-              Tổng Quan 7 Ngày Qua
-            </h3>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12} md={6}>
-                <Card>
-                  <Statistic
-                    title="Tổng Requests"
-                    value={usageHistory.totalRequests}
-                    prefix={<Activity />}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Card>
-                  <Statistic
-                    title="Trung Bình/Ngày"
-                    value={Math.round(usageHistory.averagePerDay)}
-                    prefix={<Calendar />}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Card>
-                  <Statistic
-                    title="Ngày Có Data"
-                    value={usageHistory.totalDays}
-                    prefix={<Clock />}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Card>
-                  <Statistic
-                    title="Peak Usage"
-                    value={Math.max(...usageHistory.dailyUsages.map(d => d.totalUsage))}
-                    prefix={<AlertTriangle />}
-                  />
-                </Card>
-              </Col>
-            </Row>
-          </div>
-        )}
+        {/* Usage Overview */}
+        <div>
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
+            Thống Kê Sử Dụng Hôm Nay
+          </h3>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Đã Sử Dụng"
+                  value={usageStats.current}
+                  prefix={<Activity />}
+                  suffix="lượt"
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Còn Lại"
+                  value={usageStats.remaining}
+                  prefix={<Calendar />}
+                  suffix="lượt"
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Giới Hạn Hàng Ngày"
+                  value={usageStats.dailyLimit}
+                  prefix={<Clock />}
+                  suffix="lượt"
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Phần Trăm Đã Dùng"
+                  value={usageStats.percentage.toFixed(1)}
+                  prefix={<AlertTriangle />}
+                  suffix="%"
+                />
+              </Card>
+            </Col>
+          </Row>
+        </div>
 
         {/* Charts */}
         {chartData.length > 0 && (
@@ -305,9 +316,7 @@ const UsageStatsModule: React.FC<UsageStatsModuleProps> = ({ currentUser }) => {
             message="Chưa có dữ liệu usage"
             description="Bạn chưa sử dụng các tính năng bị giới hạn. Hãy thử sử dụng Viết Truyện, Viết Lại để xem thống kê."
             type="info"
-            showIcon
-          />
-        )}
+        />
       </div>
     </ModuleContainer>
   );

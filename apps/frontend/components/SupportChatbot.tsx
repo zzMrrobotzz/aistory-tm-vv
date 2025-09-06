@@ -371,14 +371,14 @@ Creative Lab → Write Story → Hook Generator → Lesson Generator
 ### **💰 SUBSCRIPTION PLANS**
 
 **Free Plan:**
-- 10 requests/day per module
+- 300 lượt sử dụng/ngày (tất cả modules)
 - Basic features only
 - Watermarks on exports
 - Community support
 - Perfect for testing
 
 **Monthly Premium ($29.99):**
-- Unlimited requests all modules
+- Unlimited lượt sử dụng all modules
 - All advanced features
 - No watermarks
 - Priority processing
@@ -585,7 +585,7 @@ Ví dụ: "Cách cài đặt API key" hoặc "Workflow tạo content YouTube"`;
 ❌ "Quota exceeded" → Upgrade Google Cloud plan
 ❌ "Connection failed" → Check firewall/internet
 
-**PRO TIP:** Start với Gemini free tier (50 requests/day) để familiar, sau đó scale lên OpenAI khi cần chất lượng cao hơn!
+**PRO TIP:** Start với Gemini free tier (50 lượt/ngày) để familiar, sau đó scale lên OpenAI khi cần chất lượng cao hơn!
 
 Cần hỗ trợ setup? Hỏi tôi chi tiết hơn! 🚀`;
         }
@@ -666,14 +666,14 @@ VD: "Giải thích module Viết Truyện" 📝`;
             return `💰 **GÓI CƯỚC AI STORY CREATOR - CHI TIẾT ĐẦY ĐỦ**
 
 **🆓 FREE PLAN:**
-• 10 requests/ngày mỗi module
+• 300 lượt sử dụng/ngày (tất cả modules)
 • Tất cả basic features
 • Watermark trên exports
 • Community support
 • **Perfect để:** Test & familiar với tool
 
 **💳 MONTHLY PREMIUM ($29.99/tháng):**
-• ✅ Unlimited requests TẤT CẢ modules
+• ✅ Unlimited lượt sử dụng TẤT CẢ modules
 • ✅ Advanced features unlock
 • ✅ No watermarks
 • ✅ Priority processing (faster)
@@ -719,7 +719,7 @@ VD: "Giải thích module Viết Truyện" 📝`;
 - ✅ Upgrade API plan (Google/OpenAI)
 - ✅ Wait cho quota reset (hàng ngày)
 - ✅ Switch sang API provider khác
-- ✅ Batch requests thay vì spam
+- ✅ Batch processing thay vì spam
 
 **3. "Connection Failed"**
 - ✅ Check internet connection

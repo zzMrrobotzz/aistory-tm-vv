@@ -1,24 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Activity, Clock, TrendingUp } from 'lucide-react';
-import { getUserUsageStatus } from '../services/rateLimitService';
+// Feature usage tracking instead of request counting
+import featureUsageTracker from '../services/featureUsageTracker';
 
+// Using simplified stats from featureUsageTracker
 interface UsageStatus {
-  canProceed: boolean;
-  totalUsage: number;
-  usageLimit: number;
-  remainingRequests: number;
+  current: number;
+  dailyLimit: number;
+  remaining: number;
   percentage: number;
-  subscription: string;
-  moduleBreakdown: Array<{
-    moduleId: string;
-    requestCount: number;
-    weightedUsage: number;
-  }>;
-  warning?: {
-    message: string;
-    percentage: number;
-  } | null;
-  resetTime: number;
+  isBlocked: boolean;
+  resetTime?: number;
 }
 
 interface UsageQuotaDisplayProps {
@@ -26,13 +18,6 @@ interface UsageQuotaDisplayProps {
   showDetails?: boolean;
   className?: string;
 }
-
-const moduleNames = {
-  'write-story': 'Viết Truyện',
-  'batch-story-writing': 'Viết Truyện Hàng Loạt',
-  'rewrite': 'Viết Lại',
-  'batch-rewrite': 'Viết Lại Hàng Loạt'
-};
 
 const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({ 
   compact = false, 
@@ -45,59 +30,35 @@ const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({
 
   useEffect(() => {
     loadUsageStatus();
-    // Refresh every minute to handle midnight reset  
-    const interval = setInterval(loadUsageStatus, 60 * 1000);
+    // Refresh every 2 minutes to sync with backend 
+    const interval = setInterval(loadUsageStatus, 2 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
-
-  // Listen to usage warnings from textGenerationService
-  useEffect(() => {
-    const handleUsageWarning = (event: CustomEvent) => {
-      const { warning } = event.detail;
-      if (warning) {
-        // Refresh usage status when warning is received
-        loadUsageStatus();
-      }
-    };
-
-    window.addEventListener('usage-warning', handleUsageWarning);
-    return () => window.removeEventListener('usage-warning', handleUsageWarning);
   }, []);
 
   const loadUsageStatus = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getUserUsageStatus();
-      const status: UsageStatus = {
-        canProceed: data.canProceed,
-        totalUsage: data.totalUsage,
-        usageLimit: data.usageLimit,
-        remainingRequests: data.remainingRequests,
-        percentage: data.percentage,
-        subscription: data.subscription,
-        moduleBreakdown: data.moduleBreakdown || [],
-        warning: data.warning || null,
-        resetTime: data.resetTime as unknown as number
-      };
-      setUsageStatus(status);
+      const stats = await featureUsageTracker.getUsageStats();
+      setUsageStatus({
+        current: stats.current,
+        dailyLimit: stats.dailyLimit,
+        remaining: stats.remaining,
+        percentage: stats.percentage,
+        isBlocked: stats.isBlocked
+      });
     } catch (err) {
-      console.error('Failed to load usage status:', err);
-      
-      // Fallback to basic display without error UI 
-      const fallbackStatus: UsageStatus = {
-        canProceed: true,
-        totalUsage: 0,
-        usageLimit: 5000,
-        remainingRequests: 5000,
-        percentage: 0,
-        subscription: 'Unknown',
-        moduleBreakdown: [],
-        warning: null,
-        resetTime: 0
-      };
-      setUsageStatus(fallbackStatus);
-      // Don't set error to avoid red error UI
+      console.error('Error loading usage status:', err);
+      // Fallback to local stats
+      const localStats = featureUsageTracker.getUsageStatsSync();
+      setUsageStatus({
+        current: localStats.current,
+        dailyLimit: localStats.dailyLimit,
+        remaining: localStats.remaining,
+        percentage: localStats.percentage,
+        isBlocked: localStats.isBlocked
+      });
+      setError('Không thể đồng bộ với server, sử dụng dữ liệu local');
     } finally {
       setLoading(false);
     }
@@ -105,166 +66,152 @@ const UsageQuotaDisplay: React.FC<UsageQuotaDisplayProps> = ({
 
   if (loading) {
     return (
-      <div className={`bg-gray-50 border border-gray-200 rounded-lg p-4 ${className}`}>
-        <div className="animate-pulse flex items-center">
-          <div className="w-4 h-4 bg-gray-300 rounded mr-2"></div>
-          <div className="h-4 bg-gray-300 rounded w-32"></div>
+      <div className={`p-4 border border-gray-200 rounded-lg bg-gray-50 ${className}`}>
+        <div className="flex items-center space-x-2">
+          <Activity className="animate-spin w-5 h-5 text-blue-600" />
+          <span className="text-sm text-gray-600">Đang tải trạng thái sử dụng...</span>
         </div>
       </div>
     );
   }
 
-  if (error || !usageStatus) {
+  if (!usageStatus) {
     return (
-      <div className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
-        <div className="flex items-center text-red-700">
-          <AlertCircle className="w-4 h-4 mr-2" />
-          <span className="text-sm">{error || 'Lỗi tải usage'}</span>
+      <div className={`p-4 border border-red-200 rounded-lg bg-red-50 ${className}`}>
+        <div className="flex items-center space-x-2">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <span className="text-sm text-red-600">
+            {error || 'Không thể tải trạng thái sử dụng'}
+          </span>
         </div>
       </div>
     );
   }
 
-  const getProgressColor = (percentage: number) => {
-    if (percentage >= 90) return 'bg-red-500';
-    if (percentage >= 80) return 'bg-yellow-500';
-    return 'bg-green-500';
+  const getStatusColor = () => {
+    if (usageStatus.isBlocked) return 'red';
+    if (usageStatus.percentage >= 80) return 'yellow';
+    return 'green';
   };
 
-  const getStatusColor = (percentage: number) => {
-    if (percentage >= 90) return 'text-red-700 bg-red-50 border-red-200';
-    if (percentage >= 80) return 'text-yellow-700 bg-yellow-50 border-yellow-200';
-    return 'text-green-700 bg-green-50 border-green-200';
+  const statusColor = getStatusColor();
+  const colorClasses = {
+    red: {
+      border: 'border-red-200',
+      bg: 'bg-red-50',
+      text: 'text-red-800',
+      subtext: 'text-red-600',
+      progress: 'bg-red-500'
+    },
+    yellow: {
+      border: 'border-yellow-200', 
+      bg: 'bg-yellow-50',
+      text: 'text-yellow-800',
+      subtext: 'text-yellow-600',
+      progress: 'bg-yellow-500'
+    },
+    green: {
+      border: 'border-green-200',
+      bg: 'bg-green-50', 
+      text: 'text-green-800',
+      subtext: 'text-green-600',
+      progress: 'bg-green-500'
+    }
   };
+
+  const colors = colorClasses[statusColor];
 
   if (compact) {
     return (
-      <div className={`border rounded-lg p-3 ${getStatusColor(usageStatus.percentage)} ${className}`}>
+      <div className={`p-3 border ${colors.border} rounded-lg ${colors.bg} ${className}`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Activity className="w-4 h-4 mr-2" />
-            <span className="text-sm font-medium">
-              {usageStatus.totalUsage}/{usageStatus.usageLimit} requests
+          <div className="flex items-center space-x-2">
+            <Activity className={`w-4 h-4 ${colors.text}`} />
+            <span className={`text-sm font-medium ${colors.text}`}>
+              {usageStatus.current}/{usageStatus.dailyLimit} lượt sử dụng
             </span>
           </div>
-          <div className="text-xs">
-            {usageStatus.remainingRequests} còn lại
-          </div>
+          {usageStatus.isBlocked && (
+            <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full">
+              Đã hết
+            </span>
+          )}
         </div>
-        
-        <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(usageStatus.percentage)}`}
-            style={{ width: `${Math.min(100, usageStatus.percentage)}%` }}
-          ></div>
-        </div>
-
-        {usageStatus.warning && (
-          <div className="mt-2 text-xs flex items-center">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            {usageStatus.warning.message}
-          </div>
-        )}
       </div>
     );
   }
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm ${className}`}>
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
-            Usage Hôm Nay
-          </h3>
-          <div className="text-sm text-gray-500 flex items-center">
-            <Clock className="w-4 h-4 mr-1" />
-            Reset: {new Date(usageStatus.resetTime).toLocaleTimeString('vi-VN')}
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4">
-        {/* Main Progress */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              Tổng Usage ({usageStatus.subscription.toUpperCase()})
-            </span>
-            <span className={`text-sm font-bold ${usageStatus.percentage >= 90 ? 'text-red-600' : 'text-gray-900'}`}>
-              {usageStatus.totalUsage} / {usageStatus.usageLimit}
-            </span>
-          </div>
-          
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div
-              className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(usageStatus.percentage)}`}
-              style={{ width: `${Math.min(100, usageStatus.percentage)}%` }}
-            ></div>
-          </div>
-          
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>0</span>
-            <span className="font-medium">
-              {usageStatus.remainingRequests} requests còn lại ({Math.round(100 - usageStatus.percentage)}%)
-            </span>
-            <span>{usageStatus.usageLimit}</span>
-          </div>
-        </div>
-
-        {/* Warning Alert */}
-        {usageStatus.warning && (
-          <div className={`p-3 rounded-lg border mb-4 ${
-            usageStatus.warning.type === 'approaching_limit' 
-              ? 'bg-red-50 border-red-200 text-red-800'
-              : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-          }`}>
-            <div className="flex items-center">
-              <AlertCircle className="w-4 h-4 mr-2" />
-              <span className="text-sm font-medium">{usageStatus.warning.message}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Module Breakdown */}
-        {showDetails && usageStatus.moduleBreakdown.length > 0 && (
+    <div className={`p-4 border ${colors.border} rounded-lg ${colors.bg} ${className}`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          <Activity className={`w-5 h-5 ${colors.text}`} />
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Chi tiết theo Module:</h4>
-            <div className="space-y-2">
-              {usageStatus.moduleBreakdown.map((module) => (
-                <div key={module.moduleId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <span className="text-sm text-gray-700">
-                    {moduleNames[module.moduleId as keyof typeof moduleNames] || module.moduleId}
-                  </span>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">
-                      {module.requestCount} requests
-                    </div>
-                    {module.weightedUsage !== module.requestCount && (
-                      <div className="text-xs text-gray-500">
-                        Weight: {module.weightedUsage}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h3 className={`font-medium ${colors.text}`}>
+              Sử Dụng Hôm Nay
+            </h3>
+            <p className={`text-sm ${colors.subtext}`}>
+              Tất cả tính năng AI
+            </p>
           </div>
-        )}
-
-        {/* Status Info */}
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>Subscription: {usageStatus.subscription.toUpperCase()}</span>
-            <button 
-              onClick={loadUsageStatus}
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Refresh
-            </button>
+        </div>
+        <div className="text-right">
+          <div className={`text-lg font-bold ${colors.text}`}>
+            {usageStatus.current}/{usageStatus.dailyLimit}
+          </div>
+          <div className={`text-xs ${colors.subtext}`}>
+            lượt sử dụng
           </div>
         </div>
       </div>
+
+      {showDetails && (
+        <div className="space-y-3">
+          {/* Progress bar */}
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className={`h-2 rounded-full transition-all duration-300 ${colors.progress}`}
+              style={{ width: `${Math.min(usageStatus.percentage, 100)}%` }}
+            />
+          </div>
+
+          {/* Status info */}
+          <div className="flex items-center justify-between text-sm">
+            <div className={`flex items-center space-x-1 ${colors.subtext}`}>
+              <TrendingUp className="w-4 h-4" />
+              <span>
+                {usageStatus.isBlocked 
+                  ? 'Đã đạt giới hạn' 
+                  : `Còn lại ${usageStatus.remaining} lượt`}
+              </span>
+            </div>
+            <div className={`flex items-center space-x-1 ${colors.subtext}`}>
+              <Clock className="w-4 h-4" />
+              <span>Reset 00:00 ngày mai</span>
+            </div>
+          </div>
+
+          {/* Warning message */}
+          {usageStatus.isBlocked && (
+            <div className="flex items-start space-x-2 p-3 bg-red-100 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-red-700">
+                <div className="font-medium">Đã đạt giới hạn hàng ngày</div>
+                <div>Quota sẽ được reset vào 00:00 ngày mai (giờ VN).</div>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-start space-x-2 p-3 bg-orange-100 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-orange-700">
+                {error}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
