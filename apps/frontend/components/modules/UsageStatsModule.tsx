@@ -303,19 +303,19 @@ const UsageStatsModule: React.FC<UsageStatsModuleProps> = ({ currentUser }) => {
             description={error}
             type="error"
             action={
-              <Button size="small" onClick={loadUsageHistory}>
+              <Button size="small" onClick={loadUsageStats}>
                 Thử lại
               </Button>
             }
           />
         )}
 
-        {/* No Data */}
-        {!loading && !error && (!usageHistory || usageHistory.totalRequests === 0) && (
-          <Alert
-            message="Chưa có dữ liệu usage"
-            description="Bạn chưa sử dụng các tính năng bị giới hạn. Hãy thử sử dụng Viết Truyện, Viết Lại để xem thống kê."
-            type="info"
+        {/* Info Alert */}
+        <Alert
+          message="Thông tin hệ thống"
+          description="Tất cả modules hiện đã được đồng bộ với hệ thống quản lý tập trung. Giới hạn được điều khiển từ webadmin."
+          type="info"
+          showIcon
         />
       </div>
     </ModuleContainer>
