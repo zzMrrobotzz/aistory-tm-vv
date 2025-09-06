@@ -2,7 +2,7 @@ import axios from 'axios';
 import { ProxyItem, ProxyTestResult, ProxyBatchTestResult, ProxyStatistics } from '../types';
 
 // --- Base API Configuration ---
-const API_BASE = process.env.REACT_APP_API_URL || "https://key-manager-backend.onrender.com/api";
+const API_BASE = process.env.REACT_APP_API_URL || "https://aistory-backend.onrender.com/api";
 
 const apiClient = axios.create({
     baseURL: API_BASE,
