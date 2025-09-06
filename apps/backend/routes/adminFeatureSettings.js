@@ -204,40 +204,56 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// POST /api/admin/feature-settings/reset-all-usage - Reset all users usage (emergency)
+// POST /api/admin/feature-settings/reset-all-usage - Reset session usage counter (emergency)
 router.post('/reset-all-usage', async (req, res) => {
   try {
-    const adminUser = req.user?.username || 'admin';
+    const adminUser = req.user?.username || 'webadmin';
     const today = new Date().toISOString().split('T')[0];
     
-    console.log(`🚨 Admin ${adminUser} resetting all usage for ${today}`);
+    console.log(`🚨 Admin ${adminUser} resetting session usage counter for ${today}`);
     
-    const result = await FeatureUsage.updateMany(
-      { date: today },
-      {
-        $set: {
-          totalUses: 0,
-          featureBreakdown: [],
-          usageHistory: [],
-          lastActivity: new Date()
+    // Reset the global session counter (current tracking system)
+    const previousCount = global.sessionUsageCount || 0;
+    global.sessionUsageCount = 0;
+    
+    console.log(`✅ Reset session usage counter from ${previousCount} to 0`);
+    
+    // Also reset any database records if they exist (legacy cleanup)
+    let dbResetCount = 0;
+    try {
+      const result = await FeatureUsage.updateMany(
+        { date: today },
+        {
+          $set: {
+            totalUses: 0,
+            featureBreakdown: [],
+            usageHistory: [],
+            lastActivity: new Date()
+          }
         }
+      );
+      dbResetCount = result.modifiedCount;
+      if (dbResetCount > 0) {
+        console.log(`✅ Also reset ${dbResetCount} database usage records`);
       }
-    );
-    
-    console.log(`✅ Reset ${result.modifiedCount} user usage records`);
+    } catch (dbError) {
+      console.warn('Database reset failed (not critical):', dbError.message);
+    }
     
     res.json({
       success: true,
-      message: `Đã reset usage cho ${result.modifiedCount} users`,
+      message: `Đã reset usage counter từ ${previousCount} về 0`,
       data: {
-        resetCount: result.modifiedCount,
+        sessionResetFrom: previousCount,
+        sessionResetTo: 0,
+        dbResetCount: dbResetCount,
         date: today,
         resetBy: adminUser
       }
     });
     
   } catch (error) {
-    console.error('Error resetting all usage:', error);
+    console.error('Error resetting usage:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi reset usage',
