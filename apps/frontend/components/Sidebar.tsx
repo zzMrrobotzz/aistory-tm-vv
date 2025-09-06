@@ -5,6 +5,8 @@ import { ActiveModule, UserProfile } from '../types';
 import { NAVIGATION_GROUPS } from '../constants';
 import { ChevronDown, LogOut, User } from 'lucide-react';
 import UsageQuotaDisplay from './UsageQuotaDisplay';
+// Feature usage tracking for sidebar sync
+import featureUsageTracker from '../services/featureUsageTracker';
 
 interface SidebarProps {
   activeModule: ActiveModule;
@@ -15,6 +17,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, currentUser, onLogout }) => {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStatsSync());
 
   useEffect(() => {
     // Find the group that contains the active module and open it.
@@ -26,6 +29,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, curren
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule]);
+
+  // Auto-sync usage stats for sidebar display
+  useEffect(() => {
+    const syncUsageStats = async () => {
+      try {
+        const stats = await featureUsageTracker.getUsageStats();
+        setUsageStats(stats);
+      } catch (error) {
+        // Fallback to sync stats if backend fails
+        const fallbackStats = featureUsageTracker.getUsageStatsSync();
+        setUsageStats(fallbackStats);
+      }
+    };
+
+    syncUsageStats(); // Initial sync
+    
+    // Auto-sync every 3 seconds to keep sidebar in sync with modules
+    const interval = setInterval(syncUsageStats, 3000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const toggleGroup = (title: string) => {
     setOpenGroups(prev => ({ ...prev, [title]: !prev[title] }));
@@ -86,7 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, curren
       {/* Usage Quota Display */}
       {currentUser && (
         <div className="mb-4">
-          <UsageQuotaDisplay compact={true} showDetails={false} />
+          <UsageQuotaDisplay usageStats={usageStats} compact={true} showDetails={false} />
         </div>
       )}
       
