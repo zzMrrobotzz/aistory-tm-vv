@@ -44,7 +44,70 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/admin/feature-settings/:key - Update specific setting
+// SPECIFIC ROUTES MUST COME BEFORE DYNAMIC ROUTES
+// POST /api/admin/feature-settings/reset-all-usage - Reset session usage counter (emergency)
+router.post('/reset-all-usage', async (req, res) => {
+  console.log('🔥 DEBUG: reset-all-usage route called - MOVED TO TOP');
+  console.log('🔥 DEBUG: req.method =', req.method);
+  console.log('🔥 DEBUG: req.body =', JSON.stringify(req.body));
+  
+  try {
+    const adminUser = req.user?.username || 'webadmin';
+    const today = new Date().toISOString().split('T')[0];
+    
+    console.log(`🚨 Admin ${adminUser} resetting session usage counter for ${today}`);
+    
+    // Reset the global session counter (current tracking system)
+    const previousCount = global.sessionUsageCount || 0;
+    global.sessionUsageCount = 0;
+    
+    console.log(`✅ Reset session usage counter from ${previousCount} to 0`);
+    
+    // Also reset any database records if they exist (legacy cleanup)
+    let dbResetCount = 0;
+    try {
+      const result = await FeatureUsage.updateMany(
+        { date: today },
+        {
+          $set: {
+            totalUses: 0,
+            featureBreakdown: [],
+            usageHistory: [],
+            lastActivity: new Date()
+          }
+        }
+      );
+      dbResetCount = result.modifiedCount;
+      if (dbResetCount > 0) {
+        console.log(`✅ Also reset ${dbResetCount} database usage records`);
+      }
+    } catch (dbError) {
+      console.warn('Database reset failed (not critical):', dbError.message);
+    }
+    
+    res.json({
+      success: true,
+      message: `Đã reset usage counter từ ${previousCount} về 0`,
+      data: {
+        sessionResetFrom: previousCount,
+        sessionResetTo: 0,
+        dbResetCount: dbResetCount,
+        date: today,
+        resetBy: adminUser
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error resetting usage:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi reset usage',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/admin/feature-settings/:key - Update specific setting (AFTER SPECIFIC ROUTES)
 router.post('/:key', async (req, res) => {
   try {
     const { key } = req.params;
@@ -202,94 +265,6 @@ router.get('/stats', async (req, res) => {
       error: error.message
     });
   }
-});
-
-// GET /api/admin/feature-settings/test-reset - Test route for debugging
-router.get('/test-reset', (req, res) => {
-  console.log('🔥 DEBUG: test-reset GET route called successfully');
-  res.json({
-    success: true,
-    message: 'Test route working',
-    method: 'GET',
-    path: '/test-reset'
-  });
-});
-
-// POST /api/admin/feature-settings/reset-all-usage - Reset session usage counter (emergency)
-router.post('/reset-all-usage', async (req, res) => {
-  console.log('🔥 DEBUG: reset-all-usage route called');
-  console.log('🔥 DEBUG: req.method =', req.method);
-  console.log('🔥 DEBUG: req.body =', JSON.stringify(req.body));
-  console.log('🔥 DEBUG: req.headers content-type =', req.headers['content-type']);
-  
-  // Immediate success response for testing
-  console.log('✅ Sending immediate success response for debug');
-  return res.json({
-    success: true,
-    message: 'DEBUG: Route reached successfully',
-    debug: {
-      method: req.method,
-      body: req.body,
-      contentType: req.headers['content-type']
-    }
-  });
-  
-  /* ORIGINAL CODE COMMENTED FOR DEBUGGING:
-  try {
-    const adminUser = req.user?.username || 'webadmin';
-    const today = new Date().toISOString().split('T')[0];
-    
-    console.log(`🚨 Admin ${adminUser} resetting session usage counter for ${today}`);
-    
-    // Reset the global session counter (current tracking system)
-    const previousCount = global.sessionUsageCount || 0;
-    global.sessionUsageCount = 0;
-    
-    console.log(`✅ Reset session usage counter from ${previousCount} to 0`);
-    
-    // Also reset any database records if they exist (legacy cleanup)
-    let dbResetCount = 0;
-    try {
-      const result = await FeatureUsage.updateMany(
-        { date: today },
-        {
-          $set: {
-            totalUses: 0,
-            featureBreakdown: [],
-            usageHistory: [],
-            lastActivity: new Date()
-          }
-        }
-      );
-      dbResetCount = result.modifiedCount;
-      if (dbResetCount > 0) {
-        console.log(`✅ Also reset ${dbResetCount} database usage records`);
-      }
-    } catch (dbError) {
-      console.warn('Database reset failed (not critical):', dbError.message);
-    }
-    
-    res.json({
-      success: true,
-      message: `Đã reset usage counter từ ${previousCount} về 0`,
-      data: {
-        sessionResetFrom: previousCount,
-        sessionResetTo: 0,
-        dbResetCount: dbResetCount,
-        date: today,
-        resetBy: adminUser
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error resetting usage:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi reset usage',
-      error: error.message
-    });
-  }
-  */
 });
 
 // POST /api/admin/feature-settings/initialize - Initialize default settings
