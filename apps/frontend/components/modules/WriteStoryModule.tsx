@@ -16,6 +16,7 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle, Loader2, X } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
+import UsageQuotaDisplay from '../UsageQuotaDisplay';
 import { logApiCall } from '../../services/usageService';
 // Feature usage tracking instead of request counting
 import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
@@ -366,7 +367,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
   // Process individual story queue item
   const processStoryQueueItem = async (item: WriteStoryQueueItem) => {
     // Check feature usage limit for queue item
-    const canUse = await featureUsageTracker.canUseFeature();
+    const canUse = featureUsageTracker.canUse();
     if (!canUse) {
       const stats = await featureUsageTracker.getUsageStats();
       const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
@@ -736,7 +737,7 @@ Provide ONLY the story content for this section:`;
   // Process individual hook queue item
   const processHookQueueItem = async (item: HookQueueItem) => {
     // Check feature usage limit for queue item
-    const canUse = await featureUsageTracker.canUseFeature();
+    const canUse = featureUsageTracker.canUse();
     if (!canUse) {
       const stats = await featureUsageTracker.getUsageStats();
       const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
@@ -923,7 +924,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
     }
 
     // Check feature usage limit
-    const canUse = await featureUsageTracker.canUseFeature();
+    const canUse = featureUsageTracker.canUse();
     if (!canUse) {
       const stats = await featureUsageTracker.getUsageStats();
       const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
@@ -999,7 +1000,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
     }
 
     // Check feature usage limit
-    const canUse = await featureUsageTracker.canUseFeature();
+    const canUse = featureUsageTracker.canUse();
     if (!canUse) {
       const stats = await featureUsageTracker.getUsageStats();
       const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
@@ -1294,7 +1295,7 @@ Provide ONLY the numbered hooks, no additional explanations.`;
     }
 
     // Check feature usage limit
-    const canUse = await featureUsageTracker.canUseFeature();
+    const canUse = featureUsageTracker.canUse();
     if (!canUse) {
       const stats = await featureUsageTracker.getUsageStats();
       const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
@@ -1582,7 +1583,7 @@ ${storyToEdit}
     }
 
     // Check feature usage limit
-    const canUse = await featureUsageTracker.canUseFeature();
+    const canUse = featureUsageTracker.canUse();
     if (!canUse) {
       const stats = await featureUsageTracker.getUsageStats();
       const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
@@ -1785,7 +1786,7 @@ ${storyToEdit}
   // Helper function to extract the core story generation logic
   const processPromptStoryGeneration = async (title: string, outlinePrompt: string, writingPrompt: string) => {
     // Check feature usage limit
-    const canUse = await featureUsageTracker.canUseFeature();
+    const canUse = featureUsageTracker.canUse();
     if (!canUse) {
       const stats = await featureUsageTracker.getUsageStats();
       const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
@@ -2268,6 +2269,7 @@ ${story}
   return (
     <ModuleContainer title="✍️ Module: Viết Truyện, Hook & Bài Học" badge="PRO">
         {!hasActiveSubscription && <UpgradePrompt />}
+        <UsageQuotaDisplay usageStats={usageStats} />
         <InfoBox>
             <p><strong>📌 Quy trình Tạo Truyện Hoàn Chỉnh:</strong></p>
             <ol className="list-decimal list-inside space-y-1.5 text-sm mt-2">
