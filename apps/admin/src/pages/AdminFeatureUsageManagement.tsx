@@ -47,19 +47,14 @@ const AdminFeatureUsageManagement: React.FC = () => {
 
   const API_BASE_URL = 'https://aistory-backend.onrender.com/api';
 
-  // Get admin token from localStorage
-  const getAuthToken = () => {
-    return localStorage.getItem('adminToken');
-  };
+  // Note: Admin system currently doesn't use JWT tokens - matches existing admin routes
 
   // Fetch feature settings
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/admin/feature-settings`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -86,10 +81,8 @@ const AdminFeatureUsageManagement: React.FC = () => {
   const fetchUsageStats = async () => {
     setStatsLoading(true);
     try {
-      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/admin/feature-settings/stats`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -116,11 +109,9 @@ const AdminFeatureUsageManagement: React.FC = () => {
   const updateDailyLimit = async (value: number) => {
     setLoading(true);
     try {
-      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/admin/feature-settings/feature_daily_limit`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -164,11 +155,9 @@ const AdminFeatureUsageManagement: React.FC = () => {
       onOk: async () => {
         setLoading(true);
         try {
-          const token = getAuthToken();
           const response = await fetch(`${API_BASE_URL}/admin/feature-settings/reset-all-usage`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
           });
