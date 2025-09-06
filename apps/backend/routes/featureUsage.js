@@ -31,7 +31,51 @@ const extractUserId = (req, res, next) => {
 // Global feature limit - all users get same limit regardless of subscription
 const DEFAULT_DAILY_LIMIT = 300; // All subscriptions share same 300 daily limit
 
+// Test route để kiểm tra backend hoạt động
+router.get('/test', (req, res) => {
+  console.log('📍 Feature usage test route called');
+  res.json({
+    success: true,
+    message: 'Feature usage backend is working',
+    timestamp: new Date().toISOString(),
+    server: 'featureUsage service'
+  });
+});
+
 // GET /api/features/usage-status - Get current feature usage status
+// Simplified route without auth middleware for debugging
+router.get('/usage-status-debug', async (req, res) => {
+  try {
+    console.log('🔧 Debug route called - no auth');
+    res.json({
+      success: true,
+      data: {
+        usage: {
+          current: 0,
+          dailyLimit: DEFAULT_DAILY_LIMIT,
+          remaining: DEFAULT_DAILY_LIMIT,
+          percentage: 0,
+          isBlocked: false,
+          resetTime: 24 * 60 * 60 * 1000 // 24 hours
+        },
+        config: {
+          subscriptionType: 'debug',
+          isEnabled: true,
+          resetTime: '00:00',
+          timezone: 'Asia/Ho_Chi_Minh'
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Debug route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Debug route failed',
+      error: error.message
+    });
+  }
+});
+
 router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
   try {
     const userId = req.userId;

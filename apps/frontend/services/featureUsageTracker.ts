@@ -5,7 +5,8 @@ const API_URL = 'https://aistory-backend.onrender.com/api';
 
 interface FeatureUsageData {
   date: string; // YYYY-MM-DD
-  totalUses: number;
+  totalUses: number; // Keep totalUses for internal use
+  current?: number; // Backend field name
   dailyLimit: number;
   remaining: number;
   percentage: number;
@@ -55,7 +56,7 @@ const syncWithBackend = async (): Promise<FeatureUsageData | null> => {
       
       const syncedData: FeatureUsageData = {
         date: today,
-        totalUses: usage.totalUses || 0,
+        totalUses: usage.current || usage.totalUses || 0, // Handle both field names
         dailyLimit: usage.dailyLimit || DEFAULT_DAILY_LIMIT,
         remaining: usage.remaining || 0,
         percentage: usage.percentage || 0,
@@ -106,7 +107,7 @@ const trackWithBackend = async (featureId: string, featureName: string): Promise
         
         const updatedData: FeatureUsageData = {
           date: today,
-          totalUses: usage.totalUses || 0,
+          totalUses: usage.current || usage.totalUses || 0, // Handle both field names
           dailyLimit: usage.dailyLimit || DEFAULT_DAILY_LIMIT,
           remaining: usage.remaining || 0,
           percentage: usage.percentage || 0,
@@ -129,7 +130,7 @@ const trackWithBackend = async (featureId: string, featureName: string): Promise
         
         const blockedData: FeatureUsageData = {
           date: today,
-          totalUses: usage.totalUses || 0,
+          totalUses: usage.current || usage.totalUses || 0, // Handle both field names
           dailyLimit: usage.dailyLimit || DEFAULT_DAILY_LIMIT,
           remaining: usage.remaining || 0,
           percentage: usage.percentage || 100,
