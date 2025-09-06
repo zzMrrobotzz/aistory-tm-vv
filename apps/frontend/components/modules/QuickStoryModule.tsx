@@ -2,10 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ApiSettings, QuickStoryModuleState, QuickStoryTask, QuickStoryActiveTab, ActiveModule, SequelStoryResult, UserProfile, QuickStoryWordStats, QuickStoryQualityStats } from '../../types';
 import { STORY_LENGTH_OPTIONS, WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
-import { checkAndTrackRequest, REQUEST_ACTIONS, getUserUsageStatus, recordUsage } from '../../services/requestTrackingService';
 import { delay, isSubscribed } from '../../utils';
-import { logApiCall, logTextRewritten } from '../../services/usageService';
-import { getTimeUntilReset } from '../../services/localRequestCounter';
+// Feature usage tracking instead of request counting
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -97,54 +96,47 @@ const QuickStoryModule: React.FC<QuickStoryModuleProps> = ({
     // Subscription check
     const hasActiveSubscription = isSubscribed(currentUser);
     
-    // Usage tracking state from backend
-    const [usageStats, setUsageStats] = useState({ current: 0, limit: 5000, remaining: 5000, percentage: 0, isBlocked: false } as any);
+    // Feature usage tracking state
+    const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStatsSync());
     
-    // Thay thế useEffect cũ bằng logic mới
+    // Sync usage stats with backend
     useEffect(() => {
-        const fetchUsage = async () => {
-            try {
-                const status = await getUserUsageStatus();
-                if (status.success) {
-                    setUsageStats(status.data.usage);
-                }
-            } catch (error) {
-                console.error('Failed to fetch usage status:', error);
-            }
-        };
-        fetchUsage(); // Initial fetch
-        const interval = setInterval(fetchUsage, 60000); // Poll every minute
-        return () => clearInterval(interval);
+      const syncUsageStats = async () => {
+        try {
+          const stats = await featureUsageTracker.getUsageStats(); // This syncs with backend
+          setUsageStats(stats);
+        } catch (error) {
+          const stats = featureUsageTracker.getUsageStatsSync();
+          setUsageStats(stats);
+        }
+      };
+      
+      syncUsageStats(); // Initial sync
+      const interval = setInterval(syncUsageStats, 2 * 60 * 1000); // Sync every 2 minutes
+      
+      return () => clearInterval(interval);
     }, []);
 
     const updateState = (updates: Partial<QuickStoryModuleState>) => {
         setModuleState(prev => ({ ...prev, ...updates }));
     };
 
-    // Helper: check & track usage with backend and sync local counter box
-    const checkAndTrackQuickRequest = async (action: string, itemCount: number = 1) => {
+    // Helper: check feature usage limit with backend sync
+    const checkFeatureUsage = async () => {
         try {
-            const result = await checkAndTrackRequest(action, itemCount);
-            // Sync UI usage box with backend numbers
-            if (result?.usage) {
-                setUsageStats({
-                    current: result.usage.current,
-                    limit: result.usage.limit,
-                    remaining: result.usage.remaining,
-                    percentage: result.usage.percentage,
-                    canUse: result.usage.current < result.usage.limit,
-                    isBlocked: !!result.blocked
-                });
-            }
-            if (result.blocked) {
+            const canUse = await featureUsageTracker.canUseFeature();
+            const stats = await featureUsageTracker.getUsageStats();
+            setUsageStats(stats);
+            
+            if (!canUse) {
                 return {
                     allowed: false,
-                    message: result.message,
-                    stats: result.usage
+                    message: `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`,
+                    stats: stats
                 } as const;
             }
-            // Removed warning handling as it's not in the new interface
-            return { allowed: true, stats: result.usage, message: result.message } as const;
+            
+            return { allowed: true, stats: stats } as const;
         } catch (error) {
             console.warn('Backend request check failed, proceeding with local counter');
             return { allowed: true } as const;
@@ -432,10 +424,13 @@ ${fullStory}
             storyQualityStats: storyQualityStats
         });
         
-        // Log usage statistics
-        const totalApiCalls = numChunks + 1 + (enableQualityAnalysis && finalStory.length > 500 ? 1 : 0); // outline + chunks + edit + analysis
-        logApiCall('quickstory', totalApiCalls);
-        logTextRewritten('quickstory', 1);
+        // Track feature usage for quick story
+        try {
+            const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.QUICK_STORY, 'Tạo Truyện Nhanh');
+            setUsageStats(updatedStats);
+        } catch (error) {
+            console.warn('Failed to track quick story usage:', error);
+        }
         
         return finalStory;
     };
@@ -527,7 +522,7 @@ ${fullStory}
         
         // ✅ Track usage ONCE when user starts queue processing (based on number of stories)
         const storyCount = queueableTasks.length;
-        const usageCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY, storyCount);
+        const usageCheck = await checkFeatureUsage();
         if (usageCheck && (usageCheck as any).allowed === false) {
             alert((usageCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.');
             return;
@@ -686,8 +681,13 @@ ${fullStory}
                     sequelSuggestedTitles: titles,
                 });
                 
-                // Log usage statistics
-                logApiCall('quickstory-titles', 1);
+                // Track feature usage for sequel titles
+                try {
+                    const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.QUICK_STORY, 'Gợi Ý Tiêu Đề Sequel');
+                    setUsageStats(updatedStats);
+                } catch (error) {
+                    console.warn('Failed to track sequel titles usage:', error);
+                }
             }
         } catch (e) {
             updateState({
@@ -715,7 +715,7 @@ ${fullStory}
         
         // ✅ Track usage ONCE when user starts the batch (based on number of stories)
         const storyCount = sequelSelectedTitles.length;
-        const usageCheck = await checkAndTrackQuickRequest(REQUEST_ACTIONS.QUICK_STORY, storyCount);
+        const usageCheck = await checkFeatureUsage();
         if (usageCheck && (usageCheck as any).allowed === false) {
             updateState({ sequelError: (usageCheck as any).message || 'Đã đạt giới hạn sử dụng hôm nay.' });
             return;
@@ -880,10 +880,13 @@ ${fullStory}
         // Calculate word statistics
         const wordStats = calculateWordStats('', finalStory); // No original text for sequel stories
         
-        // Log usage statistics
-        const totalApiCalls = numChunks + 1 + (enableQualityAnalysis && finalStory.length > 500 ? 1 : 0); // chunks + edit + analysis
-        logApiCall('quickstory-sequel', totalApiCalls);
-        logTextRewritten('quickstory-sequel', 1);
+        // Track feature usage for sequel story
+        try {
+            const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.QUICK_STORY, 'Tạo Sequel Story');
+            setUsageStats(updatedStats);
+        } catch (error) {
+            console.warn('Failed to track sequel story usage:', error);
+        }
         
         return {
             story: finalStory,

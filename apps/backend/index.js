@@ -531,6 +531,7 @@ app.use('/api/admin', require('./routes/adminPackages')); // Package management
 app.use('/api/admin/payments', require('./routes/adminPayments')); // Payment management
 app.use('/api/admin/anti-sharing', require('./routes/adminAntiSharing')); // Anti-sharing management
 app.use('/api/admin/support-content', require('./routes/adminSupportContent')); // Support content management
+app.use('/api/admin/feature-settings', require('./routes/adminFeatureSettings')); // Feature usage settings management
 // Apply universal activity tracking to protected routes
 app.use('/api/ai', auth, updateUserActivity, aiProxyRouter);
 app.use('/api/tutorials', require('./routes/tutorials')); // Public tutorials for end users

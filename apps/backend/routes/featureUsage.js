@@ -4,6 +4,7 @@ const { authenticateUser } = require('../middleware/adminAuth');
 const { updateUserActivity } = require('../middleware/activityTracker');
 const FeatureUsage = require('../models/FeatureUsage');
 const User = require('../models/User');
+const FeatureSettings = require('../models/FeatureSettings');
 const { getVietnamDate } = require('../utils/timezone');
 
 // Middleware để extract userId từ token
@@ -27,12 +28,8 @@ const extractUserId = (req, res, next) => {
   }
 };
 
-// Feature limit configurations
-const FEATURE_LIMITS = {
-  free: 300,
-  monthly: 1000, 
-  lifetime: 9999
-};
+// Global feature limit - all users get same limit regardless of subscription
+const DEFAULT_DAILY_LIMIT = 300; // All subscriptions share same 300 daily limit
 
 // GET /api/features/usage-status - Get current feature usage status
 router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId, async (req, res) => {
@@ -55,9 +52,9 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     let usageRecord = await FeatureUsage.findOne({ userId, date: today });
     
     if (!usageRecord) {
-      // Create new record for today
+      // Create new record for today - get limit from settings
       const subscriptionType = user.subscriptionType || 'free';
-      const dailyLimit = FEATURE_LIMITS[subscriptionType] || FEATURE_LIMITS.free;
+      const dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
       
       usageRecord = new FeatureUsage({
         userId,
@@ -74,9 +71,9 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
       await usageRecord.save();
       console.log(`✅ Created new feature usage record for user ${userId}`);
     } else {
-      // Update subscription info if changed
+      // Update subscription info if changed - get limit from settings
       const subscriptionType = user.subscriptionType || 'free';
-      const newLimit = FEATURE_LIMITS[subscriptionType] || FEATURE_LIMITS.free;
+      const newLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
       
       if (usageRecord.subscriptionType !== subscriptionType || usageRecord.dailyLimit !== newLimit) {
         usageRecord.subscriptionType = subscriptionType;
@@ -152,9 +149,9 @@ router.post('/track-usage', authenticateUser, updateUserActivity, extractUserId,
     let usageRecord = await FeatureUsage.findOne({ userId, date: today });
     
     if (!usageRecord) {
-      // Create new record for today
+      // Create new record for today - get limit from settings
       const subscriptionType = user.subscriptionType || 'free';
-      const dailyLimit = FEATURE_LIMITS[subscriptionType] || FEATURE_LIMITS.free;
+      const dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
       
       usageRecord = new FeatureUsage({
         userId,
@@ -234,9 +231,9 @@ router.post('/check-usage', authenticateUser, updateUserActivity, extractUserId,
     let usageRecord = await FeatureUsage.findOne({ userId, date: today });
     
     if (!usageRecord) {
-      // Create new record for today
+      // Create new record for today - get limit from settings
       const subscriptionType = user.subscriptionType || 'free';
-      const dailyLimit = FEATURE_LIMITS[subscriptionType] || FEATURE_LIMITS.free;
+      const dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
       
       usageRecord = new FeatureUsage({
         userId,

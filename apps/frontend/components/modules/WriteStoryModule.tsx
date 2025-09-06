@@ -16,10 +16,9 @@ import { delay, isSubscribed } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 import { Languages, StopCircle, Clock, Plus, Play, Pause, CheckCircle, Trash2, AlertCircle, Loader2, X } from 'lucide-react';
 import UpgradePrompt from '../UpgradePrompt';
-import { logApiCall, logStoryGenerated, logTextRewritten } from '../../services/usageService';
-import { checkAndTrackRequest, getRequestStatus, REQUEST_ACTIONS, RequestCheckResult } from '../../services/requestTrackingService';
-// Keep local counter as fallback
-import { getTimeUntilReset } from '../../services/localRequestCounter';
+import { logApiCall } from '../../services/usageService';
+// Feature usage tracking instead of request counting
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 // Retry logic with exponential backoff for API calls (imported from RewriteModule)
 const retryApiCall = async (
@@ -82,34 +81,26 @@ interface WriteStoryModuleProps {
 
 const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis, currentUser }) => {
   
-  // Helper function to check and track request with backend
-  const checkAndTrackStoryRequest = async (action: string, itemCount: number = 1): Promise<{ allowed: boolean; stats: any; message?: string }> => {
-    try {
-      const result: RequestCheckResult = await checkAndTrackRequest(action, itemCount);
-      
-      if (result.blocked) {
-        return {
-          allowed: false,
-          stats: result.usage,
-          message: result.message
-        };
+  // Feature usage tracking state (shared with other modules)
+  const [usageStats, setUsageStats] = useState(featureUsageTracker.getUsageStatsSync());
+  
+  // Update usage stats when component mounts and every 2 minutes for backend sync
+  useEffect(() => {
+    const updateStats = async () => {
+      try {
+        const stats = await featureUsageTracker.getUsageStats(); // This syncs with backend
+        setUsageStats(stats);
+      } catch (error) {
+        // Fallback to sync version
+        const stats = featureUsageTracker.getUsageStatsSync();
+        setUsageStats(stats);
       }
-      
-      return {
-        allowed: true,
-        stats: result.usage,
-        message: result.warning
-      };
-    } catch (error) {
-      console.warn('Backend request check failed, using local fallback');
-      // Fallback to local logic if backend fails
-      return {
-        allowed: true,
-        stats: { current: 0, limit: 5000, remaining: 5000, percentage: 0 },
-        message: 'Sử dụng chế độ offline'
-      };
-    }
-  };
+    };
+    
+    updateStats();
+    const interval = setInterval(updateStats, 120000); // Check every 2 minutes for backend sync
+    return () => clearInterval(interval);
+  }, []);
   const {
     activeWriteTab,
     // Common settings
@@ -374,19 +365,21 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
 
   // Process individual story queue item
   const processStoryQueueItem = async (item: WriteStoryQueueItem) => {
-    // Check request limit for queue item
-    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.allowed) {
+    // Check feature usage limit for queue item
+    const canUse = await featureUsageTracker.canUseFeature();
+    if (!canUse) {
+      const stats = await featureUsageTracker.getUsageStats();
+      const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
       // Mark item as failed due to limit
       setModuleState(prev => ({
         ...prev,
         storyQueue: prev.storyQueue.map(qItem =>
           qItem.id === item.id
-            ? { ...qItem, status: 'failed', error: requestCheck.message }
+            ? { ...qItem, status: 'failed', error: errorMessage }
             : qItem
         ),
       }));
-      throw new Error(`Request limit reached: ${requestCheck.message}`);
+      throw new Error(`Feature usage limit reached: ${errorMessage}`);
     }
     if (requestCheck.message) {
       console.log('⚠️ Queue story request warning:', requestCheck.message);
@@ -526,9 +519,13 @@ Provide ONLY the story content for this section:`;
       ),
     }));
 
-    // Log usage statistics (editing calls are logged by handleEditStory)
-    logApiCall('write-story', numChunks);
-    logStoryGenerated('write-story', 1);
+    // Track feature usage successfully
+    try {
+      const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Viết Truyện');
+      setUsageStats(updatedStats);
+    } catch (error) {
+      console.warn('Failed to track write story usage:', error);
+    }
   };
 
   // Hook Queue Management Functions
@@ -738,19 +735,21 @@ Provide ONLY the story content for this section:`;
 
   // Process individual hook queue item
   const processHookQueueItem = async (item: HookQueueItem) => {
-    // Check request limit for queue item
-    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.allowed) {
+    // Check feature usage limit for queue item
+    const canUse = await featureUsageTracker.canUseFeature();
+    if (!canUse) {
+      const stats = await featureUsageTracker.getUsageStats();
+      const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
       // Mark item as failed due to limit
       setModuleState(prev => ({
         ...prev,
         hookQueue: prev.hookQueue.map(qItem =>
           qItem.id === item.id
-            ? { ...qItem, status: 'failed', error: requestCheck.message }
+            ? { ...qItem, status: 'failed', error: errorMessage }
             : qItem
         ),
       }));
-      throw new Error(`Request limit reached: ${requestCheck.message}`);
+      throw new Error(`Feature usage limit reached: ${errorMessage}`);
     }
     if (requestCheck.message) {
       console.log('⚠️ Queue hook request warning:', requestCheck.message);
@@ -847,8 +846,13 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       ),
     }));
 
-    // Log usage statistics
-    logApiCall('write-story', 1);
+    // Track feature usage for hook generation
+    try {
+      const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Tạo Hooks Hàng Loạt');
+      setUsageStats(updatedStats);
+    } catch (error) {
+      console.warn('Failed to track hook queue usage:', error);
+    }
   };
 
   const updateState = (updates: Partial<WriteStoryModuleState>) => {
@@ -918,16 +922,13 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       return;
     }
 
-    // Check request limit with backend tracking
-    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.allowed) {
-      const timeLeft = getTimeUntilReset();
-      const errorMessage = `${requestCheck.message} Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
+    // Check feature usage limit
+    const canUse = await featureUsageTracker.canUseFeature();
+    if (!canUse) {
+      const stats = await featureUsageTracker.getUsageStats();
+      const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
       updateState({ hookError: errorMessage });
       return;
-    }
-    if (requestCheck.message) {
-      console.log('⚠️ Request warning:', requestCheck.message);
     }
     
     const abortCtrl = new AbortController();
@@ -972,9 +973,13 @@ Provide ONLY the numbered hooks, no additional explanations.`;
         HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY + '_hooks', hookTitle, result.text);
       }
       
-      // Log usage statistics for hooks generation
-      logApiCall('write-story', 1); // 1 API call for hooks
-      logStoryGenerated('write-story', hookCount); // Log number of hooks generated
+      // Track feature usage for hooks generation
+      try {
+        const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Tạo Hooks');
+        setUsageStats(updatedStats);
+      } catch (error) {
+        console.warn('Failed to track hooks usage:', error);
+      }
     } catch (e: any) {
       if (e.name === 'AbortError') {
         updateState({ hookError: 'Tạo hook đã bị hủy.', hookLoadingMessage: 'Đã hủy.' });
@@ -993,16 +998,13 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       return;
     }
 
-    // Check request limit with backend tracking
-    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.allowed) {
-      const timeLeft = getTimeUntilReset();
-      const errorMessage = `${requestCheck.message} Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
+    // Check feature usage limit
+    const canUse = await featureUsageTracker.canUseFeature();
+    if (!canUse) {
+      const stats = await featureUsageTracker.getUsageStats();
+      const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
       updateState({ storyError: errorMessage });
       return;
-    }
-    if (requestCheck.message) {
-      console.log('⚠️ Request warning:', requestCheck.message);
     }
 
     // Local counter system doesn't need warning checks
@@ -1229,9 +1231,13 @@ Provide ONLY the numbered hooks, no additional explanations.`;
         });
       }
       
-      // Log usage statistics for story generation
-      logApiCall('write-story', 2); // Typically uses 2 API calls (generate + edit)
-      logStoryGenerated('write-story', 1); // Log 1 story generated
+      // Track feature usage for story generation
+      try {
+        const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Viết Truyện');
+        setUsageStats(updatedStats);
+      } catch (error) {
+        console.warn('Failed to track single story usage:', error);
+      }
     } catch (e: any) {
       if (e.name === 'AbortError') {
          updateState({ storyError: 'Biên tập truyện đã bị hủy.', storyLoadingMessage: 'Đã hủy biên tập.', singleStoryEditProgress: null, hasSingleStoryBeenEditedSuccessfully: false });
@@ -1287,10 +1293,12 @@ Provide ONLY the numbered hooks, no additional explanations.`;
       return;
     }
 
-    // Check usage before proceeding
-    const usageCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.STORY_GENERATION, 1);
-    if (!usageCheck.allowed) {
-      updateState({ promptStoryError: usageCheck.message || 'Bạn đã đạt giới hạn tạo truyện.' });
+    // Check feature usage limit
+    const canUse = await featureUsageTracker.canUseFeature();
+    if (!canUse) {
+      const stats = await featureUsageTracker.getUsageStats();
+      const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
+      updateState({ promptStoryError: errorMessage });
       return;
     }
 
@@ -1543,9 +1551,13 @@ ${storyToEdit}
         }
       );
       
-      // Log usage
-      logStoryGenerated(1);
-      logTextRewritten('write-story', 1); // Log prompt-based story as text rewrite
+      // Track feature usage for prompt story
+      try {
+        const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Tạo Truyện Theo Prompt');
+        setUsageStats(updatedStats);
+      } catch (error) {
+        console.warn('Failed to track prompt story usage:', error);
+      }
     } catch (e: any) {
       if (e.name === 'AbortError') {
          updateState({ promptStoryError: 'Biên tập đã bị hủy.', promptStoryLoadingMessage: 'Đã hủy biên tập.', promptStoryEditProgress: null });
@@ -1569,16 +1581,13 @@ ${storyToEdit}
       return;
     }
 
-    // Check request limit with backend tracking
-    const requestCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.WRITE_STORY);
-    if (!requestCheck.allowed) {
-      const timeLeft = getTimeUntilReset();
-      const errorMessage = `${requestCheck.message} Còn ${timeLeft.hours}h ${timeLeft.minutes}m để reset.`;
+    // Check feature usage limit
+    const canUse = await featureUsageTracker.canUseFeature();
+    if (!canUse) {
+      const stats = await featureUsageTracker.getUsageStats();
+      const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
       updateState({ lessonError: errorMessage });
       return;
-    }
-    if (requestCheck.message) {
-      console.log('⚠️ Request warning:', requestCheck.message);
     }
     let currentLessonStyle = lessonWritingStyle;
     if (lessonWritingStyle === 'custom') {
@@ -1617,9 +1626,13 @@ ${storyToEdit}
         HistoryStorage.saveToHistory(MODULE_KEYS.WRITE_STORY + '_lessons', lessonTitle, result.text);
       }
       
-      // Log usage statistics for lesson generation
-      logApiCall('write-story', 1); // 1 API call for lesson
-      logStoryGenerated('write-story', 1); // Log 1 lesson generated
+      // Track feature usage for lesson generation
+      try {
+        const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Tạo Bài Học');
+        setUsageStats(updatedStats);
+      } catch (error) {
+        console.warn('Failed to track lesson usage:', error);
+      }
     } catch (e: any) {
        if (e.name === 'AbortError') {
         updateState({ lessonError: 'Tạo bài học đã bị hủy.', lessonLoadingMessage: 'Đã hủy.' });
@@ -1771,10 +1784,12 @@ ${storyToEdit}
 
   // Helper function to extract the core story generation logic
   const processPromptStoryGeneration = async (title: string, outlinePrompt: string, writingPrompt: string) => {
-    // Check usage before proceeding
-    const usageCheck = await checkAndTrackStoryRequest(REQUEST_ACTIONS.STORY_GENERATION, 1);
-    if (!usageCheck.allowed) {
-      throw new Error(usageCheck.message || 'Bạn đã đạt giới hạn tạo truyện.');
+    // Check feature usage limit
+    const canUse = await featureUsageTracker.canUseFeature();
+    if (!canUse) {
+      const stats = await featureUsageTracker.getUsageStats();
+      const errorMessage = `Đã đạt giới hạn ${stats.dailyLimit} lượt sử dụng/ngày. Reset vào 00:00 ngày mai.`;
+      throw new Error(errorMessage);
     }
 
     const abortCtrl = new AbortController();
@@ -1928,9 +1943,13 @@ ${storyToEdit}
         }
       );
 
-      // Log usage
-      logStoryGenerated(1);
-      logTextRewritten('write-story', 1); // Log prompt-based story queue processing as text rewrite
+      // Track feature usage for prompt-based story
+      try {
+        const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Tạo Truyện Theo Prompt');
+        setUsageStats(updatedStats);
+      } catch (error) {
+        console.warn('Failed to track prompt story usage:', error);
+      }
 
       return editedStory;
 
