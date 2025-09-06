@@ -30,23 +30,18 @@ const getAuthToken = (): string | null => {
 
 const syncWithBackend = async (): Promise<FeatureUsageData | null> => {
   try {
-    const token = getAuthToken();
-    if (!token) {
-      console.warn('No auth token, skipping backend sync');
-      return null;
-    }
-
+    // Try backend sync first
     const response = await fetch(`${API_URL}/features/usage-status`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
+        'Content-Type': 'application/json'
+      },
+      timeout: 5000 // 5 second timeout
     });
 
     if (!response.ok) {
       console.warn('Backend sync failed:', response.status, response.statusText);
-      return null;
+      return getDefaultFallbackData();
     }
 
     const backendData = await response.json();
@@ -72,10 +67,25 @@ const syncWithBackend = async (): Promise<FeatureUsageData | null> => {
       return syncedData;
     }
   } catch (error) {
-    console.warn('Backend sync failed, using local data:', error);
+    console.warn('Backend sync failed, using fallback data:', error);
+    return getDefaultFallbackData();
   }
   
   return null;
+};
+
+// Fallback data when backend is unavailable
+const getDefaultFallbackData = (): FeatureUsageData => {
+  const today = getTodayVietnam();
+  return {
+    date: today,
+    totalUses: 0,
+    dailyLimit: DEFAULT_DAILY_LIMIT,
+    remaining: DEFAULT_DAILY_LIMIT,
+    percentage: 0,
+    isBlocked: false,
+    featureBreakdown: {}
+  };
 };
 
 const trackWithBackend = async (featureId: string, featureName: string): Promise<boolean> => {
