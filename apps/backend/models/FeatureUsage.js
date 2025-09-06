@@ -145,7 +145,7 @@ FeatureUsageSchema.methods.getUsageStats = function() {
   const percentage = this.dailyLimit > 0 ? Math.round((this.totalUses / this.dailyLimit) * 100) : 0;
   
   return {
-    totalUses: this.totalUses,
+    current: this.totalUses,
     dailyLimit: this.dailyLimit,
     remaining,
     percentage,

@@ -39,6 +39,15 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     
     console.log(`🔍 Getting feature usage status for user ${userId} on ${today}`);
     
+    // Defensive check
+    if (!userId) {
+      console.error('❌ No userId found in request');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing user ID'
+      });
+    }
+    
     // Get user info for subscription type
     const user = await User.findById(userId);
     if (!user) {
@@ -49,12 +58,26 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     }
     
     // Find or create feature usage record for today
-    let usageRecord = await FeatureUsage.findOne({ userId, date: today });
+    let usageRecord;
+    try {
+      usageRecord = await FeatureUsage.findOne({ userId, date: today });
+      console.log(`💾 Found usage record:`, usageRecord ? 'Yes' : 'No');
+    } catch (dbError) {
+      console.error('❌ Database query error:', dbError);
+      throw new Error(`Database connection failed: ${dbError.message}`);
+    }
     
     if (!usageRecord) {
       // Create new record for today - get limit from settings
       const subscriptionType = user.subscriptionType || 'free';
-      const dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+      let dailyLimit;
+      try {
+        dailyLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+        console.log(`🔧 Retrieved daily limit:`, dailyLimit);
+      } catch (settingsError) {
+        console.warn('⚠️ FeatureSettings query failed, using default:', DEFAULT_DAILY_LIMIT);
+        dailyLimit = DEFAULT_DAILY_LIMIT;
+      }
       
       usageRecord = new FeatureUsage({
         userId,
@@ -73,7 +96,13 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     } else {
       // Update subscription info if changed - get limit from settings
       const subscriptionType = user.subscriptionType || 'free';
-      const newLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+      let newLimit;
+      try {
+        newLimit = await FeatureSettings.getSetting('feature_daily_limit', DEFAULT_DAILY_LIMIT);
+      } catch (settingsError) {
+        console.warn('⚠️ FeatureSettings query failed, using existing limit:', usageRecord.dailyLimit);
+        newLimit = usageRecord.dailyLimit || DEFAULT_DAILY_LIMIT;
+      }
       
       if (usageRecord.subscriptionType !== subscriptionType || usageRecord.dailyLimit !== newLimit) {
         usageRecord.subscriptionType = subscriptionType;
@@ -84,7 +113,29 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     }
     
     // Get usage stats
-    const stats = usageRecord.getUsageStats();
+    let stats;
+    try {
+      stats = usageRecord.getUsageStats();
+      console.log(`📊 Usage stats for ${userId}:`, stats);
+      
+      // Validate stats object
+      if (!stats || typeof stats.current === 'undefined') {
+        throw new Error('Invalid stats object returned from getUsageStats');
+      }
+    } catch (statsError) {
+      console.error('❌ Error getting usage stats:', statsError);
+      // Fallback stats
+      stats = {
+        current: usageRecord.totalUses || 0,
+        dailyLimit: usageRecord.dailyLimit || DEFAULT_DAILY_LIMIT,
+        remaining: Math.max(0, (usageRecord.dailyLimit || DEFAULT_DAILY_LIMIT) - (usageRecord.totalUses || 0)),
+        percentage: 0,
+        isBlocked: false,
+        featureBreakdown: [],
+        lastActivity: usageRecord.lastActivity || new Date()
+      };
+      console.log(`⚠️ Using fallback stats:`, stats);
+    }
     
     // Calculate time until reset (midnight Vietnam time)
     const now = new Date();
@@ -111,11 +162,13 @@ router.get('/usage-status', authenticateUser, updateUserActivity, extractUserId,
     });
     
   } catch (error) {
-    console.error('Error getting feature usage status:', error);
+    console.error('❌ Error getting feature usage status:', error);
+    console.error('❌ Stack trace:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy trạng thái sử dụng tính năng',
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
