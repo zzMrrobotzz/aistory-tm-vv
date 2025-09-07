@@ -4,7 +4,22 @@
       "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\frontend/**)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\backend\\routes/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\backend\\routes/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\backend\\routes/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\backend\\routes/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\backend\\routes/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\frontend\\components\\pages/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\frontend\\components\\pages/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\frontend\\components\\pages/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\frontend\\components\\pages/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\frontend\\components\\pages/**)",
+      "Read(/C:\\Users\\Admin\\Desktop\\SRCFullToolviettruyenTM\\AISTORY-TM-T8\\AISTORY-TM-VN\\apps\\admin\\src\\components/**)"
     ],
     "deny": [],
     "ask": []

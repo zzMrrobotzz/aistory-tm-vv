@@ -60,11 +60,30 @@ const UserManagement: React.FC = () => {
 
   // Get users with multi-IP violations
   const getMultiIPViolators = (): User[] => {
-    return users.filter(user => {
+    const violators = users.filter(user => {
       const sessionInfo = user.sessionInfo;
       if (!sessionInfo) return false;
-      return sessionInfo.hasMultipleActiveIPs && sessionInfo.recentIPs && sessionInfo.recentIPs.length > 1;
+      
+      const hasViolation = sessionInfo.hasMultipleActiveIPs && sessionInfo.recentIPs && sessionInfo.recentIPs.length > 1;
+      
+      // Debug logging
+      if (sessionInfo.recentIPs && sessionInfo.recentIPs.length > 0) {
+        console.log(`🔍 Frontend Debug - ${user.username}:`, {
+          hasMultipleActiveIPs: sessionInfo.hasMultipleActiveIPs,
+          recentIPs: sessionInfo.recentIPs,
+          suspiciousScore: sessionInfo.suspiciousScore,
+          hasViolation
+        });
+      }
+      
+      return hasViolation;
     });
+    
+    if (violators.length > 0) {
+      console.log(`🚨 Found ${violators.length} violators:`, violators.map(u => u.username));
+    }
+    
+    return violators;
   };
   const [users, setUsers] = useState<User[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);

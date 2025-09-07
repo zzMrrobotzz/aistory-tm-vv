@@ -216,6 +216,18 @@ router.get('/', /* isAdmin, */ async (req, res) => {
       const hasMultipleActiveIPs = recentIPs.length > 1;
       const suspiciousScore = hasMultipleActiveIPs ? 85 : 0;
       
+      // Debug logging for IP data
+      if (hasMultipleActiveIPs || uniqueIPs.length > 1) {
+        console.log(`🔍 Multi-IP Debug for ${user.username}:`, {
+          uniqueIPs,
+          recentIPs,
+          latestIP: latestSession?.ipAddress,
+          sessionsCount: allUserSessions.length,
+          suspiciousScore,
+          hasMultipleActiveIPs
+        });
+      }
+
       return {
         ...user.toObject(),
         sessionInfo: {
