@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Select, Tag, Space, Modal, message, InputNumber, Tooltip } from 'antd';
+import { Table, Button, Input, Select, Tag, Space, Modal, message, InputNumber, Tooltip, Alert, Card, Row, Col } from 'antd';
 import { SearchOutlined, UserOutlined, EditOutlined, StopOutlined, CheckOutlined, CrownOutlined, GlobalOutlined, ClockCircleOutlined, WarningOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { fetchUsers, fetchUserStats, updateUserCredits, updateUserStatus, updateUserSubscription } from '../services/keyService';
 
@@ -51,6 +51,21 @@ interface Package {
 }
 
 const UserManagement: React.FC = () => {
+  // Utility function to clean IP address format
+  const cleanIPAddress = (ip: string): string => {
+    if (!ip) return '';
+    // Remove IPv6-mapped IPv4 prefix (::ffff:)
+    return ip.replace(/^::ffff:/i, '');
+  };
+
+  // Get users with multi-IP violations
+  const getMultiIPViolators = (): User[] => {
+    return users.filter(user => {
+      const sessionInfo = user.sessionInfo;
+      if (!sessionInfo) return false;
+      return sessionInfo.hasMultipleActiveIPs && sessionInfo.recentIPs && sessionInfo.recentIPs.length > 1;
+    });
+  };
   const [users, setUsers] = useState<User[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -448,7 +463,7 @@ const UserManagement: React.FC = () => {
             {sessionInfo.ipAddress && (
               <div style={{ fontSize: '11px', color: '#666', marginTop: 2, fontFamily: 'monospace' }}>
                 <span style={{ backgroundColor: '#f5f5f5', padding: '2px 4px', borderRadius: '3px' }}>
-                  📍 {sessionInfo.ipAddress}
+                  📍 {cleanIPAddress(sessionInfo.ipAddress)}
                 </span>
               </div>
             )}
@@ -469,7 +484,7 @@ const UserManagement: React.FC = () => {
             color="blue" 
             style={{ fontFamily: 'monospace', fontSize: '11px' }}
           >
-            {ipAddress}
+            {cleanIPAddress(ipAddress)}
           </Tag>
         );
       },
@@ -498,7 +513,7 @@ const UserManagement: React.FC = () => {
                 Safe
               </Tag>
               <div style={{ fontSize: '11px', color: '#52c41a', marginTop: 2 }}>
-                Single IP: {recentIPs[0] || 'N/A'}
+                Single IP: {recentIPs[0] ? cleanIPAddress(recentIPs[0]) : 'N/A'}
               </div>
             </div>
           );
@@ -528,7 +543,7 @@ const UserManagement: React.FC = () => {
                     marginRight: '2px',
                     fontFamily: 'monospace'
                   }}>
-                    {ip}
+                    {cleanIPAddress(ip)}
                   </span>
                 ))}
               </div>
@@ -591,6 +606,106 @@ const UserManagement: React.FC = () => {
       <div className="page-header">
         <h2>Quản lý Users</h2>
       </div>
+
+      {/* Multi-IP Violation Alert Panel */}
+      {(() => {
+        const violators = getMultiIPViolators();
+        if (violators.length === 0) return null;
+        
+        return (
+          <Alert
+            message={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ExclamationCircleOutlined style={{ fontSize: 16, color: '#ff4d4f' }} />
+                <strong>🚨 CẢNH BÁO: {violators.length} tài khoản đang truy cập từ nhiều IP cùng lúc!</strong>
+              </div>
+            }
+            description={
+              <div style={{ marginTop: 12 }}>
+                <Row gutter={[16, 8]}>
+                  {violators.map((user) => {
+                    const sessionInfo = user.sessionInfo!;
+                    const isBlocked = sessionInfo.suspiciousScore && sessionInfo.suspiciousScore >= 85;
+                    
+                    return (
+                      <Col span={24} key={user._id}>
+                        <Card 
+                          size="small" 
+                          style={{ 
+                            borderLeft: `4px solid ${isBlocked ? '#ff4d4f' : '#fa8c16'}`,
+                            backgroundColor: isBlocked ? '#fff1f0' : '#fff7e6'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <Tag color={isBlocked ? 'red' : 'orange'} icon={isBlocked ? <ExclamationCircleOutlined /> : <WarningOutlined />}>
+                                {isBlocked ? 'BLOCKED' : 'SUSPICIOUS'}
+                              </Tag>
+                              <strong style={{ marginLeft: 8, fontSize: 14 }}>
+                                {user.username}
+                              </strong>
+                              <span style={{ marginLeft: 8, color: '#666', fontSize: 12 }}>
+                                ({user.email})
+                              </span>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: 12, color: '#ff4d4f', fontWeight: 'bold' }}>
+                                🌍 {sessionInfo.recentIPs?.length || 0} IP addresses trong 30 phút
+                              </div>
+                              <div style={{ fontSize: 11, color: '#666' }}>
+                                Score: {sessionInfo.suspiciousScore || 0}/100 | Sessions: {sessionInfo.recentActiveSessions || 0}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: 8, fontSize: 11 }}>
+                            <strong>🔍 IP Addresses: </strong>
+                            {sessionInfo.recentIPs?.map((ip, index) => (
+                              <span 
+                                key={ip}
+                                style={{
+                                  backgroundColor: index === 0 ? '#e6f7ff' : '#fff2e8',
+                                  color: index === 0 ? '#1890ff' : '#fa8c16',
+                                  padding: '2px 6px',
+                                  borderRadius: '3px',
+                                  marginRight: '4px',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                📍 {cleanIPAddress(ip)}
+                              </span>
+                            )) || 'N/A'}
+                          </div>
+                          {sessionInfo.lastActivity && (
+                            <div style={{ marginTop: 4, fontSize: 11, color: '#999' }}>
+                              ⏱️ Hoạt động cuối: {new Date(sessionInfo.lastActivity).toLocaleString('vi-VN')}
+                            </div>
+                          )}
+                        </Card>
+                      </Col>
+                    );
+                  })}
+                </Row>
+                <div style={{ marginTop: 12, fontSize: 12, color: '#666' }}>
+                  💡 Những tài khoản này có thể đang chia sẻ với người khác. Hãy kiểm tra và xử lý kịp thời.
+                </div>
+              </div>
+            }
+            type="error"
+            showIcon
+            style={{ marginBottom: 24 }}
+            action={
+              <Button 
+                size="small" 
+                danger 
+                onClick={() => setSharingFilter('suspicious')}
+              >
+                Xem chi tiết
+              </Button>
+            }
+          />
+        );
+      })()}
 
       {/* Stats Cards */}
       {userStats && (
