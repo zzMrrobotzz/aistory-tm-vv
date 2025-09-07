@@ -13,8 +13,9 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
-import { UserProfile } from '../../types';
+// Feature usage tracking
 import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
+import { UserProfile } from '../../types';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;
@@ -94,8 +95,12 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
       }
       updateState({ youtubeDescription: descriptionText, youtubeTags: tagsResult, currentResult: descriptionText, loadingMessage: "Tạo mô tả & timeline theo cấu trúc mới hoàn tất!" });
       
-      // Track feature usage
-      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+      // Track feature usage for description generation
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+      } catch (trackingError) {
+        console.warn('Failed to track YouTube SEO usage:', trackingError);
+      }
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo mô tả (cấu trúc mới)." }); 
     } finally { 
@@ -122,8 +127,12 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ suggestedKeywordsOutput: result.text, currentResult: result.text, loadingMessage: "Tìm từ khóa hoàn tất!" });
       
-      // Track feature usage
-      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+      // Track feature usage for keywords generation
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+      } catch (trackingError) {
+        console.warn('Failed to track YouTube SEO usage:', trackingError);
+      }
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tìm từ khóa." }); 
     } finally { 
@@ -151,8 +160,12 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ generatedChapters: result.text, currentResult: result.text, loadingMessage: "Tạo chapter hoàn tất!" });
       
-      // Track feature usage
-      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+      // Track feature usage for chapters generation
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+      } catch (trackingError) {
+        console.warn('Failed to track YouTube SEO usage:', trackingError);
+      }
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo chapter." }); 
     } finally { 
@@ -209,8 +222,12 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
             errorTitleOptimizer: null,
         });
         
-        // Track feature usage
-        featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+        // Track feature usage for title analysis
+        try {
+          await featureUsageTracker.trackUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+        } catch (trackingError) {
+          console.warn('Failed to track YouTube SEO usage:', trackingError);
+        }
     } catch (e) {
         updateState({ 
             errorTitleOptimizer: `Lỗi phân tích tiêu đề: ${(e as Error).message}`, 
@@ -259,8 +276,12 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
             errorTitleOptimizer: null,
         });
         
-        // Track feature usage
-        featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+        // Track feature usage for thumbnail text generation
+        try {
+          await featureUsageTracker.trackUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
+        } catch (trackingError) {
+          console.warn('Failed to track YouTube SEO usage:', trackingError);
+        }
     } catch (e) {
         updateState({ 
             errorTitleOptimizer: `Lỗi gợi ý text thumbnail: ${(e as Error).message}`, 

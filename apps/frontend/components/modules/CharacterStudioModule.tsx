@@ -156,7 +156,11 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
           });
           
           // Track feature usage for refinement
-          featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
+          try {
+            await featureUsageTracker.trackUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
+          } catch (trackingError) {
+            console.warn('Failed to track usage:', trackingError);
+          }
       } else {
           updateState({ 
               generatedBaseCharacterPrompt: result.text.trim(), 
@@ -166,7 +170,11 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
           });
           
           // Track feature usage for base character creation
-          featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
+          try {
+            await featureUsageTracker.trackUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
+          } catch (trackingError) {
+            console.warn('Failed to track usage:', trackingError);
+          }
       }
     } catch (e) {
       if (isRefinement) {
@@ -242,7 +250,11 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
       });
       
       // Track feature usage for complete image prompt
-      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
+      } catch (trackingError) {
+        console.warn('Failed to track usage:', trackingError);
+      }
     } catch (e) {
       updateState({ 
           errorCompletePrompt: `Lỗi khi tạo Prompt Ảnh Hoàn Chỉnh: ${(e as Error).message}`, 

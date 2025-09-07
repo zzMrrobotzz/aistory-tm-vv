@@ -122,7 +122,11 @@ If you cannot find enough distinct similar channels, return as many as you can u
       });
       
       // Track feature usage
-      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.DREAM100_ANALYSIS, 'Phân Tích Dream100');
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.DREAM100_ANALYSIS, 'Phân Tích Dream100');
+      } catch (trackingError) {
+        console.warn('Failed to track usage:', trackingError);
+      }
     } catch (e) {
       updateState({
         error: `Lỗi khi phân tích: ${(e as Error).message}. Có thể kết quả trả về không phải là JSON hợp lệ.`,

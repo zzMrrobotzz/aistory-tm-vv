@@ -147,7 +147,11 @@ Yêu cầu:
             });
             
             // Track feature usage
-            featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CONTENT_SUMMARIZER, 'Tóm Tắt Nội Dung');
+            try {
+              await featureUsageTracker.trackUsage(FEATURE_IDS.CONTENT_SUMMARIZER, 'Tóm Tắt Nội Dung');
+            } catch (trackingError) {
+              console.warn('Failed to track usage:', trackingError);
+            }
 
         } catch (e) {
             const errorMessage = (e as Error).message;
@@ -181,7 +185,11 @@ Yêu cầu:
             });
             
             // Track feature usage for chat interaction
-            featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CONTENT_SUMMARIZER, 'Tóm Tắt Nội Dung');
+            try {
+              await featureUsageTracker.trackUsage(FEATURE_IDS.CONTENT_SUMMARIZER, 'Tóm Tắt Nội Dung');
+            } catch (trackingError) {
+              console.warn('Failed to track usage:', trackingError);
+            }
 
         } catch (e) {
             const errorMessage = `Lỗi khi trả lời: ${(e as Error).message}`;
