@@ -30,6 +30,44 @@ const extractUserId = (req, res, next) => {
 // Global feature limit - all users get same limit regardless of subscription
 const DEFAULT_DAILY_LIMIT = 300; // All subscriptions share same 300 daily limit
 
+// Helper function to check and perform daily reset if needed
+const checkDailyReset = (source = 'unknown') => {
+  if (!global.featureTracking) {
+    global.featureTracking = {
+      totalUsage: 0,
+      featureBreakdown: {},
+      userBreakdown: {},
+      lastReset: new Date().toISOString().split('T')[0]
+    };
+  }
+  
+  const vietnamToday = new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}).split(',')[0];
+  const todayISO = new Date(vietnamToday).toISOString().split('T')[0];
+  
+  if (global.featureTracking.lastReset !== todayISO) {
+    const previousUsage = global.featureTracking.totalUsage;
+    console.log(`🔄 Auto-reset detected from ${source}: ${global.featureTracking.lastReset} → ${todayISO} (was ${previousUsage} usage)`);
+    
+    global.featureTracking = {
+      totalUsage: 0,
+      featureBreakdown: {},
+      userBreakdown: {},
+      lastReset: todayISO
+    };
+    global.sessionUsageCount = 0; // Reset old system too
+    
+    console.log(`✅ Daily usage reset completed for ${todayISO} (${source}) - reset from ${previousUsage} to 0`);
+    return true; // Reset occurred
+  }
+  
+  return false; // No reset needed
+};
+
+// Simple daily reset scheduler - check every hour for reset
+setInterval(() => {
+  checkDailyReset('cron-scheduler');
+}, 60 * 60 * 1000); // Every hour
+
 // Test route để kiểm tra backend hoạt động
 router.get('/test', (req, res) => {
   console.log('📍 Feature usage test route called');
@@ -131,6 +169,9 @@ router.get('/usage-status', optionalAuth, async (req, res) => {
       }
     }
     
+    // Check and perform daily reset if needed
+    checkDailyReset('usage-status');
+    
     // Get usage count from enhanced tracking system (fallback to old system)
     const enhancedUsage = global.featureTracking?.totalUsage || 0;
     const oldUsage = global.sessionUsageCount || 0;
@@ -218,29 +259,8 @@ router.post('/track-usage', auth, async (req, res) => {
       globalDailyLimit = DEFAULT_DAILY_LIMIT;
     }
     
-    // Enhanced tracking system with detailed breakdown
-    if (!global.featureTracking) {
-      global.featureTracking = {
-        totalUsage: 0,
-        featureBreakdown: {}, // { featureId: { count: number, users: Set<userId> } }
-        userBreakdown: {}, // { userId: { total: number, features: { featureId: count } } }
-        lastReset: new Date().toISOString().split('T')[0]
-      };
-    }
-    
-    // Check if need to reset daily (Vietnam timezone)
-    const vietnamToday = new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}).split(',')[0];
-    const todayISO = new Date(vietnamToday).toISOString().split('T')[0];
-    if (global.featureTracking.lastReset !== todayISO) {
-      global.featureTracking = {
-        totalUsage: 0,
-        featureBreakdown: {},
-        userBreakdown: {},
-        lastReset: todayISO
-      };
-      global.sessionUsageCount = 0; // Reset old system too
-      console.log(`🔄 Reset daily tracking for ${todayISO} (both systems synced)`);
-    }
+    // Check and perform daily reset if needed
+    checkDailyReset('track-usage');
     
     // Extract user info from authenticated token and calculate total daily limit
     const userId = req.user?.id || 'anonymous';
@@ -359,6 +379,9 @@ router.post('/check-usage', async (req, res) => {
       console.warn('⚠️ FeatureSettings query failed, using default:', DEFAULT_DAILY_LIMIT);
       dailyLimit = DEFAULT_DAILY_LIMIT;
     }
+    
+    // Check and perform daily reset if needed
+    checkDailyReset('check-usage');
     
     // Check usage count from enhanced tracking system (fallback to old system)
     const enhancedUsage = global.featureTracking?.totalUsage || 0;
