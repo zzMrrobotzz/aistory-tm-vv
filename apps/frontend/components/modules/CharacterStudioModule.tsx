@@ -11,6 +11,7 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
 import { UserProfile } from '../../types';
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 interface CharacterStudioModuleProps {
   apiSettings: ApiSettings;
@@ -153,6 +154,9 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
               errorRefinementForBasePrompt: null,
               refinementInstructionForBasePrompt: '', // Clear instruction after successful refinement
           });
+          
+          // Track feature usage for refinement
+          featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
       } else {
           updateState({ 
               generatedBaseCharacterPrompt: result.text.trim(), 
@@ -160,6 +164,9 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
               progressMessageBasePrompt: `Hoàn thành! Đã tạo Mô tả Nhân vật Cốt lõi.`, 
               errorBasePrompt: null 
           });
+          
+          // Track feature usage for base character creation
+          featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
       }
     } catch (e) {
       if (isRefinement) {
@@ -233,6 +240,9 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
           progressMessageCompletePrompt: `Hoàn thành! Prompt tạo ảnh hoàn chỉnh đã sẵn sàng.`, 
           errorCompletePrompt: null 
       });
+      
+      // Track feature usage for complete image prompt
+      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CHARACTER_STUDIO, 'Xưởng Nhân Vật');
     } catch (e) {
       updateState({ 
           errorCompletePrompt: `Lỗi khi tạo Prompt Ảnh Hoàn Chỉnh: ${(e as Error).message}`, 

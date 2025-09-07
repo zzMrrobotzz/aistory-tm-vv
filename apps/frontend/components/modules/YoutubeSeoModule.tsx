@@ -14,6 +14,7 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
 import { UserProfile } from '../../types';
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;
@@ -92,6 +93,9 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
           descriptionText = descriptionText.replace(tagMatch[0], '').trim();
       }
       updateState({ youtubeDescription: descriptionText, youtubeTags: tagsResult, currentResult: descriptionText, loadingMessage: "Tạo mô tả & timeline theo cấu trúc mới hoàn tất!" });
+      
+      // Track feature usage
+      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo mô tả (cấu trúc mới)." }); 
     } finally { 
@@ -117,6 +121,9 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
     try {
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ suggestedKeywordsOutput: result.text, currentResult: result.text, loadingMessage: "Tìm từ khóa hoàn tất!" });
+      
+      // Track feature usage
+      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tìm từ khóa." }); 
     } finally { 
@@ -143,6 +150,9 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
     try {
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ generatedChapters: result.text, currentResult: result.text, loadingMessage: "Tạo chapter hoàn tất!" });
+      
+      // Track feature usage
+      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo chapter." }); 
     } finally { 
@@ -198,6 +208,9 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
             loadingTitleOptimizer: false,
             errorTitleOptimizer: null,
         });
+        
+        // Track feature usage
+        featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
     } catch (e) {
         updateState({ 
             errorTitleOptimizer: `Lỗi phân tích tiêu đề: ${(e as Error).message}`, 
@@ -245,6 +258,9 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
             loadingTitleOptimizer: false,
             errorTitleOptimizer: null,
         });
+        
+        // Track feature usage
+        featureUsageTracker.trackFeatureUsage(FEATURE_IDS.YOUTUBE_SEO, 'YouTube SEO');
     } catch (e) {
         updateState({ 
             errorTitleOptimizer: `Lỗi gợi ý text thumbnail: ${(e as Error).message}`, 

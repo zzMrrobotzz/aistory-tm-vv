@@ -7,6 +7,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { Youtube, FileText, Bot, User, Send, ChevronDown, ChevronUp, Copy, CopyCheck, Play, AlertCircle } from 'lucide-react';
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 interface ContentSummarizerModuleProps {
     apiSettings: ApiSettings;
@@ -144,6 +145,9 @@ Yêu cầu:
                         : "✅ Phân tích văn bản hoàn tất! Tôi đã đọc và tóm tắt nội dung. Bạn có câu hỏi nào không?"
                 }]
             });
+            
+            // Track feature usage
+            featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CONTENT_SUMMARIZER, 'Tóm Tắt Nội Dung');
 
         } catch (e) {
             const errorMessage = (e as Error).message;
@@ -175,6 +179,9 @@ Yêu cầu:
             updateState({
                 chatHistory: [...newHistory, { role: 'model', message: result.text.trim() }]
             });
+            
+            // Track feature usage for chat interaction
+            featureUsageTracker.trackFeatureUsage(FEATURE_IDS.CONTENT_SUMMARIZER, 'Tóm Tắt Nội Dung');
 
         } catch (e) {
             const errorMessage = `Lỗi khi trả lời: ${(e as Error).message}`;

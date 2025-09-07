@@ -7,6 +7,8 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import HistoryPanel from '../HistoryPanel';
 import { generateText } from '../../services/textGenerationService'; // Corrected import path
+// Feature usage tracking
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
 
 
@@ -134,6 +136,13 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
         const result = await generateText(prompt, undefined, false, apiSettings);
         updateState({ suggestions: result.text, loadingMessage: "Nhận gợi ý Gemini hoàn tất!" });
 
+        // Track feature usage for analysis
+        try {
+          await featureUsageTracker.trackUsage(FEATURE_IDS.ANALYSIS, 'Gợi Ý Gemini');
+        } catch (trackingError) {
+          console.warn('Failed to track analysis usage:', trackingError);
+        }
+
         // Save Gemini suggestions to history
         if (result.text?.trim()) {
           const title = `Gợi ý Gemini - ${new Date().toLocaleString('vi-VN')}`;
@@ -188,6 +197,13 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
     try {
       const result = await generateText(prompt, undefined, false, apiSettings);
       updateState({ improvedStory: result.text, loadingMessage: "Cải thiện truyện hoàn tất!" });
+
+      // Track feature usage for story improvement
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.ANALYSIS, 'Cải Thiện Truyện');
+      } catch (trackingError) {
+        console.warn('Failed to track analysis usage:', trackingError);
+      }
 
       // Save improved story to history
       if (result.text?.trim()) {
@@ -250,6 +266,13 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleStat
     try {
       const result = await generateText(prompt, undefined, false, apiSettings);
       updateState({ viralOutlineAnalysisResult: result.text, loadingMessage: "Phân tích Dàn Ý Viral hoàn tất!" });
+
+      // Track feature usage for viral outline analysis
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.ANALYSIS, 'Phân Tích Dàn Ý Viral');
+      } catch (trackingError) {
+        console.warn('Failed to track analysis usage:', trackingError);
+      }
 
       // Save viral analysis to history
       if (result.text?.trim()) {

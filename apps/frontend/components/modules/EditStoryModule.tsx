@@ -20,6 +20,7 @@ import HistoryPanel from '../HistoryPanel';
 import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
 import { delay } from '../../utils';
 import { HistoryStorage, MODULE_KEYS } from '../../utils/historyStorage';
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 interface EditStoryModuleProps {
   apiSettings: ApiSettings;
@@ -204,6 +205,13 @@ CHỈ TRẢ VỀ JSON.`;
         );
         updateState({ editedStoryOutput: editedText, isLoadingEditing: false });
 
+        // Track feature usage for edit story
+        try {
+          await featureUsageTracker.trackUsage(FEATURE_IDS.EDIT_STORY, 'Biên Tập Truyện');
+        } catch (trackingError) {
+          console.warn('Failed to track edit story usage:', trackingError);
+        }
+
         // Save single edit to history
         if (editedText?.trim()) {
           const title = `Biên tập đơn - ${new Date().toLocaleString('vi-VN')}`;
@@ -262,6 +270,13 @@ CHỈ TRẢ VỀ JSON.`;
     try {
       const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
       updateState({ editedStoryOutput: result.text, isRefiningFurther: false, postEditAnalysis: null, refinementInstruction: '' }); // Clear instruction after use, optionally clear analysis
+
+      // Track feature usage for edit story refinement
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.EDIT_STORY, 'Biên Tập Truyện');
+      } catch (trackingError) {
+        console.warn('Failed to track edit story refinement usage:', trackingError);
+      }
 
       // Save refinement to history
       if (result.text?.trim()) {

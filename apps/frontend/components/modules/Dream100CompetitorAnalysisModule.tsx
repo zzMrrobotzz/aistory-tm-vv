@@ -13,6 +13,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 interface Dream100CompetitorAnalysisModuleProps {
   apiSettings: ApiSettings;
@@ -119,6 +120,9 @@ If you cannot find enough distinct similar channels, return as many as you can u
         progressMessage: `Phân tích hoàn tất! Đã tìm thấy ${parsedResults.length} kênh tương tự.`,
         groundingSources: result.groundingChunks || []
       });
+      
+      // Track feature usage
+      featureUsageTracker.trackFeatureUsage(FEATURE_IDS.DREAM100_ANALYSIS, 'Phân Tích Dream100');
     } catch (e) {
       updateState({
         error: `Lỗi khi phân tích: ${(e as Error).message}. Có thể kết quả trả về không phải là JSON hợp lệ.`,
