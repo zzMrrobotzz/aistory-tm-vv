@@ -180,7 +180,7 @@ Now, generate the complete script.
 
             // Track feature usage successfully
             try {
-                const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.WRITE_STORY, 'Kịch Bản Video Ngắn');
+                const updatedStats = await featureUsageTracker.trackUsage(FEATURE_IDS.SHORT_FORM_SCRIPT, 'Kịch Bản Video Ngắn');
                 setUsageStats(updatedStats);
             } catch (error) {
                 console.warn('Failed to track short script usage:', error);

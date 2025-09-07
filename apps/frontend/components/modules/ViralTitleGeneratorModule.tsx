@@ -8,6 +8,8 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
+// Feature usage tracking
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
 interface ContentStrategyModuleProps {
   apiSettings: ApiSettings;
@@ -123,6 +125,13 @@ ${creationViralContext.trim()}
             }
         }
         updateState({ resultText: mainResultText, generateVariationsExplanation: explanationText, loadingMessage: actionCompletedMessage });
+        
+        // Track feature usage for viral title generation
+        try {
+          await featureUsageTracker.trackUsage(FEATURE_IDS.VIRAL_TITLE_GENERATOR, 'Tạo Tiêu Đề Viral');
+        } catch (trackingError) {
+          console.warn('Failed to track viral title generator usage:', trackingError);
+        }
       } else {
         updateState({ error: 'Không thể xác định hành động cho tab hiện tại.', loadingMessage: null });
       }

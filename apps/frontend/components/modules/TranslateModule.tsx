@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { ApiSettings, TranslateModuleState, UserProfile } from '../../types';
 import { TRANSLATE_LANGUAGE_OPTIONS, TRANSLATE_STYLE_OPTIONS } from '../../constants';
 import { generateText } from '../../services/textGenerationService';
+// Feature usage tracking
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -69,6 +71,13 @@ const TranslateModule: React.FC<TranslateModuleProps> = ({
 
             const result = await generateText(prompt, undefined, false, apiSettings);
             updateState({ outputText: result.text.trim() });
+            
+            // Track feature usage for translation
+            try {
+                await featureUsageTracker.trackUsage(FEATURE_IDS.TRANSLATE, 'Dịch Thuật');
+            } catch (trackingError) {
+                console.warn('Failed to track translate usage:', trackingError);
+            }
             
             // Log translation usage
             logApiCall('translate', 1);

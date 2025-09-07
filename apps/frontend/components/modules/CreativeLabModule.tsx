@@ -9,6 +9,8 @@ import {
   GeneratedBatchOutlineItem 
 } from '../../types';
 import { PLOT_STRUCTURE_OPTIONS, OUTLINE_DETAIL_LEVEL_OPTIONS, HOOK_LANGUAGE_OPTIONS } from '../../constants';
+// Feature usage tracking
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner'; // Re-add
 import ErrorAlert from '../ErrorAlert';     // Re-add
@@ -94,6 +96,13 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
         referenceOutlineAnalysisResult: result.text, 
         isAnalyzingReferenceOutline: false 
       });
+
+      // Track feature usage for reference outline analysis
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.CREATIVE_LAB, 'Phân Tích Dàn Ý Tham Khảo');
+      } catch (trackingError) {
+        console.warn('Failed to track creative lab usage:', trackingError);
+      }
     } catch (e) {
       updateState({ 
         errorAnalyzingReferenceOutline: `Lỗi khi phân tích dàn ý tham khảo: ${(e as Error).message}`, 
@@ -142,6 +151,13 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     try {
       const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ quickOutlineResult: result.text, quickOutlineLoading: false, quickOutlineProgressMessage: 'Hoàn thành!' });
+      
+      // Track feature usage for quick outline generation
+      try {
+        await featureUsageTracker.trackUsage(FEATURE_IDS.CREATIVE_LAB, 'Tạo Dàn Ý Nhanh');
+      } catch (trackingError) {
+        console.warn('Failed to track creative lab usage:', trackingError);
+      }
       
       // Save to history
       if (result.text) {

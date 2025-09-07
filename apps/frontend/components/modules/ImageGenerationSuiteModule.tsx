@@ -10,6 +10,8 @@ import {
     UserProfile
 } from '../../types';
 import { ASPECT_RATIO_OPTIONS, STABILITY_STYLE_PRESETS, IMAGE_GENERATION_ENGINE_OPTIONS, PREDEFINED_ART_STYLES, HOOK_LANGUAGE_OPTIONS } from '../../constants';
+// Feature usage tracking
+import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';

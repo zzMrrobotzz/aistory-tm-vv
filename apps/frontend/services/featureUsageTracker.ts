@@ -398,7 +398,15 @@ export const FEATURE_IDS = {
   SHORT_FORM_SCRIPT: 'short-form-script',
   IMAGE_GENERATION: 'image-generation',
   TEXT_TO_SPEECH: 'text-to-speech',
-  CREATIVE_LAB: 'creative-lab'
+  CREATIVE_LAB: 'creative-lab',
+  TRANSLATE: 'translate',
+  ANALYSIS: 'analysis',
+  EDIT_STORY: 'edit-story',
+  CONTENT_SUMMARIZER: 'content-summarizer',
+  YOUTUBE_SEO: 'youtube-seo',
+  DREAM100_ANALYSIS: 'dream100-analysis',
+  CHARACTER_STUDIO: 'character-studio',
+  VIRAL_TITLE_GENERATOR: 'viral-title-generator'
 } as const;
 
 // Feature names for display
@@ -409,7 +417,15 @@ export const FEATURE_NAMES = {
   [FEATURE_IDS.SHORT_FORM_SCRIPT]: 'Script Ngắn',
   [FEATURE_IDS.IMAGE_GENERATION]: 'Tạo Hình Ảnh',
   [FEATURE_IDS.TEXT_TO_SPEECH]: 'Chuyển Văn Bản Thành Giọng Nói',
-  [FEATURE_IDS.CREATIVE_LAB]: 'Phòng Thí Nghiệm Sáng Tạo'
+  [FEATURE_IDS.CREATIVE_LAB]: 'Phòng Thí Nghiệm Sáng Tạo',
+  [FEATURE_IDS.TRANSLATE]: 'Dịch Thuật',
+  [FEATURE_IDS.ANALYSIS]: 'Phân Tích',
+  [FEATURE_IDS.EDIT_STORY]: 'Biên Tập Truyện',
+  [FEATURE_IDS.CONTENT_SUMMARIZER]: 'Tóm Tắt Nội Dung',
+  [FEATURE_IDS.YOUTUBE_SEO]: 'YouTube SEO',
+  [FEATURE_IDS.DREAM100_ANALYSIS]: 'Phân Tích Dream100',
+  [FEATURE_IDS.CHARACTER_STUDIO]: 'Xưởng Nhân Vật',
+  [FEATURE_IDS.VIRAL_TITLE_GENERATOR]: 'Tạo Tiêu Đề Viral'
 } as const;
 
 export default {
