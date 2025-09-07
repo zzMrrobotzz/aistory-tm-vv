@@ -41,7 +41,9 @@ const AnalyticsDashboard: React.FC = () => {
   const fetchAnalytics = async (selectedPeriod: string) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem('userToken') || localStorage.getItem('token');
+      console.log('🔐 Analytics token check:', token ? `Found: ${token.substring(0,10)}...` : 'Not found');
+      
       if (!token) {
         message.error('Vui lòng đăng nhập để xem thống kê');
         return;
@@ -55,14 +57,18 @@ const AnalyticsDashboard: React.FC = () => {
         },
       });
 
+      console.log('🌐 Analytics response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Analytics error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
       if (data.success) {
         setAnalytics(data.data);
-        console.log('📊 Analytics loaded:', data.data);
+        // console.log('📊 Analytics loaded:', data.data); // Reduced console logs
       } else {
         message.error(data.message || 'Lỗi khi tải thống kê');
       }
