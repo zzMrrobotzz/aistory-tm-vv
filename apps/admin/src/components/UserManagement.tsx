@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Input, Select, Tag, Space, Modal, message, InputNumber, Tooltip } from 'antd';
-import { SearchOutlined, UserOutlined, EditOutlined, StopOutlined, CheckOutlined, CrownOutlined, GlobalOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { SearchOutlined, UserOutlined, EditOutlined, StopOutlined, CheckOutlined, CrownOutlined, GlobalOutlined, ClockCircleOutlined, WarningOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { fetchUsers, fetchUserStats, updateUserCredits, updateUserStatus, updateUserSubscription } from '../services/keyService';
 
 const { Option } = Select;
@@ -24,6 +24,12 @@ interface User {
     sessionDuration: number; // in minutes
     ipAddress: string | null;
     userAgent: string | null;
+    allIPs?: string[];
+    recentIPs?: string[];
+    hasMultipleActiveIPs?: boolean;
+    suspiciousScore?: number;
+    totalActiveSessions?: number;
+    recentActiveSessions?: number;
   };
 }
 
@@ -57,6 +63,7 @@ const UserManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [onlineStatusFilter, setOnlineStatusFilter] = useState('all');
+  const [sharingFilter, setSharingFilter] = useState('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newCredits, setNewCredits] = useState(0);
@@ -69,15 +76,38 @@ const UserManagement: React.FC = () => {
   const [isBonusLimitModalVisible, setIsBonusLimitModalVisible] = useState(false);
   const [newBonusLimit, setNewBonusLimit] = useState(0);
 
-  const loadUsers = async (page = 1, search = searchText, status = statusFilter, onlineStatus = onlineStatusFilter) => {
+  const loadUsers = async (page = 1, search = searchText, status = statusFilter, onlineStatus = onlineStatusFilter, sharing = sharingFilter) => {
     setLoading(true);
     try {
       const response = await fetchUsers(page, pagination.pageSize, search, status, onlineStatus);
-      setUsers(response.users || []);
+      let filteredUsers = response.users || [];
+      
+      // Client-side filtering for account sharing status
+      if (sharing !== 'all') {
+        filteredUsers = filteredUsers.filter(user => {
+          const sessionInfo = user.sessionInfo;
+          if (!sessionInfo) return sharing === 'safe'; // Users without session info are considered safe
+          
+          const { hasMultipleActiveIPs, suspiciousScore = 0, recentIPs = [] } = sessionInfo;
+          
+          switch (sharing) {
+            case 'safe':
+              return !hasMultipleActiveIPs && recentIPs.length <= 1;
+            case 'suspicious':
+              return hasMultipleActiveIPs && suspiciousScore < 85;
+            case 'blocked':
+              return hasMultipleActiveIPs && suspiciousScore >= 85;
+            default:
+              return true;
+          }
+        });
+      }
+      
+      setUsers(filteredUsers);
       setPagination(prev => ({
         ...prev,
         current: response.pagination?.current || 1,
-        total: response.pagination?.total || 0,
+        total: filteredUsers.length,
       }));
     } catch (error) {
       console.error('Failed to load users:', error);
@@ -103,7 +133,7 @@ const UserManagement: React.FC = () => {
     
     // Auto-refresh mỗi 30 giây để cập nhật trạng thái online
     const interval = setInterval(() => {
-      loadUsers(pagination.current, searchText, statusFilter, onlineStatusFilter);
+      loadUsers(pagination.current, searchText, statusFilter, onlineStatusFilter, sharingFilter);
     }, 30000);
     
     return () => clearInterval(interval);
@@ -124,17 +154,22 @@ const UserManagement: React.FC = () => {
 
   const handleSearch = (value: string) => {
     setSearchText(value);
-    loadUsers(1, value, statusFilter, onlineStatusFilter);
+    loadUsers(1, value, statusFilter, onlineStatusFilter, sharingFilter);
   };
 
   const handleStatusFilter = (value: string) => {
     setStatusFilter(value);
-    loadUsers(1, searchText, value, onlineStatusFilter);
+    loadUsers(1, searchText, value, onlineStatusFilter, sharingFilter);
   };
 
   const handleOnlineStatusFilter = (value: string) => {
     setOnlineStatusFilter(value);
-    loadUsers(1, searchText, statusFilter, value);
+    loadUsers(1, searchText, statusFilter, value, sharingFilter);
+  };
+
+  const handleSharingFilter = (value: string) => {
+    setSharingFilter(value);
+    loadUsers(1, searchText, statusFilter, onlineStatusFilter, value);
   };
 
   const handleTableChange = (paginationInfo: any) => {
@@ -440,6 +475,71 @@ const UserManagement: React.FC = () => {
       },
     },
     {
+      title: 'Account Sharing Detection',
+      key: 'multiIPDetection',
+      render: (_, record: User) => {
+        const sessionInfo = record.sessionInfo;
+        if (!sessionInfo) {
+          return <Tag color="default">No Data</Tag>;
+        }
+
+        const { 
+          hasMultipleActiveIPs, 
+          suspiciousScore = 0, 
+          recentIPs = [], 
+          totalActiveSessions = 0,
+          recentActiveSessions = 0 
+        } = sessionInfo;
+
+        if (!hasMultipleActiveIPs && recentIPs.length <= 1) {
+          return (
+            <div>
+              <Tag color="green" icon={<CheckOutlined />}>
+                Safe
+              </Tag>
+              <div style={{ fontSize: '11px', color: '#52c41a', marginTop: 2 }}>
+                Single IP: {recentIPs[0] || 'N/A'}
+              </div>
+            </div>
+          );
+        }
+
+        if (hasMultipleActiveIPs) {
+          return (
+            <div>
+              <Tag 
+                color={suspiciousScore >= 85 ? "red" : "orange"} 
+                icon={suspiciousScore >= 85 ? <ExclamationCircleOutlined /> : <WarningOutlined />}
+              >
+                {suspiciousScore >= 85 ? "BLOCKED" : "SUSPICIOUS"}
+              </Tag>
+              <div style={{ fontSize: '11px', color: '#ff4d4f', marginTop: 2 }}>
+                🚨 {recentIPs.length} IPs detected (30min)
+              </div>
+              <div style={{ fontSize: '10px', color: '#666', marginTop: 2 }}>
+                Score: {suspiciousScore}/100 | Sessions: {recentActiveSessions}
+              </div>
+              <div style={{ fontSize: '10px', color: '#666', marginTop: 2 }}>
+                Recent IPs: {recentIPs.map((ip, index) => (
+                  <span key={ip} style={{ 
+                    backgroundColor: index === 0 ? '#e6f7ff' : '#fff2e8', 
+                    padding: '1px 3px', 
+                    borderRadius: '2px',
+                    marginRight: '2px',
+                    fontFamily: 'monospace'
+                  }}>
+                    {ip}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        return <Tag color="default">Unknown</Tag>;
+      },
+    },
+    {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
@@ -549,6 +649,17 @@ const UserManagement: React.FC = () => {
             <Option value="all">🌐 Tất cả</Option>
             <Option value="online">🟢 Online</Option>
             <Option value="offline">⚪ Offline</Option>
+          </Select>
+          <Select
+            value={sharingFilter}
+            style={{ width: 170 }}
+            onChange={handleSharingFilter}
+            placeholder="Account Sharing"
+          >
+            <Option value="all">🔍 Tất cả</Option>
+            <Option value="safe">✅ Safe (1 IP)</Option>
+            <Option value="suspicious">⚠️ Suspicious</Option>
+            <Option value="blocked">🚫 Blocked</Option>
           </Select>
           <Button onClick={() => loadUsers(1)}>
             Làm mới

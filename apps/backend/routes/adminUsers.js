@@ -184,13 +184,14 @@ router.get('/', /* isAdmin, */ async (req, res) => {
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
     
     const usersWithSessionInfo = await Promise.all(allUsers.map(async (user) => {
-      // Get latest session for this user
-      const latestSession = await UserSession.findOne({ 
+      // Get all active sessions for this user (for multi-IP detection)
+      const allUserSessions = await UserSession.find({ 
         userId: user._id,
         isActive: true 
       }).sort({ lastActivity: -1 });
       
-      // Debug logging removed - filter working correctly
+      // Get latest session for basic info
+      const latestSession = allUserSessions[0] || null;
       
       // Determine online status (active within 5 minutes)
       const isOnline = latestSession && 
@@ -202,6 +203,19 @@ router.get('/', /* isAdmin, */ async (req, res) => {
         sessionDuration = Math.round((now.getTime() - new Date(latestSession.loginAt).getTime()) / 60000); // minutes
       }
       
+      // Multi-IP detection for account sharing (within last 30 minutes)
+      const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+      const recentSessions = allUserSessions.filter(s => 
+        s.lastActivity && s.lastActivity >= thirtyMinutesAgo
+      );
+      
+      const uniqueIPs = [...new Set(allUserSessions.map(s => s.ipAddress).filter(ip => ip))];
+      const recentIPs = [...new Set(recentSessions.map(s => s.ipAddress).filter(ip => ip))];
+      
+      // Account sharing detection
+      const hasMultipleActiveIPs = recentIPs.length > 1;
+      const suspiciousScore = hasMultipleActiveIPs ? 85 : 0;
+      
       return {
         ...user.toObject(),
         sessionInfo: {
@@ -210,7 +224,14 @@ router.get('/', /* isAdmin, */ async (req, res) => {
           loginAt: latestSession?.loginAt || null,
           sessionDuration, // in minutes
           ipAddress: latestSession?.ipAddress || null,
-          userAgent: latestSession?.userAgent || null
+          userAgent: latestSession?.userAgent || null,
+          // Multi-IP detection data
+          allIPs: uniqueIPs,
+          recentIPs: recentIPs,
+          hasMultipleActiveIPs: hasMultipleActiveIPs,
+          suspiciousScore: suspiciousScore,
+          totalActiveSessions: allUserSessions.length,
+          recentActiveSessions: recentSessions.length
         }
       };
     }));
