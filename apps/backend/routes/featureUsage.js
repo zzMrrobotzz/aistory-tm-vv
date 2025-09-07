@@ -416,6 +416,86 @@ router.post('/check-usage', async (req, res) => {
   }
 });
 
+// GET /api/features/user-analytics - Get personal analytics for authenticated user
+router.get('/user-analytics', auth, async (req, res) => {
+  try {
+    const { period = 'all' } = req.query; // all, today, week, month
+    const userId = req.user?.id;
+    
+    console.log(`📈 Getting user analytics for ${userId}, period: ${period}`);
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Get user info
+    const user = await User.findById(userId);
+    const userName = user?.username || 'User';
+    
+    // Check and perform daily reset
+    checkDailyReset('user-analytics');
+    
+    const today = new Date().toISOString().split('T')[0];
+    const tracking = global.featureTracking || { userBreakdown: {}, featureBreakdown: {} };
+    
+    // Get user's personal data from current session tracking
+    const userTracking = tracking.userBreakdown[userName] || { 
+      total: 0, 
+      features: {} 
+    };
+    
+    // Calculate user's feature breakdown
+    const userFeatureStats = Object.entries(userTracking.features).map(([featureId, count]) => ({
+      featureId,
+      featureName: tracking.featureBreakdown[featureId]?.featureName || featureId,
+      count: count,
+      percentage: userTracking.total > 0 ? Math.round((count / userTracking.total) * 100) : 0
+    })).sort((a, b) => b.count - a.count);
+    
+    // For now, return today's data (can be extended to historical data)
+    const analytics = {
+      user: {
+        id: userId,
+        username: userName
+      },
+      period: period,
+      totalUsage: userTracking.total,
+      featureStats: userFeatureStats,
+      summary: {
+        totalFeatures: Object.keys(userTracking.features).length,
+        mostUsedFeature: userFeatureStats[0] || null,
+        averagePerFeature: userFeatureStats.length > 0 ? 
+          Math.round(userTracking.total / userFeatureStats.length) : 0
+      },
+      timeRange: {
+        start: today,
+        end: today,
+        description: period === 'all' ? 'All time' : 
+                    period === 'today' ? 'Today' :
+                    period === 'week' ? 'This week' : 'This month'
+      }
+    };
+    
+    console.log(`✅ User analytics for ${userName}: ${userTracking.total} total uses, ${userFeatureStats.length} features`);
+    
+    res.json({
+      success: true,
+      data: analytics
+    });
+    
+  } catch (error) {
+    console.error('Error getting user analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy thống kê người dùng',
+      error: error.message
+    });
+  }
+});
+
 // GET /api/features/usage-history - Get feature usage history (webadmin sync mode)
 router.get('/usage-history', async (req, res) => {
   try {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart3, Activity, Calendar, TrendingUp, Zap, Clock, Eye, FileText } from 'lucide-react';
 import { UserProfile, ActiveModule } from '../../types';
 import SubscriptionStatus from '../SubscriptionStatus';
+import AnalyticsDashboard from '../AnalyticsDashboard';
 import { getCurrentUserToken } from '../../services/authService';
 
 interface DashboardProps {
@@ -293,6 +294,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, setActiveModule }) =
         <div className="lg:col-span-1">
           <SubscriptionStatus className="h-full" />
         </div>
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="bg-white rounded-lg shadow-md p-6 border">
+        <AnalyticsDashboard />
       </div>
 
       {/* Quick Actions */}
