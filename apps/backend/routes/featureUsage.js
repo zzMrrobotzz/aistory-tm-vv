@@ -70,7 +70,7 @@ setInterval(() => {
 
 // Test route để kiểm tra backend hoạt động
 router.get('/test', (req, res) => {
-  console.log('📍 Feature usage test route called');
+  console.log('📍 Feature usage test route called - analytics ready');
   res.json({
     success: true,
     message: 'Feature usage backend is working',
