@@ -410,7 +410,32 @@ const UserManagement: React.FC = () => {
                 Hoạt động: {new Date(sessionInfo.lastActivity).toLocaleString('vi-VN')}
               </div>
             )}
+            {sessionInfo.ipAddress && (
+              <div style={{ fontSize: '11px', color: '#666', marginTop: 2, fontFamily: 'monospace' }}>
+                <span style={{ backgroundColor: '#f5f5f5', padding: '2px 4px', borderRadius: '3px' }}>
+                  📍 {sessionInfo.ipAddress}
+                </span>
+              </div>
+            )}
           </div>
+        );
+      },
+    },
+    {
+      title: 'IP Address',
+      key: 'ipAddress',
+      render: (_, record: User) => {
+        const ipAddress = record.sessionInfo?.ipAddress;
+        if (!ipAddress) {
+          return <Tag color="default">-</Tag>;
+        }
+        return (
+          <Tag 
+            color="blue" 
+            style={{ fontFamily: 'monospace', fontSize: '11px' }}
+          >
+            {ipAddress}
+          </Tag>
         );
       },
     },
