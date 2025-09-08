@@ -78,6 +78,25 @@ class DailyResetService {
         }
       );
       console.log(`[Daily Reset] Reset ${todayResetCount.modifiedCount} today's usage records`);
+      
+      // 4. 🔥 NEW: Don't delete FeatureUsage records, just archive them (keep historical data)
+      const FeatureUsage = require('../models/FeatureUsage');
+      console.log(`[Daily Reset] Preserving FeatureUsage historical data (no deletion)`);
+      
+      // Optional: Archive very old FeatureUsage records (older than retention days)
+      const archiveDate = new Date();
+      archiveDate.setDate(archiveDate.getDate() - retentionDays);
+      const archiveDateStr = archiveDate.toISOString().split('T')[0];
+      
+      const archivedCount = await FeatureUsage.countDocuments({ 
+        date: { $lt: archiveDateStr } 
+      });
+      
+      if (archivedCount > 0) {
+        // Instead of deleting, we could mark as archived or move to archive collection
+        // For now, just log the count of old records
+        console.log(`[Daily Reset] Found ${archivedCount} FeatureUsage records older than ${retentionDays} days (preserved)`);
+      }
 
       // 4. Reset RequestTracking for today (removed - using simplified system)
       console.log(`[Daily Reset] Skipping tracking reset - using simplified system`);

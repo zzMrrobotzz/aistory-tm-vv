@@ -234,13 +234,13 @@ router.get('/usage-status', optionalAuth, async (req, res) => {
   }
 });
 
-// POST /api/features/track-usage - Track feature usage (with auth for proper user tracking)
+// POST /api/features/track-usage - Track feature usage with DATABASE PERSISTENCE
 router.post('/track-usage', auth, async (req, res) => {
   try {
     const { featureId, featureName } = req.body;
     const today = getVietnamDate();
     
-    console.log(`📝 Tracking feature usage: ${featureId} (webadmin sync mode)`);
+    console.log(`📝 Tracking feature usage with DATABASE persistence: ${featureId}`);
     
     if (!featureId || !featureName) {
       return res.status(400).json({
@@ -266,6 +266,7 @@ router.post('/track-usage', auth, async (req, res) => {
     const userId = req.user?.id || 'anonymous';
     let userIdentifier = userId;
     let userName = 'Anonymous';
+    let userEmail = 'anonymous@example.com';
     let bonusLimit = 0;
     let totalDailyLimit = globalDailyLimit;
     
@@ -275,6 +276,7 @@ router.post('/track-usage', auth, async (req, res) => {
         const user = await User.findById(userId);
         if (user) {
           userName = user.username || user.email || `User-${userId.substring(0,8)}`;
+          userEmail = user.email || 'noemail@example.com';
           userIdentifier = userName; // Use username instead of ObjectId for admin display
           bonusLimit = user.bonusDailyLimit || 0;
           totalDailyLimit = globalDailyLimit + bonusLimit;
@@ -288,7 +290,46 @@ router.post('/track-usage', auth, async (req, res) => {
       }
     }
     
-    // Update tracking (sync both old and new systems)
+    // 🔥 NEW: Update DATABASE for persistent storage
+    if (userId !== 'anonymous') {
+      try {
+        // Find or create today's usage record for this user
+        let usageRecord = await FeatureUsage.findOne({ 
+          userId: userId, 
+          date: today 
+        });
+        
+        if (!usageRecord) {
+          // Create new usage record for today
+          usageRecord = new FeatureUsage({
+            userId: userId,
+            username: userName,
+            email: userEmail,
+            date: today,
+            totalUses: 0,
+            dailyLimit: totalDailyLimit,
+            subscriptionType: 'free', // Default for now
+            featureBreakdown: [],
+            usageHistory: []
+          });
+          console.log(`📊 Created new usage record for ${userName} on ${today}`);
+        }
+        
+        // Track the feature usage
+        const tracked = usageRecord.trackFeatureUsage(featureId, featureName);
+        if (tracked) {
+          await usageRecord.save();
+          console.log(`✅ DATABASE: ${userName} used ${featureId} -> ${usageRecord.totalUses}/${totalDailyLimit}`);
+        } else {
+          console.log(`❌ DATABASE: ${userName} blocked from using ${featureId} (limit reached)`);
+        }
+        
+      } catch (dbError) {
+        console.error('Database tracking error (continuing with memory):', dbError.message);
+      }
+    }
+    
+    // Also update memory tracking for real-time stats (sync both systems)
     global.featureTracking.totalUsage += 1;
     global.sessionUsageCount = global.featureTracking.totalUsage; // Keep old system in sync
     
@@ -328,11 +369,11 @@ router.post('/track-usage', auth, async (req, res) => {
       lastActivity: new Date()
     };
     
-    console.log(`✅ Enhanced tracking: ${currentUsage}/${totalDailyLimit} (${globalDailyLimit}+${bonusLimit}) (${featureId}) by user ${userIdentifier}`);
+    console.log(`✅ DUAL tracking (DB + Memory): ${currentUsage}/${totalDailyLimit} (${globalDailyLimit}+${bonusLimit}) (${featureId}) by user ${userIdentifier}`);
     
     res.json({
       success: true,
-      message: 'Feature usage tracked successfully (enhanced tracking)',
+      message: 'Feature usage tracked successfully (database + memory)',
       usage: enhancedStats
     });
     

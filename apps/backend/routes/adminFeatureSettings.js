@@ -71,23 +71,28 @@ router.post('/reset-all-usage', async (req, res) => {
     
     console.log(`✅ Reset enhanced tracking system from ${previousCount} to 0`);
     
-    // Also reset any database records if they exist (legacy cleanup)
+    // 🔥 NEW: Reset TODAY'S database records but preserve historical data
     let dbResetCount = 0;
     try {
+      const FeatureUsage = require('../models/FeatureUsage');
+      
+      // Only reset TODAY's records, not historical data
       const result = await FeatureUsage.updateMany(
-        { date: today },
+        { date: today }, // Only today's records
         {
           $set: {
             totalUses: 0,
-            featureBreakdown: [],
-            usageHistory: [],
+            featureBreakdown: [], // Reset today's feature breakdown
+            // Keep usageHistory for historical analysis but could clear if needed
             lastActivity: new Date()
           }
         }
       );
       dbResetCount = result.modifiedCount;
       if (dbResetCount > 0) {
-        console.log(`✅ Also reset ${dbResetCount} database usage records`);
+        console.log(`✅ Reset ${dbResetCount} TODAY'S database usage records (preserving historical data)`);
+      } else {
+        console.log(`📊 No today's usage records to reset (${today})`);
       }
     } catch (dbError) {
       console.warn('Database reset failed (not critical):', dbError.message);
@@ -176,76 +181,117 @@ router.post('/:key', async (req, res) => {
   }
 });
 
-// GET /api/admin/feature-settings/stats - Get enhanced feature usage statistics
+// GET /api/admin/feature-settings/stats - Get enhanced feature usage statistics with database persistence
 router.get('/stats', async (req, res) => {
   try {
-    console.log('📈 Admin getting enhanced feature usage statistics...');
+    console.log('📈 Admin getting PERSISTENT feature usage statistics...');
     
     const currentLimit = await FeatureSettings.getSetting('feature_daily_limit', 300);
-    const tracking = global.featureTracking || { totalUsage: 0, featureBreakdown: {}, userBreakdown: {} };
-    const currentUsage = tracking.totalUsage;
     const today = new Date().toISOString().split('T')[0];
     
-    // Enhanced statistics
-    const isBlocked = currentUsage >= currentLimit;
-    const utilizationRate = currentLimit > 0 ? Math.round((currentUsage / currentLimit) * 100) : 0;
-    const totalUsers = Object.keys(tracking.userBreakdown).length;
+    // 🔥 NEW: Get data from DATABASE instead of memory for persistence
+    const FeatureUsage = require('../models/FeatureUsage');
+    const User = require('../models/User');
     
-    // Calculate user stats
-    const userUsages = Object.values(tracking.userBreakdown).map(user => user.total);
-    const averageUsage = totalUsers > 0 ? Math.round(userUsages.reduce((a, b) => a + b, 0) / totalUsers) : 0;
+    // Get today's actual usage from database
+    const todayUsageRecords = await FeatureUsage.find({ date: today });
+    const totalUsersToday = todayUsageRecords.length;
+    const totalUsageToday = todayUsageRecords.reduce((sum, record) => sum + record.totalUses, 0);
+    
+    // Calculate user stats from actual database data
+    const userUsages = todayUsageRecords.map(record => record.totalUses);
+    const averageUsage = totalUsersToday > 0 ? Math.round(totalUsageToday / totalUsersToday) : 0;
     const maxUsage = userUsages.length > 0 ? Math.max(...userUsages) : 0;
     const blockedUsers = userUsages.filter(usage => usage >= currentLimit).length;
+    const utilizationRate = currentLimit > 0 ? Math.round((totalUsageToday / (currentLimit * Math.max(1, totalUsersToday))) * 100) : 0;
     
     const enhancedStats = {
-      totalUsers: totalUsers,
-      totalUsage: currentUsage,
+      totalUsers: totalUsersToday,
+      totalUsage: totalUsageToday,
       averageUsage: averageUsage,
       maxUsage: maxUsage,
       blockedUsers: blockedUsers,
       utilizationRate: utilizationRate
     };
     
-    // Real feature breakdown from tracking
-    const featureBreakdown = Object.entries(tracking.featureBreakdown).map(([featureId, data]) => ({
+    // Feature breakdown from database records
+    const featureBreakdownMap = {};
+    todayUsageRecords.forEach(record => {
+      record.featureBreakdown.forEach(feature => {
+        if (!featureBreakdownMap[feature.featureId]) {
+          featureBreakdownMap[feature.featureId] = {
+            featureName: feature.featureName,
+            totalUses: 0,
+            userCount: new Set()
+          };
+        }
+        featureBreakdownMap[feature.featureId].totalUses += feature.usageCount;
+        featureBreakdownMap[feature.featureId].userCount.add(record.userId.toString());
+      });
+    });
+    
+    const featureBreakdown = Object.entries(featureBreakdownMap).map(([featureId, data]) => ({
       _id: featureId,
       featureName: data.featureName,
-      totalUses: data.count,
-      userCount: data.users.size
+      totalUses: data.totalUses,
+      userCount: data.userCount.size
     })).sort((a, b) => b.totalUses - a.totalUses);
     
-    // Top users analysis
-    const topUsers = Object.entries(tracking.userBreakdown)
-      .map(([userId, userData]) => {
+    // Top users analysis from database
+    const topUsers = todayUsageRecords
+      .map(record => {
         // Find user's most used feature
-        const userFeatures = Object.entries(userData.features);
-        const topFeature = userFeatures.reduce((max, [featureId, count]) => 
-          count > max.count ? { featureId, count } : max, 
-          { featureId: null, count: 0 }
+        const topFeature = record.featureBreakdown.reduce((max, feature) => 
+          feature.usageCount > max.usageCount ? feature : max, 
+          { featureId: null, featureName: null, usageCount: 0 }
         );
         
         return {
-          userId: userId, // Now shows username instead of IP or ObjectId
-          totalUsage: userData.total,
+          userId: record.username, // Display username
+          totalUsage: record.totalUses,
           topFeature: topFeature.featureId ? {
             featureId: topFeature.featureId,
-            featureName: tracking.featureBreakdown[topFeature.featureId]?.featureName || topFeature.featureId,
-            count: topFeature.count
+            featureName: topFeature.featureName,
+            count: topFeature.usageCount
           } : null,
-          featuresUsed: Object.keys(userData.features).length
+          featuresUsed: record.featureBreakdown.length
         };
       })
       .sort((a, b) => b.totalUsage - a.totalUsage)
-      .slice(0, 10); // Top 10 users
+      .slice(0, 10);
     
-    // Simple weekly trend (enhanced data only available for today)
-    const weeklyTrend = currentUsage > 0 ? [{
-      _id: today,
-      totalUsage: currentUsage,
-      userCount: totalUsers
-    }] : [];
+    // Get 7-day trend from database (persistent data!)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
     
-    console.log(`📊 Enhanced stats: ${currentUsage}/${currentLimit} (${utilizationRate}%), users: ${totalUsers}, features: ${featureBreakdown.length}`);
+    const weeklyRecords = await FeatureUsage.find({ 
+      date: { $gte: sevenDaysAgoStr, $lte: today } 
+    });
+    
+    const weeklyTrendMap = {};
+    weeklyRecords.forEach(record => {
+      if (!weeklyTrendMap[record.date]) {
+        weeklyTrendMap[record.date] = { totalUsage: 0, userCount: 0 };
+      }
+      weeklyTrendMap[record.date].totalUsage += record.totalUses;
+      weeklyTrendMap[record.date].userCount++;
+    });
+    
+    const weeklyTrend = Object.entries(weeklyTrendMap)
+      .map(([date, data]) => ({
+        _id: date,
+        totalUsage: data.totalUsage,
+        userCount: data.userCount
+      }))
+      .sort((a, b) => a._id.localeCompare(b._id));
+    
+    console.log(`📊 PERSISTENT stats: ${totalUsageToday}/${currentLimit} (${utilizationRate}%), users: ${totalUsersToday}, features: ${featureBreakdown.length}, 7-day trend: ${weeklyTrend.length} days`);
+    
+    // Also sync memory tracking with database for real-time updates
+    if (!global.featureTracking) {
+      global.featureTracking = { totalUsage: 0, featureBreakdown: {}, userBreakdown: {} };
+    }
     
     res.json({
       success: true,
@@ -253,16 +299,37 @@ router.get('/stats', async (req, res) => {
         currentLimit,
         todayStats: enhancedStats,
         featureBreakdown,
-        topUsers, // New: Top user analytics
-        weeklyTrend
-      }
+        topUsers,
+        weeklyTrend // Now shows real historical data!
+      },
+      dataSource: 'database', // Indicate this is from persistent storage
+      lastUpdated: new Date().toISOString()
     });
     
   } catch (error) {
-    console.error('Error getting feature statistics:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy thống kê tính năng',
+    console.error('Error getting PERSISTENT feature statistics:', error);
+    
+    // Fallback to memory tracking if database fails
+    console.log('📊 Falling back to memory tracking...');
+    const tracking = global.featureTracking || { totalUsage: 0, featureBreakdown: {}, userBreakdown: {} };
+    
+    res.json({
+      success: true,
+      data: {
+        currentLimit: await FeatureSettings.getSetting('feature_daily_limit', 300),
+        todayStats: {
+          totalUsers: Object.keys(tracking.userBreakdown).length,
+          totalUsage: tracking.totalUsage,
+          averageUsage: 0,
+          maxUsage: 0,
+          blockedUsers: 0,
+          utilizationRate: 0
+        },
+        featureBreakdown: [],
+        topUsers: [],
+        weeklyTrend: []
+      },
+      dataSource: 'memory-fallback',
       error: error.message
     });
   }
