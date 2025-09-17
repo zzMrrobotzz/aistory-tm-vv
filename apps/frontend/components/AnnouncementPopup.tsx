@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Bell } from 'lucide-react';
 import { getAnnouncements } from '../services/settingsService';
+import { QuanLyThongBao } from '../utils/quanLyThongBao';
 
 interface AnnouncementPopupProps {
   onClose: () => void;
@@ -141,6 +142,27 @@ const AnnouncementPopup: React.FC<AnnouncementPopupProps> = ({ onClose }) => {
               Đã hiểu ({announcements.length} thông báo)
             </button>
           </div>
+
+          {/* Debug info cho development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-gray-500 mt-3 text-center border-t pt-3">
+              <div className="mb-2">
+                <strong>Debug Info:</strong> {QuanLyThongBao.layThongTinDebug()}
+              </div>
+              <div className="space-x-2">
+                <span>Popup tiếp theo: {QuanLyThongBao.layChuoiThoiGianConLai()}</span>
+                <button
+                  onClick={() => {
+                    QuanLyThongBao.resetThoiGianCho();
+                    window.location.reload();
+                  }}
+                  className="text-blue-500 underline hover:text-blue-700"
+                >
+                  Reset thời gian chờ
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

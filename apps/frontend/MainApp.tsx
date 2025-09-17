@@ -3,6 +3,7 @@ import { onlineService } from './services/onlineService';
 import AnnouncementBanner from './components/AnnouncementBanner';
 import AnnouncementPopup from './components/AnnouncementPopup';
 import { getAnnouncements } from './services/settingsService';
+import { QuanLyThongBao } from './utils/quanLyThongBao';
 import {
   ActiveModule, ApiSettings, ApiProvider,
   CreativeLabModuleState, 
@@ -812,10 +813,14 @@ const MainApp: React.FC = () => {
       try {
         const announcementTexts = await getAnnouncements();
         setAnnouncements(announcementTexts);
-        
-        // Show popup if there are announcements - always show on page load
-        if (announcementTexts.length > 0) {
+
+        // 🔥 LOGIC MỚI: Chỉ hiển thị nếu đã hết thời gian chờ 24 tiếng
+        if (announcementTexts.length > 0 && QuanLyThongBao.coNenHienPopup()) {
+          console.log('📢 Hiển thị popup thông báo:', QuanLyThongBao.layThongTinDebug());
           setShowAnnouncementPopup(true);
+          QuanLyThongBao.danhDauDaHien(); // Đánh dấu đã hiển thị ngay lập tức
+        } else if (announcementTexts.length > 0) {
+          console.log('⏰ Bỏ qua popup do cooldown:', QuanLyThongBao.layThongTinDebug());
         }
       } catch (error) {
         console.error('Error loading announcements:', error);
@@ -1154,8 +1159,14 @@ const MainApp: React.FC = () => {
   // Show announcement popup when user logs in
   useEffect(() => {
     if (currentUser && announcements.length > 0) {
-      // Always show popup when user logs in if there are announcements
-      setShowAnnouncementPopup(true);
+      // 🔥 LOGIC MỚI: Tôn trọng thời gian chờ ngay cả khi đăng nhập
+      if (QuanLyThongBao.coNenHienPopup()) {
+        console.log('📢 Hiển thị popup khi đăng nhập:', QuanLyThongBao.layThongTinDebug());
+        setShowAnnouncementPopup(true);
+        QuanLyThongBao.danhDauDaHien();
+      } else {
+        console.log('⏰ Bỏ qua popup khi đăng nhập do cooldown:', QuanLyThongBao.layThongTinDebug());
+      }
     }
   }, [currentUser, announcements]);
 
