@@ -312,30 +312,32 @@ Chỉ trả về JSON.`;
             updateTask(task.id, { progressMessage: `Bước 2/3: Đang viết phần ${i + 1}/${numChunks}...` });
             const context = fullStory.length > 2000 ? '...\n' + fullStory.slice(-2000) : fullStory;
             
-            let writePrompt = `Bạn là một nhà văn AI. Dựa vào dàn ý sau, hãy viết tiếp câu chuyện một cách liền mạch BẰNG NGÔN NGỮ ${outputLanguageLabel}.
-            Phong cách viết: "${currentStoryStyle}".
-            ${referenceStoryStylePromptSegment}
-            **Dàn ý tổng thể:**
-${storyOutline}`;
+            let writePrompt = `Bạn là một nhà văn đa ngôn ngữ. Viết tiếp câu chuyện BẰNG NGÔN NGỮ ${outputLanguageLabel}, dựa HOÀN TOÀN vào "Dàn ý tổng thể".
+        \nƯớc tính độ dài cho PHẦN NÀY: khoảng ${CHUNK_WORD_COUNT} từ. Tổng độ dài mục tiêu của TOÀN BỘ truyện là ${currentTargetLengthNum} từ.
+        \nVIỆC KIỂM SOÁT ĐỘ DÀI CỦA TỪNG PHẦN LÀ RẤT QUAN TRỌNG. CỐ GẮNG GIỮ PHẦN NÀY KHÔNG VƯỢT QUÁ ${Math.round(CHUNK_WORD_COUNT * 1.15)} TỪ VÀ KHÔNG NGẮN HƠN ${Math.round(CHUNK_WORD_COUNT * 0.85)} TỪ.
+        ${referenceStoryStylePromptSegment}
+        \n**Dàn ý tổng thể (NGUỒN DUY NHẤT CHO NỘI DUNG TRUYỆN):**\n${storyOutline}`;
 
             // Key element logic from WriteStoryModule
             if (i === 0) {
                 writePrompt += `
-                \n**BƯỚC BẮT BUỘC TRƯỚC KHI VIẾT - KHÓA YẾU TỐ CỐT LÕI:**
-                \n1.  **Phân tích Dàn Ý/Tiêu đề để xác định tất cả tên nhân vật (chính, phụ) và địa điểm quan trọng.**
-                \n2.  **LỆNH: SAU KHI VIẾT XONG PHẦN 1, BẠN BẮT BUỘC PHẢI THÊM VÀO CUỐI CÙNG MỘT DÒNG DUY NHẤT THEO ĐỊNH DẠNG SAU:**
-                \n    [KEY_ELEMENTS]Tên nhân vật 1, Tên nhân vật 2; Địa điểm A, Địa điểm B[/KEY_ELEMENTS]
-                \n    **Đây là bước quan trọng nhất để đảm bảo tính nhất quán. Không được quên hoặc làm sai định dạng.**`;
+                \n**Yêu cầu RẤT QUAN TRỌNG Trước Khi Viết Phần 1:**
+                \n1.  **Phân tích Dàn Ý.**
+                \n2.  **Xác định Yếu Tố Cốt Lõi:** Tên nhân vật chính/phụ, địa điểm chính.
+                \n3.  **Xuất Yếu Tố Cốt Lõi:** Sau khi viết xong phần 1, thêm vào CUỐI CÙNG một dòng ĐẶC BIỆT theo định dạng: [KEY_ELEMENTS]Tên nhân vật 1, Tên nhân vật 2; Địa điểm A, Địa điểm B[/KEY_ELEMENTS]. Chỉ xuất thẻ này 1 LẦN DUY NHẤT trong toàn bộ quá trình viết truyện. Dòng này phải tách biệt và là dòng cuối cùng của phản hồi cho phần 1.`;
             } else if (capturedKeyElements) {
-                writePrompt += `\n**MỆNH LỆNH TỐI CAO - TUÂN THỦ 100% CÁC YẾU TỐ CỐT LÕI SAU:**
-                \n${capturedKeyElements}
-                \n**BẠN BỊ NGHIÊM CẤM thay đổi, sáng tạo, hoặc giới thiệu bất kỳ tên nhân vật hay địa điểm nào không có trong danh sách trên. Vi phạm quy tắc này sẽ làm hỏng toàn bộ câu chuyện. Hãy kiểm tra lại mỗi câu bạn viết để đảm bảo tuân thủ.**`;
+                writePrompt += `\n**YẾU TỐ CỐT LÕI (NHÂN VẬT & ĐỊA ĐIỂM) - BẮT BUỘC TUÂN THỦ NGHIÊM NGẶT:**\n${capturedKeyElements}\nTUYỆT ĐỐI không thay đổi hoặc giới thiệu tên mới không có trong danh sách này, trừ khi dàn ý yêu cầu rõ ràng.`;
             }
             
             writePrompt += `
-            \n**Nội dung đã viết (ngữ cảnh):**
-${context || "Đây là phần đầu tiên."}
-            \n**Yêu cầu:** Viết phần tiếp theo của câu chuyện. Chỉ viết nội dung, không lặp lại, không tiêu đề.`;
+            \n**Nội dung đã viết (ngữ cảnh${i === 0 ? " - trống cho phần 1" : ""}):**\n${context}
+            \n**Yêu cầu hiện tại (Phần ${i + 1}/${numChunks}):**
+            \n- Viết phần tiếp theo, liền mạch, TRUNG THÀNH với "Dàn ý tổng thể".
+            \n- ${i === 0 ? 'SỬ DỤNG NHẤT QUÁN các tên nhân vật/địa điểm bạn vừa xác định và sẽ xuất ra ở cuối phần 1.' : 'ĐẶC BIỆT CHÚ Ý sử dụng đúng "YẾU TỐ CỐT LÕI" đã được xác định trước đó.'}
+            \n- Văn phong: "${currentStoryStyle}" (nhưng ưu tiên văn phong học từ "Phân Tích ADN Viral" nếu có).
+            \n- VIẾT TOÀN BỘ BẰNG NGÔN NGỮ ${outputLanguageLabel}. Không dùng ngôn ngữ khác.
+            \n- Chỉ viết nội dung phần tiếp theo, không lặp lại, không tiêu đề.
+            \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
             
             if (i > 0) await delay(1000, abortSignal);
             const chunkResult = await retryApiCall(() => generateText(writePrompt, undefined, false, apiSettings), 3, true);
@@ -372,19 +374,25 @@ ${context || "Đây là phần đầu tiên."}
             diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
         }
         
-        const editPrompt = `Bạn là một biên tập viên AI cực kỳ tỉ mỉ và chính xác. Nhiệm vụ của bạn là biên tập lại "Truyện Gốc" theo 2 ưu tiên sau, theo đúng thứ tự:
+        const editPrompt = `Bạn là một biên tập viên AI chuyên nghiệp và cực kỳ tỉ mỉ.
 
-**ƯU TIÊN #1 - TUYỆT ĐỐI (Logic & Nhất quán):**
-1.  **KIỂM TRA TÊN:** Rà soát TOÀN BỘ truyện. Đảm bảo tên nhân vật, địa điểm phải nhất quán 100% từ đầu đến cuối.
-2.  **NGUỒN CHÂN LÝ:** ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau đây làm nguồn chân lý DUY NHẤT cho các tên: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên nhân vật/địa điểm từ đầu truyện và đảm bảo chúng được sử dụng nhất quán đến cuối cùng.'}
-3.  **SỬA LỖI LOGIC:** Sửa mọi lỗi logic, tình tiết mâu thuẫn, hoặc "plot hole". Đảm bảo câu chuyện có dòng thời gian và sự kiện hợp lý.
+**MỆNH LỆNH QUAN TRỌNG NHẤT (YÊU CẦU BẮT BUỘC SỐ 1): ĐIỀU CHỈNH ĐỘ DÀI.**
+-   ĐỘ DÀI CUỐI CÙNG của truyện sau khi bạn biên tập **PHẢI** nằm trong khoảng từ **${minLength} đến ${maxLength} từ**.
+-   Mục tiêu lý tưởng là khoảng **${currentTargetLengthNum} từ**.
+-   Truyện gốc hiện có khoảng **${estimatedCurrentWordCount} từ**.
+-   ${actionVerb ? `Hành động Yêu cầu: **BẠN BẮT BUỘC PHẢI ${actionVerb}** truyện này ${diffDescription}.` : "Độ dài hiện tại đã khá tốt, hãy tập trung vào việc tinh chỉnh chất lượng trong khi vẫn giữ độ dài trong khoảng cho phép."}
+
+**HƯỚNG DẪN BẮT BUỘC ĐỂ ĐIỀU CHỈNH ĐỘ DÀI:**
+-   **Nếu cần RÚT NGẮN:** BẠN BẮT BUỘC PHẢI cô đọng văn phong, tóm lược các đoạn mô tả dài dòng không cần thiết, loại bỏ từ ngữ thừa, và có thể gộp các tình tiết phụ ít quan trọng lại. **TUYỆT ĐỐI KHÔNG CẮT BỎ CÁC TÌNH TIẾT QUAN TRỌNG** được nêu trong dàn ý.
+-   **Nếu cần MỞ RỘNG:** BẠN BẮT BUỘC PHẢI thêm chi tiết mô tả về bối cảnh, cảm xúc, suy nghĩ nội tâm của nhân vật, hoặc kéo dài các đoạn hội thoại để làm rõ hơn tình huống. **TUYỆT ĐỐI KHÔNG THÊM CÁC TÌNH TIẾT MỚI** không có trong dàn ý.
+
+**YÊU CẦU QUAN TRỌNG SỐ 2 (SAU KHI ĐẢM BẢO ĐỘ DÀI): LOGIC & NHẤT QUÁN.**
+1.  **TÍNH NHẤT QUÁN (QUAN TRỌNG HÀNG ĐẦU):**
+    *   DUY TRÌ NGHIÊM NGẶT các yếu tố cốt lõi (tên nhân vật, đặc điểm, địa điểm). TUYỆT ĐỐI không thay đổi tên đã thiết lập.
+    *   ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau làm nguồn chân lý DUY NHẤT: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên từ đầu truyện và đảm bảo chúng nhất quán đến cuối cùng.'}
+2.  **LOGIC CỐT TRUYỆN:** Đảm bảo các sự kiện diễn ra hợp lý, tuần tự, không có "plot hole".
+3.  **NÂNG CAO VĂN PHONG:** Loại bỏ trùng lặp, cải thiện luồng chảy, đa dạng hóa cấu trúc câu.
 4.  **BÁM SÁT DÀN Ý:** Việc biên tập không được làm thay đổi các NÚT THẮT, CAO TRÀO QUAN TRỌNG, hoặc Ý NGHĨA CHÍNH của câu chuyện được mô tả trong "Dàn Ý Gốc".
-
-**ƯU TIÊN #2 - QUAN TRỌNG (Độ dài & Văn phong):**
-Sau khi đã đảm bảo Ưu tiên #1, hãy điều chỉnh độ dài của truyện để nằm trong khoảng từ ${minLength} đến ${maxLength} từ (lý tưởng là ~${currentTargetLengthNum} từ).
--   Truyện hiện có ~${estimatedCurrentWordCount} từ. ${actionVerb ? `Bạn cần ${actionVerb} ${diffDescription}.` : "Tập trung vào chất lượng."}
--   **Cách điều chỉnh độ dài:** Nếu quá dài, hãy cô đọng văn phong, tóm lược mô tả. Nếu quá ngắn, hãy thêm chi tiết, mở rộng cảnh.
--   **Nâng cao văn phong:** Loại bỏ các câu, từ ngữ trùng lặp. Cải thiện sự mạch lạc.
 
 **DÀN Ý GỐC (để đối chiếu):**
 ---
@@ -773,13 +781,14 @@ ${fullStory}
             onProgress(`Đang viết phần ${i + 1}/${numChunks}...`);
             const context = fullStory.length > 2000 ? '...\n' + fullStory.slice(-2000) : fullStory;
             
-            let writePrompt = `Bạn là một nhà văn AI chuyên viết truyện theo series.
-            Nhiệm vụ của bạn là viết một câu chuyện mới dựa trên tiêu đề được cung cấp, và câu chuyện này phải có văn phong và "ADN viral" y hệt như các truyện trong bộ sưu tập tham khảo.
-            ${adnViralPromptSegment}
-            **Tiêu đề cho truyện MỚI cần viết:** "${selectedTitle}"
-            **Ngôn ngữ cho truyện MỚI:** ${outputLanguageLabel}
-            **Phong cách viết yêu cầu (ngoài việc học từ truyện mẫu):** "${currentStoryStyle}"
-            **Độ dài mục tiêu cho TOÀN BỘ truyện mới:** ~${currentTargetLengthNum} từ.`;
+            let writePrompt = `Bạn là một nhà văn đa ngôn ngữ. Viết tiếp câu chuyện BẰNG NGÔN NGỮ ${outputLanguageLabel}, dựa HOÀN TOÀN vào "Tiêu đề và ADN Viral".
+        \nƯớc tính độ dài cho PHẦN NÀY: khoảng ${CHUNK_WORD_COUNT} từ. Tổng độ dài mục tiêu của TOÀN BỘ truyện là ${currentTargetLengthNum} từ.
+        \nVIỆC KIỂM SOÁT ĐỘ DÀI CỦA TỪNG PHẦN LÀ RẤT QUAN TRỌNG. CỐ GẮNG GIỮ PHẦN NÀY KHÔNG VƯỢT QUÁ ${Math.round(CHUNK_WORD_COUNT * 1.15)} TỪ VÀ KHÔNG NGẮN HƠN ${Math.round(CHUNK_WORD_COUNT * 0.85)} TỪ.
+        ${adnViralPromptSegment}
+        \n**Tiêu đề cho truyện MỚI cần viết:** "${selectedTitle}"
+        \n**Ngôn ngữ cho truyện MỚI:** ${outputLanguageLabel}
+        \n**Phong cách viết yêu cầu (ngoài việc học từ truyện mẫu):** "${currentStoryStyle}"
+        \n**Độ dài mục tiêu cho TOÀN BỘ truyện mới:** ~${currentTargetLengthNum} từ.`;
 
             if (i === 0) {
                  writePrompt += `
@@ -789,16 +798,19 @@ ${fullStory}
                 \n    [KEY_ELEMENTS]Tên nhân vật 1, Tên nhân vật 2; Địa điểm A, Địa điểm B[/KEY_ELEMENTS]
                 \n    **Đây là bước quan trọng nhất để đảm bảo tính nhất quán. Không được quên hoặc làm sai định dạng.**`;
             } else if (capturedKeyElements) {
-                writePrompt += `\n**MỆNH LỆNH TỐI CAO - TUÂN THỦ 100% CÁC YẾU TỐ CỐT LÕI SAU:**
-                \n${capturedKeyElements}
-                \n**BẠN BỊ NGHIÊM CẤM thay đổi, sáng tạo, hoặc giới thiệu bất kỳ tên nhân vật hay địa điểm nào không có trong danh sách trên. Vi phạm quy tắc này sẽ làm hỏng toàn bộ câu chuyện. Hãy kiểm tra lại mỗi câu bạn viết để đảm bảo tuân thủ.**`;
+                writePrompt += `\n**YẾU TỐ CỐT LÕI (NHÂN VẬT & ĐỊA ĐIỂM) - BẮT BUỘC TUÂN THỦ NGHIÊM NGẶT:**\n${capturedKeyElements}\nTUYỆT ĐỐI không thay đổi hoặc giới thiệu tên mới không có trong danh sách này, trừ khi tiêu đề yêu cầu rõ ràng.`;
             }
 
             writePrompt += `
-            \n**Nội dung đã viết (ngữ cảnh):**
-            ${context || "Đây là phần đầu tiên."}
-            
-            \n**Yêu cầu:** Viết phần tiếp theo của câu chuyện mới, khoảng ${CHUNK_WORD_COUNT} từ. Chỉ viết nội dung, không lặp lại, không tiêu đề.`;
+            \n**Nội dung đã viết (ngữ cảnh${i === 0 ? " - trống cho phần 1" : ""}):**\n${context || "Đây là phần đầu tiên."}
+
+            \n**Yêu cầu hiện tại (Phần ${i + 1}/${numChunks}):**
+            \n- Viết phần tiếp theo, liền mạch, TRUNG THÀNH với tiêu đề và ADN viral.
+            \n- ${i === 0 ? 'SỬ DỤNG NHẤT QUÁN các tên nhân vật/địa điểm bạn vừa xác định và sẽ xuất ra ở cuối phần 1.' : 'ĐẶC BIỆT CHÚ Ý sử dụng đúng "YẾU TỐ CỐT LÕI" đã được xác định trước đó.'}
+            \n- Văn phong: "${currentStoryStyle}" (nhưng ưu tiên văn phong học từ "ADN Viral" nếu có).
+            \n- VIẾT TOÀN BỘ BẰNG NGÔN NGỮ ${outputLanguageLabel}. Không dùng ngôn ngữ khác.
+            \n- Chỉ viết nội dung phần tiếp theo, không lặp lại, không tiêu đề.
+            \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
             
             if (i > 0) await delay(1000, abortSignal);
             const chunkResult = await retryApiCall(() => generateText(writePrompt, undefined, false, apiSettings), 3, true);
@@ -833,19 +845,25 @@ ${fullStory}
             diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
         }
 
-        const editPrompt = `Bạn là một biên tập viên AI cực kỳ tỉ mỉ và chính xác. Nhiệm vụ của bạn là biên tập lại "Truyện Gốc" theo 2 ưu tiên sau, theo đúng thứ tự:
+        const editPrompt = `Bạn là một biên tập viên AI chuyên nghiệp và cực kỳ tỉ mỉ.
 
-**ƯU TIÊN #1 - TUYỆT ĐỐI (Logic & Nhất quán):**
-1.  **KIỂM TRA TÊN:** Rà soát TOÀN BỘ truyện. Đảm bảo tên nhân vật, địa điểm phải nhất quán 100% từ đầu đến cuối.
-2.  **NGUỒN CHÂN LÝ:** ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau đây làm nguồn chân lý DUY NHẤT cho các tên: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên nhân vật/địa điểm từ đầu truyện và đảm bảo chúng được sử dụng nhất quán đến cuối cùng.'}
-3.  **SỬA LỖI LOGIC:** Sửa mọi lỗi logic, tình tiết mâu thuẫn, hoặc "plot hole".
+**MỆNH LỆNH QUAN TRỌNG NHẤT (YÊU CẦU BẮT BUỘC SỐ 1): ĐIỀU CHỈNH ĐỘ DÀI.**
+-   ĐỘ DÀI CUỐI CÙNG của truyện sau khi bạn biên tập **PHẢI** nằm trong khoảng từ **${minLength} đến ${maxLength} từ**.
+-   Mục tiêu lý tưởng là khoảng **${currentTargetLengthNum} từ**.
+-   Truyện gốc hiện có khoảng **${estimatedCurrentWordCount} từ**.
+-   ${actionVerb ? `Hành động Yêu cầu: **BẠN BẮT BUỘC PHẢI ${actionVerb}** truyện này ${diffDescription}.` : "Độ dài hiện tại đã khá tốt, hãy tập trung vào việc tinh chỉnh chất lượng trong khi vẫn giữ độ dài trong khoảng cho phép."}
+
+**HƯỚNG DẪN BẮT BUỘC ĐỂ ĐIỀU CHỈNH ĐỘ DÀI:**
+-   **Nếu cần RÚT NGẮN:** BẠN BẮT BUỘC PHẢI cô đọng văn phong, tóm lược các đoạn mô tả dài dòng không cần thiết, loại bỏ từ ngữ thừa, và có thể gộp các tình tiết phụ ít quan trọng lại.
+-   **Nếu cần MỞ RỘNG:** BẠN BẮT BUỘC PHẢI thêm chi tiết mô tả về bối cảnh, cảm xúc, suy nghĩ nội tâm của nhân vật, hoặc kéo dài các đoạn hội thoại để làm rõ hơn tình huống.
+
+**YÊU CẦU QUAN TRỌNG SỐ 2 (SAU KHI ĐẢM BẢO ĐỘ DÀI): LOGIC & NHẤT QUÁN.**
+1.  **TÍNH NHẤT QUÁN (QUAN TRỌNG HÀNG ĐẦU):**
+    *   DUY TRÌ NGHIÊM NGẶT các yếu tố cốt lõi (tên nhân vật, đặc điểm, địa điểm). TUYỆT ĐỐI không thay đổi tên đã thiết lập.
+    *   ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau làm nguồn chân lý DUY NHẤT: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên từ đầu truyện và đảm bảo chúng nhất quán đến cuối cùng.'}
+2.  **LOGIC CỐT TRUYỆN:** Sửa mọi lỗi logic hoặc tình tiết mâu thuẫn.
+3.  **NÂNG CAO VĂN PHONG:** Loại bỏ trùng lặp, cải thiện luồng chảy, đa dạng hóa cấu trúc câu.
 4.  **BÁM SÁT CHỦ ĐỀ:** Việc biên tập không được làm thay đổi ý nghĩa chính của câu chuyện được gợi ý bởi "Tiêu đề" và tinh thần của "Các truyện mẫu".
-
-**ƯU TIÊN #2 - QUAN TRỌNG (Độ dài & Văn phong):**
-Sau khi đã đảm bảo Ưu tiên #1, hãy điều chỉnh độ dài của truyện để nằm trong khoảng từ ${minLength} đến ${maxLength} từ (lý tưởng là ~${currentTargetLengthNum} từ).
--   Truyện hiện có ~${estimatedCurrentWordCount} từ. ${actionVerb ? `Bạn cần ${actionVerb} ${diffDescription}.` : "Tập trung vào chất lượng."}
--   **Cách điều chỉnh độ dài:** Nếu quá dài, hãy cô đọng văn phong. Nếu quá ngắn, hãy thêm chi tiết.
--   **Nâng cao văn phong:** Loại bỏ các câu, từ ngữ trùng lặp. Cải thiện sự mạch lạc.
 
 **THÔNG TIN THAM KHẢO:**
 - **TIÊU ĐỀ TRUYỆN MỚI:** ${selectedTitle}
