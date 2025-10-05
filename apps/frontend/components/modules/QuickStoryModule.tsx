@@ -433,35 +433,29 @@ Chỉ trả về JSON.`;
             diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
         }
         
-        const editPrompt = `Bạn là một biên tập viên AI chuyên nghiệp và cực kỳ tỉ mỉ.
+        const editPrompt = `Bạn là một biên tập viên AI cực kỳ tỉ mỉ và chính xác. Nhiệm vụ của bạn là biên tập lại "Truyện Gốc" theo 2 ưu tiên sau, theo đúng thứ tự:
 
-**MỆNH LỆNH QUAN TRỌNG NHẤT (YÊU CẦU BẮT BUỘC SỐ 1): ĐIỀU CHỈNH ĐỘ DÀI.**
--   ĐỘ DÀI CUỐI CÙNG của truyện sau khi bạn biên tập **PHẢI** nằm trong khoảng từ **${minLength} đến ${maxLength} từ**.
--   Mục tiêu lý tưởng là khoảng **${currentTargetLengthNum} từ**.
--   Truyện gốc hiện có khoảng **${estimatedCurrentWordCount} từ**.
--   ${actionVerb ? `Hành động Yêu cầu: **BẠN BẮT BUỘC PHẢI ${actionVerb}** truyện này ${diffDescription}.` : "Độ dài hiện tại đã khá tốt, hãy tập trung vào việc tinh chỉnh chất lượng trong khi vẫn giữ độ dài trong khoảng cho phép."}
-
-**HƯỚNG DẪN BẮT BUỘC ĐỂ ĐIỀU CHỈNH ĐỘ DÀI:**
--   **Nếu cần RÚT NGẮN:** BẠN BẮT BUỘC PHẢI cô đọng văn phong, tóm lược các đoạn mô tả dài dòng không cần thiết, loại bỏ từ ngữ thừa, và có thể gộp các tình tiết phụ ít quan trọng lại. **TUYỆT ĐỐI KHÔNG CẮT BỎ CÁC TÌNH TIẾT QUAN TRỌNG** được nêu trong dàn ý.
--   **Nếu cần MỞ RỘNG:** BẠN BẮT BUỘC PHẢI thêm chi tiết mô tả về bối cảnh, cảm xúc, suy nghĩ nội tâm của nhân vật, hoặc kéo dài các đoạn hội thoại để làm rõ hơn tình huống. **TUYỆT ĐỐI KHÔNG THÊM CÁC TÌNH TIẾT MỚI** không có trong dàn ý.
-
-**YÊU CẦU QUAN TRỌNG SỐ 2 (SAU KHI ĐẢM BẢO ĐỘ DÀI): LOGIC & NHẤT QUÁN.**
-1.  **TÍNH NHẤT QUÁN (QUAN TRỌNG HÀNG ĐẦU):**
-    *   DUY TRÌ NGHIÊM NGẶT các yếu tố cốt lõi (tên nhân vật, đặc điểm, địa điểm). TUYỆT ĐỐI không thay đổi tên đã thiết lập.
-    *   ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau làm nguồn chân lý DUY NHẤT: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên từ đầu truyện và đảm bảo chúng nhất quán đến cuối cùng.'}
-2.  **LOGIC CỐT TRUYỆN:** Đảm bảo các sự kiện diễn ra hợp lý, tuần tự, không có "plot hole".
-3.  **NÂNG CAO VĂN PHONG:** Loại bỏ trùng lặp, cải thiện luồng chảy, đa dạng hóa cấu trúc câu.
+**ƯU TIÊN #1 - TUYỆT ĐỐI (Logic & Nhất quán):**
+1.  **KIỂM TRA TÊN:** Rà soát TOÀN BỘ truyện. Đảm bảo tên nhân vật, địa điểm phải nhất quán 100% từ đầu đến cuối.
+2.  **NGUỒN CHÂN LÝ:** ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau đây làm nguồn chân lý DUY NHẤT cho các tên: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên nhân vật/địa điểm từ đầu truyện và đảm bảo chúng được sử dụng nhất quán đến cuối cùng.'}
+3.  **SỬA LỖI LOGIC:** Sửa mọi lỗi logic, tình tiết mâu thuẫn, hoặc "plot hole".
 4.  **BÁM SÁT DÀN Ý:** Việc biên tập không được làm thay đổi các NÚT THẮT, CAO TRÀO QUAN TRỌNG, hoặc Ý NGHĨA CHÍNH của câu chuyện được mô tả trong "Dàn Ý Gốc".
 
+**ƯU TIÊN #2 - QUAN TRỌNG (Độ dài & Văn phong):**
+Sau khi đã đảm bảo Ưu tiên #1, hãy điều chỉnh độ dài của truyện để nằm trong khoảng từ ${minLength} đến ${maxLength} từ (lý tưởng là ~${currentTargetLengthNum} từ).
+-   Truyện hiện có ~${estimatedCurrentWordCount} từ. ${actionVerb ? `Bạn cần ${actionVerb} ${diffDescription}.` : "Tập trung vào chất lượng."}
+-   **Cách điều chỉnh độ dài:** Nếu quá dài, hãy cô đọng văn phong. Nếu quá ngắn, hãy thêm chi tiết. **TUYỆT ĐỐI không thêm tình tiết mới không có trong dàn ý.**
+-   **Nâng cao văn phong:** Loại bỏ các câu, từ ngữ trùng lặp. Cải thiện sự mạch lạc.
+
 **DÀN Ý GỐC (để đối chiếu):**
----
+----
 ${storyOutline}
----
+----
 
 **TRUYỆN GỐC CẦN BIÊN TẬP (Output phải bằng ${outputLanguageLabel}):**
----
+----
 ${fullStory}
----
+----
 
 **ĐẦU RA YÊU CẦU:**
 -   TOÀN BỘ câu chuyện đã được biên tập lại, đáp ứng ĐẦY ĐỦ các yêu cầu trên, bằng ngôn ngữ ${outputLanguageLabel}.
@@ -652,8 +646,22 @@ ${fullStory}
                 if (savedAdnSets.length > 0 || localStorage.getItem('quickStory_savedAdnSets_v1')) {
                     localStorage.setItem('quickStory_savedAdnSets_v1', JSON.stringify(savedAdnSets));
                 }
-            } catch (error) {
-                console.error("Failed to save ADN sets to localStorage", error);
+            } catch (error: any) {
+                if (error.name === 'QuotaExceededError') {
+                    console.warn('localStorage quota exceeded for ADN sets. Keeping only recent 5 sets...');
+
+                    try {
+                        // Keep only 5 most recent ADN sets
+                        const trimmedSets = savedAdnSets.slice(-5);
+                        localStorage.setItem('quickStory_savedAdnSets_v1', JSON.stringify(trimmedSets));
+                        console.log('Successfully saved trimmed ADN sets');
+                    } catch (fallbackError) {
+                        console.error('Failed to save even trimmed ADN sets:', fallbackError);
+                        localStorage.removeItem('quickStory_savedAdnSets_v1');
+                    }
+                } else {
+                    console.error("Failed to save ADN sets to localStorage", error);
+                }
             }
         }
     }, [savedAdnSets, activeTab]);
@@ -904,37 +912,31 @@ ${fullStory}
             diffDescription = `khoảng ${currentTargetLengthNum - estimatedCurrentWordCount} từ`;
         }
 
-        const editPrompt = `Bạn là một biên tập viên AI chuyên nghiệp và cực kỳ tỉ mỉ.
+        const editPrompt = `Bạn là một biên tập viên AI cực kỳ tỉ mỉ và chính xác. Nhiệm vụ của bạn là biên tập lại "Truyện Gốc" theo 2 ưu tiên sau, theo đúng thứ tự:
 
-**MỆNH LỆNH QUAN TRỌNG NHẤT (YÊU CẦU BẮT BUỘC SỐ 1): ĐIỀU CHỈNH ĐỘ DÀI.**
--   ĐỘ DÀI CUỐI CÙNG của truyện sau khi bạn biên tập **PHẢI** nằm trong khoảng từ **${minLength} đến ${maxLength} từ**.
--   Mục tiêu lý tưởng là khoảng **${currentTargetLengthNum} từ**.
--   Truyện gốc hiện có khoảng **${estimatedCurrentWordCount} từ**.
--   ${actionVerb ? `Hành động Yêu cầu: **BẠN BẮT BUỘC PHẢI ${actionVerb}** truyện này ${diffDescription}.` : "Độ dài hiện tại đã khá tốt, hãy tập trung vào việc tinh chỉnh chất lượng trong khi vẫn giữ độ dài trong khoảng cho phép."}
-
-**HƯỚNG DẪN BẮT BUỘC ĐỂ ĐIỀU CHỈNH ĐỘ DÀI:**
--   **Nếu cần RÚT NGẮN:** BẠN BẮT BUỘC PHẢI cô đọng văn phong, tóm lược các đoạn mô tả dài dòng không cần thiết, loại bỏ từ ngữ thừa, và có thể gộp các tình tiết phụ ít quan trọng lại.
--   **Nếu cần MỞ RỘNG:** BẠN BẮT BUỘC PHẢI thêm chi tiết mô tả về bối cảnh, cảm xúc, suy nghĩ nội tâm của nhân vật, hoặc kéo dài các đoạn hội thoại để làm rõ hơn tình huống.
-
-**YÊU CẦU QUAN TRỌNG SỐ 2 (SAU KHI ĐẢM BẢO ĐỘ DÀI): LOGIC & NHẤT QUÁN.**
-1.  **TÍNH NHẤT QUÁN (QUAN TRỌNG HÀNG ĐẦU):**
-    *   DUY TRÌ NGHIÊM NGẶT các yếu tố cốt lõi (tên nhân vật, đặc điểm, địa điểm). TUYỆT ĐỐI không thay đổi tên đã thiết lập.
-    *   ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau làm nguồn chân lý DUY NHẤT: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên từ đầu truyện và đảm bảo chúng nhất quán đến cuối cùng.'}
-2.  **LOGIC CỐT TRUYỆN:** Sửa mọi lỗi logic hoặc tình tiết mâu thuẫn.
-3.  **NÂNG CAO VĂN PHONG:** Loại bỏ trùng lặp, cải thiện luồng chảy, đa dạng hóa cấu trúc câu.
+**ƯU TIÊN #1 - TUYỆT ĐỐI (Logic & Nhất quán):**
+1.  **KIỂM TRA TÊN:** Rà soát TOÀN BỘ truyện. Đảm bảo tên nhân vật, địa điểm phải nhất quán 100% từ đầu đến cuối.
+2.  **NGUỒN CHÂN LÝ:** ${capturedKeyElements ? `Sử dụng danh sách YẾU TỐ CỐT LÕI sau đây làm nguồn chân lý DUY NHẤT cho các tên: "${capturedKeyElements}". Sửa lại BẤT KỲ tên nào trong truyện không khớp với danh sách này.` : 'Tự xác định các tên nhân vật/địa điểm từ đầu truyện và đảm bảo chúng được sử dụng nhất quán đến cuối cùng.'}
+3.  **SỬA LỖI LOGIC:** Sửa mọi lỗi logic, tình tiết mâu thuẫn, hoặc "plot hole".
 4.  **BÁM SÁT CHỦ ĐỀ:** Việc biên tập không được làm thay đổi ý nghĩa chính của câu chuyện được gợi ý bởi "Tiêu đề" và tinh thần của "Các truyện mẫu".
+
+**ƯU TIÊN #2 - QUAN TRỌNG (Độ dài & Văn phong):**
+Sau khi đã đảm bảo Ưu tiên #1, hãy điều chỉnh độ dài của truyện để nằm trong khoảng từ ${minLength} đến ${maxLength} từ (lý tưởng là ~${currentTargetLengthNum} từ).
+-   Truyện hiện có ~${estimatedCurrentWordCount} từ. ${actionVerb ? `Bạn cần ${actionVerb} ${diffDescription}.` : "Tập trung vào chất lượng."}
+-   **Cách điều chỉnh độ dài:** Nếu quá dài, hãy cô đọng văn phong. Nếu quá ngắn, hãy thêm chi tiết.
+-   **Nâng cao văn phong:** Loại bỏ các câu, từ ngữ trùng lặp. Cải thiện sự mạch lạc.
 
 **THÔNG TIN THAM KHẢO:**
 - **TIÊU ĐỀ TRUYỆN MỚI:** ${selectedTitle}
 - **CÁC TRUYỆN MẪU (ADN):** (một phần)
----
+----
 ${sourceStories.substring(0, 2000)}...
----
+----
 
 **TRUYỆN GỐC CẦN BIÊN TẬP (bằng ${outputLanguageLabel}):**
----
+----
 ${fullStory}
----
+----
 
 **ĐẦU RA YÊU CẦU:**
 -   TOÀN BỘ câu chuyện đã được biên tập lại, đáp ứng ĐẦY ĐỦ các yêu cầu trên, bằng ngôn ngữ ${outputLanguageLabel}.

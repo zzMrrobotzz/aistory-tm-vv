@@ -39,6 +39,40 @@ import {
     TRANSLATE_LANGUAGE_OPTIONS, TRANSLATE_STYLE_OPTIONS, // Added
     SCRIPT_PLATFORM_OPTIONS, SCRIPT_VIDEO_STYLE_OPTIONS, SCRIPT_TARGET_DURATION_OPTIONS, SCRIPT_STRUCTURE_OPTIONS // Added for Short Form Script
 } from './constants';
+
+// Safe localStorage utility to handle quota exceeded errors
+const safeLocalStorageSet = (key: string, value: any, maxRetries: number = 2): boolean => {
+  try {
+    const serialized = JSON.stringify(value);
+    const sizeInKB = new Blob([serialized]).size / 1024;
+
+    if (sizeInKB > 1024) { // Warn if > 1MB
+      console.warn(`Large localStorage item: ${key} is ${sizeInKB.toFixed(2)}KB`);
+    }
+
+    localStorage.setItem(key, serialized);
+    return true;
+  } catch (error: any) {
+    if (error.name === 'QuotaExceededError' && maxRetries > 0) {
+      console.warn(`localStorage quota exceeded for ${key}. Attempting cleanup...`);
+
+      // Clear old/large items first
+      const keysToClean = ['quickStoryModuleState_v1', 'writeStoryModuleState_v1', 'shortFormScriptModuleState_v1'];
+      keysToClean.forEach(cleanKey => {
+        if (cleanKey !== key && localStorage.getItem(cleanKey)) {
+          console.log(`Removing ${cleanKey} to free space`);
+          localStorage.removeItem(cleanKey);
+        }
+      });
+
+      return safeLocalStorageSet(key, value, maxRetries - 1);
+    } else {
+      console.error(`Failed to save ${key} to localStorage:`, error);
+      return false;
+    }
+  }
+};
+
 import Sidebar from './components/Sidebar';
 import MainHeader from './components/MainHeader';
 import Settings from './components/pages/Settings';
@@ -1063,7 +1097,53 @@ const MainApp: React.FC = () => {
       progressMessage: task.status === 'processing' || task.status === 'queued' ? 'Sẵn sàng' : task.progressMessage
     }));
     
-    localStorage.setItem('quickStoryModuleState_v1', JSON.stringify(stateToSave));
+    try {
+      // Calculate size and optimize if needed
+      const serializedState = JSON.stringify(stateToSave);
+      const sizeInMB = new Blob([serializedState]).size / (1024 * 1024);
+
+      // If state is too large (>5MB), trim old tasks
+      if (sizeInMB > 5) {
+        console.warn(`QuickStory state is ${sizeInMB.toFixed(2)}MB, trimming old tasks...`);
+
+        // Keep only recent 10 tasks and 5 sequel stories
+        stateToSave.tasks = stateToSave.tasks.slice(-10);
+        stateToSave.sequelGeneratedStories = stateToSave.sequelGeneratedStories.slice(-5);
+
+        // Remove large story content from old tasks, keep only metadata
+        stateToSave.tasks = stateToSave.tasks.map(task => ({
+          ...task,
+          generatedStory: task.generatedStory && task.generatedStory.length > 5000
+            ? task.generatedStory.substring(0, 5000) + '... [truncated for storage]'
+            : task.generatedStory
+        }));
+      }
+
+      safeLocalStorageSet('quickStoryModuleState_v1', stateToSave);
+    } catch (error: any) {
+      if (error.name === 'QuotaExceededError') {
+        console.error('localStorage quota exceeded. Clearing old QuickStory data...');
+
+        // Emergency cleanup: keep only essential state
+        const minimalState = {
+          targetLength: stateToSave.targetLength,
+          writingStyle: stateToSave.writingStyle,
+          outputLanguage: stateToSave.outputLanguage,
+          tasks: [], // Clear all tasks
+          sequelGeneratedStories: [], // Clear all stories
+          savedAdnSets: stateToSave.savedAdnSets.slice(-3) // Keep only 3 recent ADN sets
+        };
+
+        if (!safeLocalStorageSet('quickStoryModuleState_v1', minimalState)) {
+          console.error('Failed to save even minimal state, removing localStorage item');
+          localStorage.removeItem('quickStoryModuleState_v1');
+        } else {
+          console.log('Successfully saved minimal QuickStory state after cleanup');
+        }
+      } else {
+        console.error('Failed to save QuickStory state:', error);
+      }
+    }
   }, [quickStoryState]);
 
   // Save ShortFormScript module state to localStorage
