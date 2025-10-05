@@ -54,10 +54,11 @@ const safeExtractText = (response: GenerateContentResponse): string => {
 };
 
 export const generateText = async (
-  prompt: string, 
+  prompt: string,
   systemInstruction?: string,
   useGoogleSearch?: boolean,
-  geminiUserApiKey?: string // Added to accept user-provided key
+  geminiUserApiKey?: string, // Added to accept user-provided key
+  signal?: AbortSignal
 ): Promise<{text: string, groundingChunks?: GroundingChunk[]}> => {
   try {
     const aiInstance = getAIInstance(geminiUserApiKey); // Pass user key to instance getter
@@ -78,6 +79,11 @@ export const generateText = async (
         if (request.config.responseMimeType === "application/json") {
             delete request.config.responseMimeType;
         }
+    }
+
+    // Check if aborted before making API call
+    if (signal?.aborted) {
+        throw new Error('Request was aborted');
     }
 
     const response: GenerateContentResponse = await aiInstance.models.generateContent(request);

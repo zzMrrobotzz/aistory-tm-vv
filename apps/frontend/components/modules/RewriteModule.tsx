@@ -17,13 +17,30 @@ import { logApiCall, logTextRewritten } from '../../services/usageService';
 // Feature usage tracking instead of request counting
 import featureUsageTracker, { FEATURE_IDS } from '../../services/featureUsageTracker';
 
+// Delay function with abort support
+const delayWithAbort = async (ms: number, abortController?: AbortController): Promise<void> => {
+  if (abortController?.signal.aborted) {
+    throw new Error('Request was aborted');
+  }
+  await delay(ms);
+  if (abortController?.signal.aborted) {
+    throw new Error('Request was aborted');
+  }
+};
+
 // Retry logic with exponential backoff for API calls
 const retryApiCall = async (
   apiFunction: () => Promise<any>,
   maxRetries: number = 3,
-  isQueueMode: boolean = false
+  isQueueMode: boolean = false,
+  abortController?: AbortController
 ): Promise<any> => {
   for (let i = 0; i < maxRetries; i++) {
+    // Check if aborted before each retry
+    if (abortController?.signal.aborted) {
+      throw new Error('Request was aborted');
+    }
+
     try {
       return await apiFunction();
     } catch (error: any) {
@@ -58,7 +75,7 @@ const retryApiCall = async (
           backoffDelay = baseDelay * Math.pow(2, i);
           console.warn(`🔄 RETRY: API call failed (attempt ${i + 1}/${maxRetries}), retrying in ${backoffDelay}ms... [Queue mode: ${isQueueMode}]`);
         }
-        await delay(backoffDelay);
+        await delayWithAbort(backoffDelay, abortController);
         continue;
       }
       console.error(`❌ FINAL FAILURE: All ${maxRetries} retry attempts failed. Error:`, error);
@@ -238,7 +255,7 @@ ${rewrittenText}
 
 Chỉ trả về JSON.`;
 
-            const result = await generateText(analysisPrompt, undefined, false, apiSettings, 'rewrite');
+            const result = await generateText(analysisPrompt, undefined, false, apiSettings, 'rewrite', abortControllerRef.current);
             const jsonMatch = result?.text.match(/\{[\s\S]*\}/);
             
             if (jsonMatch) {
@@ -641,11 +658,12 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
 `;
             
             // Longer delay for queue mode to prevent rate limiting - doubled again to prevent 503
-            await delay(6000);
+            await delayWithAbort(6000, abortControllerRef.current);
             const result = await retryApiCall(
-                () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
+                () => generateText(prompt, undefined, false, apiSettings, 'rewrite', abortControllerRef.current),
                 3,
-                true // isQueueMode = true
+                true, // isQueueMode = true
+                abortControllerRef.current
             );
             let currentChunkText = result?.text || '';
 
@@ -833,11 +851,12 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
                 
-                await delay(2000); // Doubled again from 1000ms to prevent 503 errors
+                await delayWithAbort(2000, abortControllerRef.current); // Doubled again from 1000ms to prevent 503 errors
                 const result = await retryApiCall(
-                    () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
+                    () => generateText(prompt, undefined, false, apiSettings, 'rewrite', abortControllerRef.current),
                     3,
-                    false // isQueueMode = false
+                    false, // isQueueMode = false
+                    abortControllerRef.current
                 );
                 let currentChunkText = result?.text || '';
 
@@ -911,10 +930,11 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             
             // Progress already reset above, no need for additional timeout
         } catch (e) {
-            if (abortControllerRef.current?.signal.aborted) {
-                setModuleState(prev => ({ ...prev, error: `Viết lại đã bị hủy.`, loadingMessage: 'Đã hủy.', progress: 0 }));
+            const errorMessage = (e as Error).message;
+            if (abortControllerRef.current?.signal.aborted || errorMessage.includes('aborted')) {
+                setModuleState(prev => ({ ...prev, error: `Viết lại đã bị dừng.`, loadingMessage: 'Đã dừng.', progress: 0 }));
             } else {
-                setModuleState(prev => ({ ...prev, error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 }));
+                setModuleState(prev => ({ ...prev, error: `Lỗi viết lại: ${errorMessage}`, loadingMessage: 'Lỗi!', progress: 0 }));
             }
         } finally {
             abortControllerRef.current = null;
@@ -969,9 +989,10 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         
         try {
             const result = await retryApiCall(
-                () => generateText(editPrompt, undefined, false, apiSettings, 'rewrite'),
+                () => generateText(editPrompt, undefined, false, apiSettings, 'rewrite', abortControllerRef.current),
                 3,
-                false
+                false,
+                abortControllerRef.current
             );
             const editedText = result?.text || '';
             setModuleState(prev => ({ ...prev, rewrittenText: editedText, isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true }));
@@ -1013,9 +1034,10 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
             const prompt = `Translate the following text to ${translateTargetLang}${styleInstruction}. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${rewrittenText.trim()}\n"""`;
 
             const result = await retryApiCall(
-                () => generateText(prompt, undefined, false, apiSettings, 'rewrite'),
+                () => generateText(prompt, undefined, false, apiSettings, 'rewrite', abortControllerRef.current),
                 3,
-                false
+                false,
+                abortControllerRef.current
             );
             setTranslatedText(result.text.trim());
             

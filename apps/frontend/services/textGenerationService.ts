@@ -14,6 +14,7 @@ import { checkRateLimit, recordUsage, isModuleRestricted } from './rateLimitServ
  * @param useGoogleSearch Whether to enable Google Search grounding (Gemini only).
  * @param apiSettings The user's current API settings, determining the provider and key.
  * @param moduleId Optional module ID for rate limiting (write-story, batch-story-writing, rewrite, batch-rewrite).
+ * @param abortController Optional AbortController to cancel the request.
  * @returns A promise that resolves to an object with the generated text and optional grounding chunks.
  */
 export const generateText = async (
@@ -21,7 +22,8 @@ export const generateText = async (
   systemInstruction?: string,
   useGoogleSearch?: boolean,
   apiSettings?: ApiSettings,
-  moduleId?: string
+  moduleId?: string,
+  abortController?: AbortController
 ): Promise<{ text: string; groundingChunks?: GroundingChunk[] }> => {
   // Check rate limiting for restricted modules
   if (moduleId && isModuleRestricted(moduleId)) {
@@ -57,6 +59,11 @@ export const generateText = async (
     }
   }
 
+  // Check if aborted before making any API calls
+  if (abortController?.signal.aborted) {
+    throw new Error('Request was aborted');
+  }
+
   let result: { text: string; groundingChunks?: GroundingChunk[] };
 
   // Use DeepSeek if explicitly chosen and has key
@@ -66,7 +73,7 @@ export const generateText = async (
     }
     // Update last used timestamp
     ApiKeyStorage.updateLastUsed('deepseek');
-    const text = await deepseekService.generateText(prompt, systemInstruction, effectiveApiSettings.apiKey);
+    const text = await deepseekService.generateText(prompt, systemInstruction, effectiveApiSettings.apiKey, abortController?.signal);
     result = { text, groundingChunks: undefined };
     
     // Track daily usage for DeepSeek API key
@@ -79,7 +86,7 @@ export const generateText = async (
     if (effectiveApiSettings?.apiKey) {
       ApiKeyStorage.updateLastUsed('gemini');
     }
-    result = await geminiService.generateText(prompt, systemInstruction, useGoogleSearch, effectiveApiSettings?.apiKey);
+    result = await geminiService.generateText(prompt, systemInstruction, useGoogleSearch, effectiveApiSettings?.apiKey, abortController?.signal);
     
     // Track daily usage for Gemini API key
     const activeGeminiKey = ApiKeyStorage.getActiveKey('gemini');

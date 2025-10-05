@@ -13,6 +13,48 @@ import UpgradePrompt from '../UpgradePrompt';
 import UsageQuotaDisplay from '../UsageQuotaDisplay';
 import { Trash2, PlusCircle, Square, Play, Trash, Clipboard, ClipboardCheck, ChevronsRight, BookCopy, Zap, Save, Download, Loader2 } from 'lucide-react';
 
+// Helper function to create user-friendly error messages
+const createUserFriendlyErrorMessage = (error: any): string => {
+  const errorMessage = error?.message || error?.toString() || 'Lỗi không xác định';
+
+  // Check for 429 quota exceeded error
+  if (errorMessage.includes('429') ||
+      errorMessage.includes('quota') ||
+      errorMessage.includes('Too Many Requests') ||
+      errorMessage.includes('RESOURCE_EXHAUSTED')) {
+
+    // Parse retry delay từ Google API response
+    const retryMatch = errorMessage.match(/retryDelay["\s]*:\s*["\s]*(\d+)s/);
+    const retryDelay = retryMatch ? parseInt(retryMatch[1]) : 60;
+
+    return `🚫 Đã vượt quá giới hạn API Gemini (250k tokens/phút).
+
+💡 Giải pháp:
+• Đợi ${retryDelay} giây và thử lại
+• Chuyển sang DeepSeek API (Cài đặt > Nhà cung cấp API)
+• Giảm số lượng truyện trong hàng đợi
+• Sử dụng văn bản ngắn hơn
+
+ℹ️ Hệ thống sẽ tự động thử lại sau ${retryDelay} giây.`;
+  }
+
+  // Check for other known errors
+  if (errorMessage.includes('503') || errorMessage.includes('Service Unavailable')) {
+    return `🔧 Dịch vụ API tạm thời không khả dụng.
+
+💡 Hệ thống sẽ tự động thử lại. Vui lòng đợi...`;
+  }
+
+  if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+    return `⚠️ Lỗi máy chủ tạm thời.
+
+💡 Hệ thống sẽ tự động thử lại. Nếu vẫn lỗi, vui lòng thử lại sau vài phút.`;
+  }
+
+  // Return original error for unknown cases
+  return `❌ Lỗi: ${errorMessage}`;
+};
+
 // Advanced retry logic with exponential backoff for API calls (from RewriteModule)
 const retryApiCall = async (
   apiFunction: () => Promise<any>,
@@ -40,11 +82,28 @@ const retryApiCall = async (
                          error?.message?.includes('Service Unavailable') ||
                          error?.status === 503 ||
                          error?.code === 503;
-      
-      if ((isServerError || is503Error) && i < maxRetries - 1) {
-        // Special handling for 503 errors - longer delays (1min, 2min, 4min)
+
+      const is429Error = error?.message?.includes('429') ||
+                         error?.message?.includes('quota') ||
+                         error?.message?.includes('Too Many Requests') ||
+                         error?.message?.includes('RESOURCE_EXHAUSTED') ||
+                         error?.status === 429 ||
+                         error?.code === 429;
+
+      if ((isServerError || is503Error || is429Error) && i < maxRetries - 1) {
+        // Special handling for different error types
         let backoffDelay;
-        if (is503Error) {
+        if (is429Error) {
+          // Parse retry delay từ Google API response
+          const retryMatch = error?.message?.match(/retryDelay["\s]*:\s*["\s]*(\d+)s/);
+          const suggestedDelay = retryMatch ? parseInt(retryMatch[1]) * 1000 : 60000;
+
+          // Use suggested delay or exponential backoff, whichever is longer
+          const exponentialDelay = 60000 * Math.pow(2, i); // 1min, 2min, 4min
+          backoffDelay = Math.max(suggestedDelay, exponentialDelay);
+
+          console.warn(`⏳ QuickStory QUOTA EXCEEDED: Vượt quá giới hạn API (attempt ${i + 1}/${maxRetries}), đợi ${Math.round(backoffDelay/1000)}s... [Queue mode: ${isQueueMode}]`);
+        } else if (is503Error) {
           const baseDelay503 = 60000; // 1 minute base delay for 503
           backoffDelay = baseDelay503 * Math.pow(2, i);
           console.warn(`🚨 QuickStory 503 SERVICE UNAVAILABLE: Extended retry (attempt ${i + 1}/${maxRetries}), waiting ${Math.round(backoffDelay/1000)}s... [Queue mode: ${isQueueMode}]`);
@@ -483,7 +542,7 @@ ${fullStory}
                        updateTask(taskToProcess.id, { status: 'canceled', error: 'Quá trình đã bị người dùng dừng lại.', progressMessage: 'Đã dừng.' });
                     }
                 } else {
-                    updateTask(taskToProcess.id, { status: 'error', error: (e as Error).message, progressMessage: 'Lỗi!' });
+                    updateTask(taskToProcess.id, { status: 'error', error: createUserFriendlyErrorMessage(e), progressMessage: 'Lỗi!' });
                 }
             } finally {
                 queueAbortControllerRef.current = null;
@@ -700,7 +759,7 @@ ${fullStory}
             }
         } catch (e) {
             updateState({
-                sequelError: `Lỗi khi gợi ý tiêu đề: ${(e as Error).message}`,
+                sequelError: `Lỗi khi gợi ý tiêu đề: ${createUserFriendlyErrorMessage(e)}`,
             });
         } finally {
              updateState({ sequelIsGeneratingTitles: false });
@@ -966,7 +1025,7 @@ ${fullStory}
                  if ((e as Error).name === 'AbortError') {
                     updateSequelTask({ status: 'canceled', error: 'Đã dừng.' });
                 } else {
-                    updateSequelTask({ status: 'error', error: (e as Error).message });
+                    updateSequelTask({ status: 'error', error: createUserFriendlyErrorMessage(e) });
                 }
             }
         };
