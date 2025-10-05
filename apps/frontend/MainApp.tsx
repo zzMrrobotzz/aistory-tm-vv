@@ -40,30 +40,129 @@ import {
     SCRIPT_PLATFORM_OPTIONS, SCRIPT_VIDEO_STYLE_OPTIONS, SCRIPT_TARGET_DURATION_OPTIONS, SCRIPT_STRUCTURE_OPTIONS // Added for Short Form Script
 } from './constants';
 
-// Safe localStorage utility to handle quota exceeded errors
-const safeLocalStorageSet = (key: string, value: any, maxRetries: number = 2): boolean => {
+// Advanced localStorage compression utility for QuickStory data
+const compressQuickStoryData = (data: any): any => {
+  if (!data || typeof data !== 'object') return data;
+
   try {
-    const serialized = JSON.stringify(value);
+    const compressed = { ...data };
+
+    // 1. Limit tasks to max 8 most recent
+    if (compressed.tasks && Array.isArray(compressed.tasks)) {
+      compressed.tasks = compressed.tasks
+        .slice(-8) // Keep only last 8
+        .map((task: any) => ({
+          ...task,
+          // Truncate long content
+          prompt: task.prompt ? task.prompt.substring(0, 200) : '',
+          result: task.result ? task.result.substring(0, 800) : task.result
+        }));
+    }
+
+    // 2. Limit sequel stories to max 3
+    if (compressed.sequelGeneratedStories && Array.isArray(compressed.sequelGeneratedStories)) {
+      compressed.sequelGeneratedStories = compressed.sequelGeneratedStories
+        .slice(-3)
+        .map((story: any) => ({
+          ...story,
+          content: story.content ? story.content.substring(0, 600) : story.content
+        }));
+    }
+
+    // 3. Clear large temporary data
+    compressed.referenceViralStoryForStyle = compressed.referenceViralStoryForStyle ?
+      compressed.referenceViralStoryForStyle.substring(0, 300) : '';
+    compressed.sequelInputStories = compressed.sequelInputStories ?
+      compressed.sequelInputStories.substring(0, 300) : '';
+
+    // 4. Remove temporary states
+    compressed.sequelError = null;
+    compressed.sequelProgressMessage = '';
+    compressed.isProcessingQueue = false;
+    compressed.sequelIsGeneratingTitles = false;
+    compressed.sequelIsGeneratingStories = false;
+
+    // 5. Limit ADN sets to 3 most recent
+    if (compressed.savedAdnSets && Array.isArray(compressed.savedAdnSets)) {
+      compressed.savedAdnSets = compressed.savedAdnSets.slice(-3);
+    }
+
+    return compressed;
+  } catch (error) {
+    console.error('QuickStory compression failed:', error);
+    return data;
+  }
+};
+
+// Safe localStorage utility with intelligent compression and cleanup
+const safeLocalStorageSet = (key: string, value: any, maxRetries: number = 3): boolean => {
+  try {
+    // Special handling for QuickStory module state
+    let processedValue = value;
+    if (key === 'quickStoryModuleState_v1') {
+      processedValue = compressQuickStoryData(value);
+    }
+
+    const serialized = JSON.stringify(processedValue);
     const sizeInKB = new Blob([serialized]).size / 1024;
 
-    if (sizeInKB > 1024) { // Warn if > 1MB
+    // Log size for monitoring
+    if (sizeInKB > 300) { // Warn if > 300KB
       console.warn(`Large localStorage item: ${key} is ${sizeInKB.toFixed(2)}KB`);
     }
 
-    localStorage.setItem(key, serialized);
+    // Apply aggressive compression if still too large
+    if (sizeInKB > 1000 && key === 'quickStoryModuleState_v1') {
+      console.warn(`Applying aggressive compression to ${key}`);
+      const aggressiveCompressed = {
+        ...processedValue,
+        tasks: processedValue.tasks ? processedValue.tasks.slice(-3).map((task: any) => ({
+          id: task.id,
+          status: task.status,
+          result: task.result ? task.result.substring(0, 200) : task.result
+        })) : [],
+        sequelGeneratedStories: [],
+        referenceViralStoryForStyle: '',
+        sequelInputStories: '',
+        savedAdnSets: processedValue.savedAdnSets ? processedValue.savedAdnSets.slice(-1) : []
+      };
+      processedValue = aggressiveCompressed;
+    }
+
+    localStorage.setItem(key, JSON.stringify(processedValue));
     return true;
   } catch (error: any) {
     if (error.name === 'QuotaExceededError' && maxRetries > 0) {
-      console.warn(`localStorage quota exceeded for ${key}. Attempting cleanup...`);
+      console.warn(`localStorage quota exceeded for ${key}. Cleanup attempt ${4 - maxRetries}...`);
 
-      // Clear old/large items first
-      const keysToClean = ['quickStoryModuleState_v1', 'writeStoryModuleState_v1', 'shortFormScriptModuleState_v1'];
-      keysToClean.forEach(cleanKey => {
-        if (cleanKey !== key && localStorage.getItem(cleanKey)) {
-          console.log(`Removing ${cleanKey} to free space`);
-          localStorage.removeItem(cleanKey);
-        }
-      });
+      // Progressive cleanup strategies
+      if (maxRetries === 3) {
+        // First attempt: clear other module states
+        const moduleKeys = ['writeStoryModuleState_v1', 'creativeLabModuleState_v1',
+                           'shortFormScriptModuleState_v1', 'translateModuleState_v1',
+                           'rewriteModuleState_v1'];
+        moduleKeys.forEach(k => {
+          if (k !== key && localStorage.getItem(k)) {
+            console.log(`Cleanup: removing ${k}`);
+            localStorage.removeItem(k);
+          }
+        });
+      } else if (maxRetries === 2) {
+        // Second attempt: clear cache and temp data
+        Object.keys(localStorage).forEach(k => {
+          if ((k.includes('cache') || k.includes('temp')) && k !== key) {
+            localStorage.removeItem(k);
+          }
+        });
+      } else {
+        // Final attempt: emergency cleanup
+        const essentials = ['userToken', 'userProfile', 'apiSettings'];
+        Object.keys(localStorage).forEach(k => {
+          if (!essentials.includes(k) && k !== key) {
+            localStorage.removeItem(k);
+          }
+        });
+      }
 
       return safeLocalStorageSet(key, value, maxRetries - 1);
     } else {
@@ -1098,50 +1197,34 @@ const MainApp: React.FC = () => {
     }));
     
     try {
-      // Calculate size and optimize if needed
-      const serializedState = JSON.stringify(stateToSave);
-      const sizeInMB = new Blob([serializedState]).size / (1024 * 1024);
+      // Use the enhanced safeLocalStorageSet which automatically compresses
+      if (!safeLocalStorageSet('quickStoryModuleState_v1', stateToSave)) {
+        console.warn('Failed to save QuickStory state after compression, applying emergency cleanup');
 
-      // If state is too large (>5MB), trim old tasks
-      if (sizeInMB > 5) {
-        console.warn(`QuickStory state is ${sizeInMB.toFixed(2)}MB, trimming old tasks...`);
-
-        // Keep only recent 10 tasks and 5 sequel stories
-        stateToSave.tasks = stateToSave.tasks.slice(-10);
-        stateToSave.sequelGeneratedStories = stateToSave.sequelGeneratedStories.slice(-5);
-
-        // Remove large story content from old tasks, keep only metadata
-        stateToSave.tasks = stateToSave.tasks.map(task => ({
-          ...task,
-          generatedStory: task.generatedStory && task.generatedStory.length > 5000
-            ? task.generatedStory.substring(0, 5000) + '... [truncated for storage]'
-            : task.generatedStory
-        }));
-      }
-
-      safeLocalStorageSet('quickStoryModuleState_v1', stateToSave);
-    } catch (error: any) {
-      if (error.name === 'QuotaExceededError') {
-        console.error('localStorage quota exceeded. Clearing old QuickStory data...');
-
-        // Emergency cleanup: keep only essential state
-        const minimalState = {
+        // Emergency fallback: save only essential settings
+        const essentialState = {
+          activeTab: stateToSave.activeTab,
           targetLength: stateToSave.targetLength,
           writingStyle: stateToSave.writingStyle,
+          customWritingStyle: stateToSave.customWritingStyle,
           outputLanguage: stateToSave.outputLanguage,
-          tasks: [], // Clear all tasks
-          sequelGeneratedStories: [], // Clear all stories
-          savedAdnSets: stateToSave.savedAdnSets.slice(-3) // Keep only 3 recent ADN sets
+          title: stateToSave.title,
+          adnSetName: stateToSave.adnSetName,
+          savedAdnSets: stateToSave.savedAdnSets ? stateToSave.savedAdnSets.slice(-2) : [],
+          tasks: [], // Clear all tasks in emergency
+          sequelGeneratedStories: [] // Clear all stories in emergency
         };
 
-        if (!safeLocalStorageSet('quickStoryModuleState_v1', minimalState)) {
-          console.error('Failed to save even minimal state, removing localStorage item');
-          localStorage.removeItem('quickStoryModuleState_v1');
-        } else {
-          console.log('Successfully saved minimal QuickStory state after cleanup');
-        }
-      } else {
-        console.error('Failed to save QuickStory state:', error);
+        safeLocalStorageSet('quickStoryModuleState_v1', essentialState);
+      }
+    } catch (error: any) {
+      console.error('Critical error saving QuickStory state:', error);
+      // Last resort: clear the localStorage item completely
+      try {
+        localStorage.removeItem('quickStoryModuleState_v1');
+        console.log('Cleared QuickStory localStorage due to critical error');
+      } catch (clearError) {
+        console.error('Failed to clear localStorage:', clearError);
       }
     }
   }, [quickStoryState]);
